@@ -6,6 +6,7 @@ SQLAlchemy. Los routers solo deben recibir solicitudes y delegar reglas.
 
 from sqlalchemy.orm import Session
 
+from app.core.security import hash_password
 from app.models.identity import Project, Role, User
 from app.schemas.identity import ProjectCreate, ProjectRead, RoleCreate, RoleRead, UserCreate, UserRead
 
@@ -58,6 +59,7 @@ class IdentityService:
             full_name=payload.full_name,
             document_id=payload.document_id,
             email=str(payload.email),
+            password_hash=hash_password("ChangeMe123"),
             phone=payload.phone,
             status=payload.status.value,
             allowed_channels=_channels_to_text(payload.allowed_channels),
@@ -69,6 +71,9 @@ class IdentityService:
 
     def list_users(self, db: Session) -> list[UserRead]:
         return [_user_to_read(user) for user in db.query(User).order_by(User.created_at.desc()).all()]
+
+    def get_user_by_email(self, db: Session, email: str) -> User | None:
+        return db.query(User).filter(User.email == email).first()
 
     def create_project(self, db: Session, payload: ProjectCreate) -> ProjectRead:
         project = Project(

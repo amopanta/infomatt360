@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
 from app.api.v1.assignments import router as assignments_router
+from app.api.v1.audit import router as audit_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.files import router as files_router
 from app.api.v1.forms import router as forms_router
@@ -29,3 +30,4 @@ api_v1_router.include_router(files_router, prefix="/files", tags=["files"])
 api_v1_router.include_router(storage_router, prefix="/storage", tags=["storage"])
 api_v1_router.include_router(messages_router, prefix="/messages", tags=["messages"])
 api_v1_router.include_router(review_router, prefix="/review", tags=["review"])
+api_v1_router.include_router(audit_router, prefix="/audit", tags=["audit"])

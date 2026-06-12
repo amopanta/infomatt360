@@ -9,6 +9,7 @@ from fastapi import FastAPI
 
 from app.api.v1.router import api_v1_router
 from app.core.config import settings
+from app.db.init_db import init_db
 
 
 def create_app() -> FastAPI:
@@ -22,6 +23,15 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         description="Core API para InfoMatt360",
     )
+
+    @app.on_event("startup")
+    def on_startup() -> None:
+        """Inicializa tablas en desarrollo.
+
+        En produccion esta responsabilidad sera de Alembic para controlar
+        versiones de esquema y migraciones.
+        """
+        init_db()
 
     # Ruta simple para balanceadores, monitoreo y pruebas iniciales.
     @app.get("/health", tags=["system"])

@@ -7,6 +7,7 @@ from app.api.v1.auth import router as auth_router
 from app.api.v1.etl import router as etl_router
 from app.api.v1.files import router as files_router
 from app.api.v1.forms import router as forms_router
+from app.api.v1.gis import router as gis_router
 from app.api.v1.health import router as health_router
 from app.api.v1.identity import router as identity_router
 from app.api.v1.integrations import router as integrations_router
@@ -43,3 +44,4 @@ api_v1_router.include_router(mirror_router, prefix="/mirror", tags=["mirror"])
 api_v1_router.include_router(scheduler_router, prefix="/scheduler", tags=["scheduler"])
 api_v1_router.include_router(reports_router, prefix="/reports", tags=["reports"])
 api_v1_router.include_router(ai_router, prefix="/ai", tags=["ai"])
+api_v1_router.include_router(gis_router, prefix="/gis", tags=["gis"])

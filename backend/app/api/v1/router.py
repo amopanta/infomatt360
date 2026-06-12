@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.v1.ai import router as ai_router
 from app.api.v1.assignments import router as assignments_router
 from app.api.v1.audit import router as audit_router
 from app.api.v1.auth import router as auth_router
@@ -41,3 +42,4 @@ api_v1_router.include_router(etl_router, prefix="/etl", tags=["etl"])
 api_v1_router.include_router(mirror_router, prefix="/mirror", tags=["mirror"])
 api_v1_router.include_router(scheduler_router, prefix="/scheduler", tags=["scheduler"])
 api_v1_router.include_router(reports_router, prefix="/reports", tags=["reports"])
+api_v1_router.include_router(ai_router, prefix="/ai", tags=["ai"])

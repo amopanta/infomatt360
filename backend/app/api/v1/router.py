@@ -10,6 +10,7 @@ from app.api.v1.health import router as health_router
 from app.api.v1.identity import router as identity_router
 from app.api.v1.integrations import router as integrations_router
 from app.api.v1.messages import router as messages_router
+from app.api.v1.mirror import router as mirror_router
 from app.api.v1.participants import router as participants_router
 from app.api.v1.project_context import router as project_context_router
 from app.api.v1.records import router as records_router
@@ -35,3 +36,4 @@ api_v1_router.include_router(review_router, prefix="/review", tags=["review"])
 api_v1_router.include_router(audit_router, prefix="/audit", tags=["audit"])
 api_v1_router.include_router(integrations_router, prefix="/integrations", tags=["integrations"])
 api_v1_router.include_router(etl_router, prefix="/etl", tags=["etl"])
+api_v1_router.include_router(mirror_router, prefix="/mirror", tags=["mirror"])

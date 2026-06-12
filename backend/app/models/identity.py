@@ -1,7 +1,7 @@
 """Modelos ORM iniciales de identidad.
 
 Estos modelos representan usuarios, proyectos y roles persistidos. Son la
-base para migrar del servicio temporal en memoria a almacenamiento real.
+base para autenticacion, permisos y administracion multi proyecto.
 """
 
 from datetime import datetime
@@ -25,6 +25,7 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(180), nullable=False)
     document_id: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
     email: Mapped[str] = mapped_column(String(180), unique=True, nullable=False, index=True)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False, default="CHANGE_ON_FIRST_LOGIN")
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="active", nullable=False)
     allowed_channels: Mapped[str] = mapped_column(String(120), default="web,android,desktop", nullable=False)

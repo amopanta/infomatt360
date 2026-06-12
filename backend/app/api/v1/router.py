@@ -10,6 +10,7 @@ from app.api.v1.participants import router as participants_router
 from app.api.v1.project_context import router as project_context_router
 from app.api.v1.records import router as records_router
 from app.api.v1.security import router as security_router
+from app.api.v1.storage import router as storage_router
 
 api_v1_router = APIRouter()
 
@@ -23,3 +24,4 @@ api_v1_router.include_router(forms_router, prefix="/forms", tags=["forms"])
 api_v1_router.include_router(participants_router, prefix="/participants", tags=["participants"])
 api_v1_router.include_router(records_router, prefix="/records", tags=["records"])
 api_v1_router.include_router(files_router, prefix="/files", tags=["files"])
+api_v1_router.include_router(storage_router, prefix="/storage", tags=["storage"])

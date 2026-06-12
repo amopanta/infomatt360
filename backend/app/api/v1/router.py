@@ -4,6 +4,7 @@ from app.api.v1.ai import router as ai_router
 from app.api.v1.assignments import router as assignments_router
 from app.api.v1.audit import router as audit_router
 from app.api.v1.auth import router as auth_router
+from app.api.v1.builder import router as builder_router
 from app.api.v1.etl import router as etl_router
 from app.api.v1.files import router as files_router
 from app.api.v1.forms import router as forms_router
@@ -45,3 +46,4 @@ api_v1_router.include_router(scheduler_router, prefix="/scheduler", tags=["sched
 api_v1_router.include_router(reports_router, prefix="/reports", tags=["reports"])
 api_v1_router.include_router(ai_router, prefix="/ai", tags=["ai"])
 api_v1_router.include_router(gis_router, prefix="/gis", tags=["gis"])
+api_v1_router.include_router(builder_router, prefix="/builder", tags=["builder"])

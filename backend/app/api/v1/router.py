@@ -6,6 +6,7 @@ from app.api.v1.files import router as files_router
 from app.api.v1.forms import router as forms_router
 from app.api.v1.health import router as health_router
 from app.api.v1.identity import router as identity_router
+from app.api.v1.messages import router as messages_router
 from app.api.v1.participants import router as participants_router
 from app.api.v1.project_context import router as project_context_router
 from app.api.v1.records import router as records_router
@@ -25,3 +26,4 @@ api_v1_router.include_router(participants_router, prefix="/participants", tags=[
 api_v1_router.include_router(records_router, prefix="/records", tags=["records"])
 api_v1_router.include_router(files_router, prefix="/files", tags=["files"])
 api_v1_router.include_router(storage_router, prefix="/storage", tags=["storage"])
+api_v1_router.include_router(messages_router, prefix="/messages", tags=["messages"])

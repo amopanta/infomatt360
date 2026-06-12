@@ -15,6 +15,7 @@ from app.api.v1.participants import router as participants_router
 from app.api.v1.project_context import router as project_context_router
 from app.api.v1.records import router as records_router
 from app.api.v1.review import router as review_router
+from app.api.v1.scheduler import router as scheduler_router
 from app.api.v1.security import router as security_router
 from app.api.v1.storage import router as storage_router
 
@@ -37,3 +38,4 @@ api_v1_router.include_router(audit_router, prefix="/audit", tags=["audit"])
 api_v1_router.include_router(integrations_router, prefix="/integrations", tags=["integrations"])
 api_v1_router.include_router(etl_router, prefix="/etl", tags=["etl"])
 api_v1_router.include_router(mirror_router, prefix="/mirror", tags=["mirror"])
+api_v1_router.include_router(scheduler_router, prefix="/scheduler", tags=["scheduler"])

@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     # usara PostgreSQL y el valor vendra desde variables de entorno.
     database_url: str = "sqlite:///./infomatt360_dev.db"
 
+    # Clave de firma JWT. En produccion debe cambiarse por un secreto fuerte
+    # entregado por variable de entorno o gestor de secretos.
+    secret_key: str = "CHANGE_ME_IN_PRODUCTION"
+    access_token_expire_minutes: int = 60
+    jwt_algorithm: str = "HS256"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
 

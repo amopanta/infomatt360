@@ -2,6 +2,8 @@ from pydantic import BaseModel
 
 
 class BuilderTemplateCreate(BaseModel):
+    """Entrada para crear una plantilla visual dentro de un proyecto."""
+
     project_id: str
     name: str
     description: str | None = None
@@ -13,7 +15,14 @@ class BuilderTemplateRead(BuilderTemplateCreate):
 
 
 class BuilderComponentCreate(BaseModel):
+    """Entrada para crear un campo del constructor.
+
+    column_id permite ubicar el componente dentro del layout visual. Es
+    opcional para permitir componentes en borrador antes de ubicarlos.
+    """
+
     template_id: str
+    column_id: str | None = None
     component_type: str
     name: str
     label: str
@@ -27,6 +36,8 @@ class BuilderComponentRead(BuilderComponentCreate):
 
 
 class BuilderVersionCreate(BaseModel):
+    """Entrada para guardar una version JSON del formulario."""
+
     template_id: str
     version_number: int = 1
     schema_json: str

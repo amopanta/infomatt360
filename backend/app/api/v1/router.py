@@ -20,6 +20,7 @@ from app.api.v1.project_context import router as project_context_router
 from app.api.v1.records import router as records_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.review import router as review_router
+from app.api.v1.runtime import router as runtime_router
 from app.api.v1.scheduler import router as scheduler_router
 from app.api.v1.security import router as security_router
 from app.api.v1.storage import router as storage_router
@@ -49,3 +50,4 @@ api_v1_router.include_router(ai_router, prefix="/ai", tags=["ai"])
 api_v1_router.include_router(gis_router, prefix="/gis", tags=["gis"])
 api_v1_router.include_router(builder_router, prefix="/builder", tags=["builder"])
 api_v1_router.include_router(builder_layout_router, prefix="/builder", tags=["builder-layout"])
+api_v1_router.include_router(runtime_router, prefix="/runtime", tags=["runtime"])

@@ -1,0 +1,69 @@
+:root {
+  font-family: Inter, system-ui, Arial, sans-serif;
+  color: #17202a;
+  background: #f5f7fa;
+}
+
+body {
+  margin: 0;
+}
+
+.runtime-shell {
+  max-width: 1040px;
+  margin: 32px auto;
+  padding: 24px;
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.runtime-page {
+  margin-top: 24px;
+}
+
+.runtime-section {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #e3e8ef;
+  border-radius: 12px;
+}
+
+.runtime-row {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.runtime-column {
+  grid-column: span 12;
+}
+
+.runtime-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+  font-weight: 600;
+}
+
+.runtime-field input,
+.runtime-field textarea {
+  border: 1px solid #cfd8e3;
+  border-radius: 8px;
+  padding: 10px;
+  font: inherit;
+}
+
+.runtime-actions {
+  max-width: 1040px;
+  margin: 0 auto 32px;
+}
+
+.runtime-actions button {
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-weight: 700;
+  cursor: pointer;
+}

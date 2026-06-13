@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AppShell } from '../../components/AppShell';
 import { fetchRuntimeTemplate, saveRuntimeRecord } from './api';
 import { RuntimeRenderer } from './RuntimeRenderer';
 import type { RuntimeFormValues, RuntimeTemplate } from './types';
@@ -46,16 +47,20 @@ export function RuntimeApp() {
   }
 
   if (!template) {
-    return <main className="runtime-shell"><p>{status}</p></main>;
+    return (
+      <AppShell title="Runtime">
+        <main className="runtime-shell"><p>{status}</p></main>
+      </AppShell>
+    );
   }
 
   return (
-    <>
+    <AppShell title="Vista de Formulario">
       <RuntimeRenderer template={template} values={values} onValueChange={updateValue} />
       <div className="runtime-actions">
         <button onClick={save}>Guardar respuesta</button>
         {status ? <p>{status}</p> : null}
       </div>
-    </>
+    </AppShell>
   );
 }

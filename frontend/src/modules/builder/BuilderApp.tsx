@@ -6,6 +6,7 @@ import { createDefaultCharacterizationTemplate } from './createDefaultTemplate';
 
 export function BuilderApp() {
   const [message, setMessage] = useState('');
+  const [runtimeUrl, setRuntimeUrl] = useState('');
   const projectId = localStorage.getItem('infomatt360_project_id') ?? '';
 
   async function createMvpTemplate() {
@@ -14,7 +15,9 @@ export function BuilderApp() {
       return;
     }
     const template = await createDefaultCharacterizationTemplate(projectId);
-    setMessage(`Plantilla creada: ${template.id}. Abra /runtime/${template.id}`);
+    const url = `/runtime/${template.id}`;
+    setRuntimeUrl(url);
+    setMessage(`Plantilla creada: ${template.id}`);
   }
 
   return (
@@ -27,6 +30,7 @@ export function BuilderApp() {
             <p>Crea una caracterizacion base conectada al backend Builder.</p>
             <button onClick={createMvpTemplate}>Crear plantilla de caracterizacion</button>
             {message ? <span>{message}</span> : null}
+            {runtimeUrl ? <a href={runtimeUrl}>Abrir Runtime</a> : null}
           </div>
           <BuilderCanvas />
         </div>

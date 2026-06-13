@@ -38,6 +38,9 @@ body { margin: 0; }
 .runtime-stepper button, .runtime-section-nav button { flex: 0 0 auto; border: 1px solid #dce7f2; border-radius: 999px; padding: 10px 14px; color: #0a2540; background: #ffffff; font-weight: 700; cursor: pointer; }
 .runtime-stepper button.active, .runtime-section-nav button.active { color: #ffffff; border-color: transparent; background: linear-gradient(135deg, #0066cc, #00c2ff); }
 .runtime-page-actions { margin-top: 24px; display: flex; justify-content: space-between; gap: 16px; }
+.runtime-repeat { margin-top: 18px; border: 1px dashed #00c2ff; border-radius: 16px; padding: 16px; background: #f8fcff; }
+.runtime-repeat header { color: #0066cc; font-weight: 900; margin-bottom: 12px; }
+.runtime-repeat-item { padding: 12px; margin-bottom: 10px; border-radius: 12px; background: #ffffff; border: 1px solid #e6f1fa; }
 
 .builder-layout { padding: 32px; display: grid; grid-template-columns: 280px 1fr; gap: 24px; }
 .builder-palette, .builder-canvas, .builder-connect-panel { background: #ffffff; border: 1px solid #e6f1fa; border-radius: 18px; box-shadow: 0 14px 40px rgba(10, 37, 64, 0.08); }

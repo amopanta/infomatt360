@@ -30,8 +30,8 @@ body { margin: 0; }
 .runtime-field { width: 100%; box-sizing: border-box; border: 1px solid #cfd8e3; border-radius: 10px; padding: 12px; font: inherit; color: #0a2540; background: #ffffff; }
 .runtime-field:focus { outline: 2px solid rgba(0, 194, 255, 0.35); border-color: #00c2ff; }
 .runtime-actions { max-width: 1040px; margin: 0 auto 32px; display: flex; align-items: center; gap: 18px; }
-.runtime-actions button, .runtime-page-actions button { border: 0; border-radius: 12px; padding: 13px 20px; font-weight: 800; color: #ffffff; background: linear-gradient(135deg, #0066cc, #00c2ff); cursor: pointer; box-shadow: 0 10px 22px rgba(0, 102, 204, 0.22); }
-.runtime-actions button:disabled, .runtime-page-actions button:disabled { opacity: 0.45; cursor: not-allowed; }
+.runtime-actions button, .runtime-page-actions button, .runtime-repeat-controls button { border: 0; border-radius: 12px; padding: 13px 20px; font-weight: 800; color: #ffffff; background: linear-gradient(135deg, #0066cc, #00c2ff); cursor: pointer; box-shadow: 0 10px 22px rgba(0, 102, 204, 0.22); }
+.runtime-actions button:disabled, .runtime-page-actions button:disabled, .runtime-repeat-controls button:disabled { opacity: 0.45; cursor: not-allowed; }
 .runtime-actions p { color: #0066cc; font-weight: 700; }
 .runtime-stepper, .runtime-section-nav { display: flex; gap: 10px; overflow-x: auto; padding: 10px 0 18px; border-bottom: 1px solid #e6f1fa; }
 .runtime-section-nav { margin-top: 10px; border-bottom: 0; }
@@ -39,7 +39,10 @@ body { margin: 0; }
 .runtime-stepper button.active, .runtime-section-nav button.active { color: #ffffff; border-color: transparent; background: linear-gradient(135deg, #0066cc, #00c2ff); }
 .runtime-page-actions { margin-top: 24px; display: flex; justify-content: space-between; gap: 16px; }
 .runtime-repeat { margin-top: 18px; border: 1px dashed #00c2ff; border-radius: 16px; padding: 16px; background: #f8fcff; }
-.runtime-repeat header { color: #0066cc; font-weight: 900; margin-bottom: 12px; }
+.runtime-repeat header { color: #0066cc; font-weight: 900; margin-bottom: 8px; }
+.runtime-repeat small { display: block; margin-bottom: 12px; color: #536878; font-weight: 700; }
+.runtime-repeat-controls { display: flex; gap: 10px; margin-bottom: 12px; }
+.runtime-repeat-controls button { padding: 9px 13px; font-size: 13px; }
 .runtime-repeat-item { padding: 12px; margin-bottom: 10px; border-radius: 12px; background: #ffffff; border: 1px solid #e6f1fa; }
 
 .builder-layout { padding: 32px; display: grid; grid-template-columns: 280px 1fr; gap: 24px; }

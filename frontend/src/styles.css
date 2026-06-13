@@ -1,20 +1,114 @@
 :root {
-  font-family: Inter, system-ui, Arial, sans-serif;
-  color: #17202a;
-  background: #f5f7fa;
+  font-family: Montserrat, Inter, system-ui, Arial, sans-serif;
+  color: #0a2540;
+  background: #f5f8fb;
 }
 
 body {
   margin: 0;
 }
 
+.app-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  background: #f5f8fb;
+}
+
+.app-sidebar {
+  min-height: 100vh;
+  padding: 24px;
+  color: #ffffff;
+  background: radial-gradient(circle at 80% 10%, rgba(0, 194, 255, 0.25), transparent 28%), #0a2540;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.brand-logo {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  letter-spacing: 0.08em;
+}
+
+.brand-mark {
+  width: 42px;
+  height: 42px;
+  border: 2px solid #00c2ff;
+  border-radius: 14px;
+  display: grid;
+  place-items: center;
+  color: #00c2ff;
+  font-weight: 900;
+}
+
+.brand-logo strong,
+.brand-logo span {
+  display: block;
+}
+
+.app-sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.app-sidebar a {
+  color: #e6f1fa;
+  text-decoration: none;
+  padding: 12px 14px;
+  border-radius: 10px;
+}
+
+.app-sidebar a:first-child,
+.app-sidebar a:hover {
+  background: linear-gradient(135deg, #0066cc, #00c2ff);
+  color: #ffffff;
+}
+
+.app-sidebar small {
+  margin-top: auto;
+  color: #b9d3e8;
+}
+
+.app-main {
+  min-width: 0;
+}
+
+.app-header {
+  height: 72px;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #ffffff;
+  border-bottom: 1px solid #dce7f2;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.app-header span {
+  color: #0066cc;
+  font-weight: 700;
+}
+
 .runtime-shell {
   max-width: 1040px;
   margin: 32px auto;
-  padding: 24px;
+  padding: 28px;
   background: #ffffff;
-  border-radius: 14px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e6f1fa;
+  border-radius: 18px;
+  box-shadow: 0 14px 40px rgba(10, 37, 64, 0.08);
+}
+
+.runtime-shell h1 {
+  margin-top: 0;
+  color: #0a2540;
 }
 
 .runtime-page {
@@ -23,9 +117,15 @@ body {
 
 .runtime-section {
   margin-top: 18px;
-  padding: 16px;
+  padding: 18px;
   border: 1px solid #e3e8ef;
-  border-radius: 12px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #ffffff, #fbfdff);
+}
+
+.runtime-section h3 {
+  margin-top: 0;
+  color: #0066cc;
 }
 
 .runtime-row {
@@ -40,30 +140,51 @@ body {
 }
 
 .runtime-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-bottom: 14px;
-  font-weight: 600;
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cfd8e3;
+  border-radius: 10px;
+  padding: 12px;
+  font: inherit;
+  color: #0a2540;
+  background: #ffffff;
 }
 
-.runtime-field input,
-.runtime-field textarea {
-  border: 1px solid #cfd8e3;
-  border-radius: 8px;
-  padding: 10px;
-  font: inherit;
+.runtime-field:focus {
+  outline: 2px solid rgba(0, 194, 255, 0.35);
+  border-color: #00c2ff;
 }
 
 .runtime-actions {
   max-width: 1040px;
   margin: 0 auto 32px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
 }
 
 .runtime-actions button {
   border: 0;
-  border-radius: 10px;
-  padding: 12px 18px;
-  font-weight: 700;
+  border-radius: 12px;
+  padding: 13px 20px;
+  font-weight: 800;
+  color: #ffffff;
+  background: linear-gradient(135deg, #0066cc, #00c2ff);
   cursor: pointer;
+  box-shadow: 0 10px 22px rgba(0, 102, 204, 0.22);
+}
+
+.runtime-actions p {
+  color: #0066cc;
+  font-weight: 700;
+}
+
+@media (max-width: 900px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .app-sidebar {
+    min-height: auto;
+  }
 }

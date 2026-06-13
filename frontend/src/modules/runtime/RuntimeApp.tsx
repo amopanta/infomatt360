@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { AppShell } from '../../components/AppShell';
 import { fetchRuntimeTemplate, saveRuntimeRecord } from './api';
 import { RuntimeRenderer } from './RuntimeRenderer';
-import type { RuntimeFormValues, RuntimeTemplate } from './types';
+import { useRuntimeDraft } from './useRuntimeDraft';
+import type { RuntimeTemplate } from './types';
 
 function getTemplateIdFromPath(): string {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -12,11 +13,11 @@ function getTemplateIdFromPath(): string {
 
 export function RuntimeApp() {
   const [template, setTemplate] = useState<RuntimeTemplate | null>(null);
-  const [values, setValues] = useState<RuntimeFormValues>({});
   const [status, setStatus] = useState('Cargando formulario...');
 
   const templateId = getTemplateIdFromPath();
   const projectId = localStorage.getItem('infomatt360_project_id') ?? '';
+  const { values, setValues, clearDraft } = useRuntimeDraft(templateId || 'sin-template');
 
   useEffect(() => {
     if (!templateId) {
@@ -27,7 +28,7 @@ export function RuntimeApp() {
     fetchRuntimeTemplate(templateId)
       .then((result) => {
         setTemplate(result);
-        setStatus('');
+        setStatus('Borrador local activo.');
       })
       .catch((error: Error) => setStatus(error.message));
   }, [templateId]);
@@ -43,7 +44,8 @@ export function RuntimeApp() {
     }
 
     await saveRuntimeRecord({ projectId, templateId: template.template_id, values });
-    setStatus('Respuesta guardada correctamente.');
+    clearDraft();
+    setStatus('Respuesta guardada correctamente. Borrador local limpiado.');
   }
 
   if (!template) {

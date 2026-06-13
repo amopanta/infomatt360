@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RuntimeField } from './RuntimeField';
+import { RuntimeSectionNavigator } from './RuntimeSectionNavigator';
 import { RuntimeStepper } from './RuntimeStepper';
 import type { RuntimeFormValues, RuntimeTemplate } from './types';
 
@@ -19,7 +20,13 @@ function widthStyle(column: { desktop_width: number; tablet_width: number; mobil
 
 export function RuntimeRenderer({ template, values, onValueChange }: Props) {
   const [activePageIndex, setActivePageIndex] = useState(0);
+  const [activeSectionIndex, setActiveSectionIndex] = useState(0);
   const activePage = template.pages[activePageIndex];
+  const activeSection = activePage?.sections[activeSectionIndex];
+
+  useEffect(() => {
+    setActiveSectionIndex(0);
+  }, [activePageIndex]);
 
   if (!activePage) {
     return <main className="runtime-shell"><h1>{template.name}</h1><p>Sin paginas configuradas.</p></main>;
@@ -31,10 +38,11 @@ export function RuntimeRenderer({ template, values, onValueChange }: Props) {
       <RuntimeStepper pages={template.pages} activePageIndex={activePageIndex} onSelect={setActivePageIndex} />
       <section key={activePage.id} className="runtime-page">
         <h2>{activePage.title}</h2>
-        {activePage.sections.map((section) => (
-          <div key={section.id} className="runtime-section">
-            <h3>{section.title}</h3>
-            {section.rows.map((row) => (
+        <RuntimeSectionNavigator sections={activePage.sections} activeSectionIndex={activeSectionIndex} onSelect={setActiveSectionIndex} />
+        {activeSection ? (
+          <div key={activeSection.id} className="runtime-section">
+            <h3>{activeSection.title}</h3>
+            {activeSection.rows.map((row) => (
               <div key={row.id} className="runtime-row">
                 {row.columns.map((column) => (
                   <div key={column.id} className="runtime-column" style={widthStyle(column)}>
@@ -46,7 +54,7 @@ export function RuntimeRenderer({ template, values, onValueChange }: Props) {
               </div>
             ))}
           </div>
-        ))}
+        ) : <p>Sin secciones configuradas.</p>}
       </section>
       <div className="runtime-page-actions">
         <button disabled={activePageIndex === 0} onClick={() => setActivePageIndex((current) => current - 1)}>Anterior</button>

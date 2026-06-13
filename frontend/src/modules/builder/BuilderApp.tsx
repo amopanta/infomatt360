@@ -1,13 +1,35 @@
+import { useState } from 'react';
 import { AppShell } from '../../components/AppShell';
 import { BuilderCanvas } from './BuilderCanvas';
 import { BuilderPalette } from './BuilderPalette';
+import { createDefaultCharacterizationTemplate } from './createDefaultTemplate';
 
 export function BuilderApp() {
+  const [message, setMessage] = useState('');
+  const projectId = localStorage.getItem('infomatt360_project_id') ?? '';
+
+  async function createMvpTemplate() {
+    if (!projectId) {
+      setMessage('Falta infomatt360_project_id en localStorage.');
+      return;
+    }
+    const template = await createDefaultCharacterizationTemplate(projectId);
+    setMessage(`Plantilla creada: ${template.id}. Abra /runtime/${template.id}`);
+  }
+
   return (
     <AppShell title="Constructor de Formularios">
       <div className="builder-layout">
         <BuilderPalette />
-        <BuilderCanvas />
+        <div>
+          <div className="builder-connect-panel">
+            <strong>Plantilla MVP</strong>
+            <p>Crea una caracterizacion base conectada al backend Builder.</p>
+            <button onClick={createMvpTemplate}>Crear plantilla de caracterizacion</button>
+            {message ? <span>{message}</span> : null}
+          </div>
+          <BuilderCanvas />
+        </div>
       </div>
     </AppShell>
   );

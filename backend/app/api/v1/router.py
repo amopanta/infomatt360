@@ -6,6 +6,7 @@ from app.api.v1.audit import router as audit_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.builder import router as builder_router
 from app.api.v1.builder_layout import router as builder_layout_router
+from app.api.v1.compiler import router as compiler_router
 from app.api.v1.etl import router as etl_router
 from app.api.v1.files import router as files_router
 from app.api.v1.forms import router as forms_router
@@ -51,3 +52,4 @@ api_v1_router.include_router(gis_router, prefix="/gis", tags=["gis"])
 api_v1_router.include_router(builder_router, prefix="/builder", tags=["builder"])
 api_v1_router.include_router(builder_layout_router, prefix="/builder", tags=["builder-layout"])
 api_v1_router.include_router(runtime_router, prefix="/runtime", tags=["runtime"])
+api_v1_router.include_router(compiler_router, prefix="/compiler", tags=["compiler"])

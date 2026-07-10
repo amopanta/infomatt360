@@ -32,13 +32,13 @@ backend/app/api/v1/files.py
 
 ```text
 POST /api/v1/files/
+POST /api/v1/files/upload
 GET /api/v1/files/project/{project_id}
 ```
 
 ## Pendientes
 
-- carga real multipart;
-- almacenamiento local;
+- descarga autenticada;
 - MinIO o S3;
 - Google Drive;
 - limite de peso por proyecto;

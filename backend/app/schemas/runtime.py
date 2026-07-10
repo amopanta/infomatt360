@@ -41,4 +41,5 @@ class RuntimeTemplate(BaseModel):
     template_id: str
     name: str
     status: str
+    theme_json: str | None = None
     pages: list[RuntimePage] = []

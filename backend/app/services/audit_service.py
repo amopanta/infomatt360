@@ -17,6 +17,7 @@ def to_read(row: AuditLog) -> AuditRead:
         after_json=row.after_json,
         ip_address=row.ip_address,
         device_info=row.device_info,
+        created_at=row.created_at,
     )
 
 
@@ -28,13 +29,15 @@ class AuditService:
         db.refresh(row)
         return to_read(row)
 
-    def list_logs(self, db: Session, project_id: str | None = None, module: str | None = None) -> list[AuditRead]:
+    def list_logs(self, db: Session, project_id: str | None = None, module: str | None = None, user_id: str | None = None, limit: int = 200) -> list[AuditRead]:
         query = db.query(AuditLog)
         if project_id:
             query = query.filter(AuditLog.project_id == project_id)
+        elif user_id:
+            query = query.filter(AuditLog.user_id == user_id, AuditLog.project_id.is_(None))
         if module:
             query = query.filter(AuditLog.module == module)
-        rows = query.order_by(AuditLog.created_at.desc()).limit(200).all()
+        rows = query.order_by(AuditLog.created_at.desc()).limit(limit).all()
         return [to_read(row) for row in rows]
 
 

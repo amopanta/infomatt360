@@ -6,7 +6,7 @@ from app.schemas.builder import BuilderComponentCreate, BuilderComponentRead, Bu
 
 def template_to_read(row: BuilderTemplate) -> BuilderTemplateRead:
     """Convierte el modelo ORM de plantilla a esquema de salida."""
-    return BuilderTemplateRead(id=row.id, project_id=row.project_id, name=row.name, description=row.description, status=row.status)
+    return BuilderTemplateRead(id=row.id, project_id=row.project_id, name=row.name, description=row.description, status=row.status, theme_json=row.theme_json)
 
 
 def component_to_read(row: BuilderComponent) -> BuilderComponentRead:
@@ -63,7 +63,12 @@ class BuilderService:
         return [component_to_read(row) for row in rows]
 
     def create_version(self, db: Session, payload: BuilderVersionCreate) -> BuilderVersionRead:
-        row = BuilderVersion(**payload.model_dump())
+        row = BuilderVersion(
+            template_id=payload.template_id,
+            version_number=payload.version_number,
+            schema_json=payload.schema_content,
+            status=payload.status,
+        )
         db.add(row)
         db.commit()
         db.refresh(row)

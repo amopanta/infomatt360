@@ -1,3 +1,4 @@
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.participants import Participant
@@ -13,12 +14,23 @@ def _to_read(row: Participant) -> ParticipantRead:
         full_name=row.full_name,
         participant_type=row.participant_type,
         status=row.status,
+        duplicate_flag=row.duplicate_flag,
         metadata_json=row.metadata_json,
     )
 
 
 class ParticipantService:
     def create_participant(self, db: Session, payload: ParticipantCreate) -> ParticipantRead:
+        if payload.document_id:
+            duplicate = db.query(Participant).filter(
+                Participant.project_id == payload.project_id,
+                Participant.document_id == payload.document_id,
+            ).first()
+            if duplicate is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Ya existe un participante con este documento en el proyecto",
+                )
         row = Participant(**payload.model_dump())
         db.add(row)
         db.commit()

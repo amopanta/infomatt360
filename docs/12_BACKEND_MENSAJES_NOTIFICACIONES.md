@@ -18,8 +18,13 @@ backend/alembic/versions/0009_messages.py
 - crear perfil de correo por proyecto;
 - listar perfiles de correo;
 - crear mensaje interno;
-- listar mensajes internos del usuario autenticado;
-- validar acceso al proyecto antes de operar.
+- validar que remitente y destinatario pertenezcan al proyecto;
+- listar bandeja de entrada del usuario autenticado;
+- listar mensajes enviados;
+- consultar conteos de mensajes;
+- marcar mensajes como leidos o archivados;
+- validar acceso al proyecto antes de operar;
+- recibir notificaciones automaticas generadas por cambios de estado en revision.
 
 ## Endpoints
 
@@ -28,13 +33,31 @@ POST /api/v1/messages/profiles
 GET /api/v1/messages/profiles/{project_id}
 POST /api/v1/messages/internal
 GET /api/v1/messages/internal/{project_id}
+GET /api/v1/messages/internal/{project_id}/inbox
+GET /api/v1/messages/internal/{project_id}/sent
+GET /api/v1/messages/internal/{project_id}/counts
+PATCH /api/v1/messages/internal/{project_id}/{message_id}
 ```
+
+## Frontend
+
+Pantalla disponible:
+
+```text
+/messages
+```
+
+Incluye:
+
+- tarjetas de no leidos, recibidos y enviados;
+- redaccion de mensaje interno;
+- bandeja de recibidos/enviados;
+- accion para marcar como leido.
 
 ## Pendientes
 
 - envio real SMTP;
 - lectura IMAP;
-- notificaciones por flujo;
 - plantillas de correo;
 - adjuntos;
 - cola de envio;

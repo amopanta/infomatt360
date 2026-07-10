@@ -63,7 +63,7 @@ class FormulaCompiler:
         ">=": "GREATER_EQUAL",
         "<=": "LESS_EQUAL",
     }
-    ALLOWED_FUNCTIONS = {"if", "sum", "count", "round", "concat", "selected", "today", "now", "true", "false"}
+    ALLOWED_FUNCTIONS = {"if", "sum", "count", "round", "concat", "selected", "pulldata", "today", "now", "true", "false"}
 
     def tokenize(self, expression: str) -> list[Token]:
         """Convierte texto de expresion en tokens."""

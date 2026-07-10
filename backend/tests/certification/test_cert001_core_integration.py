@@ -20,6 +20,7 @@ def build_cert001_core_template():
             {"name": "total", "label": "Total", "type": "calculate", "config": {"calculate": "${subtotal} + ${iva}"}},
             {"name": "mayor_edad", "label": "Mayor edad", "type": "text", "config": {"relevant": "${edad} >= 18"}},
             {"name": "edad", "label": "Edad", "type": "number", "config": {"constraint": "${edad} >= 0", "required": "true()"}},
+            {"name": "departamento", "label": "Departamento", "type": "select_one"},
             {"name": "municipio", "label": "Municipio", "type": "select_one", "config": {"choice_filter": "${departamento} = 5"}},
         ],
     }

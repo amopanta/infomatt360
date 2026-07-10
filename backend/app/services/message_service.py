@@ -1,7 +1,9 @@
 from sqlalchemy.orm import Session
 
+from app.models.assignment import UserProjectAssignment
+from app.models.identity import User
 from app.models.messages import InternalMessage, MailProfile
-from app.schemas.messages import InternalMessageCreate, InternalMessageRead, MailProfileCreate, MailProfileRead
+from app.schemas.messages import InternalMessageCreate, InternalMessageRead, MailProfileCreate, MailProfileRead, MessageCounts
 
 
 def mail_to_read(row: MailProfile) -> MailProfileRead:
@@ -28,6 +30,7 @@ def msg_to_read(row: InternalMessage) -> InternalMessageRead:
         body=row.body,
         sender_id=row.sender_id,
         status=row.status,
+        created_at=row.created_at,
     )
 
 
@@ -60,12 +63,60 @@ class MessageService:
         db.refresh(row)
         return msg_to_read(row)
 
-    def list_messages(self, db: Session, project_id: str, recipient_id: str) -> list[InternalMessageRead]:
-        rows = db.query(InternalMessage).filter(
+    def list_inbox(self, db: Session, project_id: str, recipient_id: str, status: str | None = None, limit: int = 50, offset: int = 0) -> list[InternalMessageRead]:
+        query = db.query(InternalMessage).filter(
             InternalMessage.project_id == project_id,
             InternalMessage.recipient_id == recipient_id,
-        ).order_by(InternalMessage.created_at.desc()).all()
+        )
+        if status:
+            query = query.filter(InternalMessage.status == status)
+        rows = query.order_by(InternalMessage.created_at.desc()).offset(offset).limit(limit).all()
         return [msg_to_read(row) for row in rows]
+
+    def list_sent(self, db: Session, project_id: str, sender_id: str, limit: int = 50, offset: int = 0) -> list[InternalMessageRead]:
+        rows = db.query(InternalMessage).filter(
+            InternalMessage.project_id == project_id,
+            InternalMessage.sender_id == sender_id,
+        ).order_by(InternalMessage.created_at.desc()).offset(offset).limit(limit).all()
+        return [msg_to_read(row) for row in rows]
+
+    def get_project_message_for_user(self, db: Session, message_id: str, project_id: str, user_id: str) -> InternalMessage | None:
+        return db.query(InternalMessage).filter(
+            InternalMessage.id == message_id,
+            InternalMessage.project_id == project_id,
+            InternalMessage.recipient_id == user_id,
+        ).first()
+
+    def set_status(self, db: Session, message: InternalMessage, status: str) -> InternalMessageRead:
+        message.status = status
+        db.add(message)
+        db.commit()
+        db.refresh(message)
+        return msg_to_read(message)
+
+    def counts(self, db: Session, project_id: str, user_id: str) -> MessageCounts:
+        inbox = db.query(InternalMessage).filter(
+            InternalMessage.project_id == project_id,
+            InternalMessage.recipient_id == user_id,
+        ).count()
+        unread = db.query(InternalMessage).filter(
+            InternalMessage.project_id == project_id,
+            InternalMessage.recipient_id == user_id,
+            InternalMessage.status == "unread",
+        ).count()
+        sent = db.query(InternalMessage).filter(
+            InternalMessage.project_id == project_id,
+            InternalMessage.sender_id == user_id,
+        ).count()
+        return MessageCounts(unread=unread, inbox=inbox, sent=sent)
+
+    def user_exists_in_project(self, db: Session, user_id: str, project_id: str) -> bool:
+        return db.query(UserProjectAssignment).join(User, User.id == UserProjectAssignment.user_id).filter(
+            UserProjectAssignment.user_id == user_id,
+            UserProjectAssignment.project_id == project_id,
+            UserProjectAssignment.status == "active",
+            User.status == "active",
+        ).first() is not None
 
 
 message_service = MessageService()

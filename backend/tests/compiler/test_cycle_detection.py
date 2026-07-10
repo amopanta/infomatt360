@@ -29,3 +29,17 @@ def test_self_reference_is_detected_as_cycle():
 
     with pytest.raises(CompilerError, match="Dependencia circular"):
         form_compiler.compile(template)
+
+
+def test_self_reference_in_validation_rule_is_not_a_cycle():
+    template = {
+        "id": "tpl-self-validation",
+        "name": "Self Validation Test",
+        "fields": [
+            {"name": "edad", "label": "Edad", "type": "number", "config": {"constraint": "${edad} >= 0"}},
+        ],
+    }
+
+    package = form_compiler.compile(template)
+
+    assert package.dependency_graph["edad"] == []

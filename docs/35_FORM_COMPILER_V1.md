@@ -42,10 +42,13 @@ version
 
 - contratos Pydantic de Runtime Package;
 - extraccion de campos;
+- validacion de nombres, duplicados y estructura minima de campos;
 - extraccion de expresiones;
+- validacion de sintaxis y referencias contra campos existentes;
 - extraccion de dependencias usando ${campo};
 - generacion de dependency_graph;
 - deteccion de ciclos;
+- distincion entre calculos autorreferenciados y reglas locales de validacion;
 - perfil basico de complejidad;
 - API de compilacion.
 

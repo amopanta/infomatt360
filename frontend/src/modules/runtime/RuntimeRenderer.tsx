@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react';
 import { RuntimeField } from './RuntimeField';
 import { RuntimeSectionNavigator } from './RuntimeSectionNavigator';
 import { RuntimeStepper } from './RuntimeStepper';
-import type { RuntimeFormValues, RuntimeTemplate } from './types';
+import type { RuntimeFormValue, RuntimeFormValues, RuntimeTemplate } from './types';
 
 type Props = {
   template: RuntimeTemplate;
+  projectId: string;
   values: RuntimeFormValues;
-  onValueChange: (fieldName: string, value: string | number | boolean | null) => void;
+  onValueChange: (fieldName: string, value: RuntimeFormValue) => void;
 };
 
 function widthStyle(column: { desktop_width: number; tablet_width: number; mobile_width: number }) {
@@ -18,7 +19,21 @@ function widthStyle(column: { desktop_width: number; tablet_width: number; mobil
   } as React.CSSProperties;
 }
 
-export function RuntimeRenderer({ template, values, onValueChange }: Props) {
+export function themeStyle(themeJson?: string | null) {
+  try {
+    const theme = JSON.parse(themeJson ?? '{}') as Record<string, unknown>;
+    return {
+      '--form-primary': typeof theme.primaryColor === 'string' ? theme.primaryColor : '#0066cc',
+      '--form-accent': typeof theme.accentColor === 'string' ? theme.accentColor : '#00c2ff',
+      '--form-background': typeof theme.backgroundColor === 'string' ? theme.backgroundColor : '#ffffff',
+      '--form-radius': typeof theme.radius === 'string' ? theme.radius : '18px',
+    } as React.CSSProperties;
+  } catch {
+    return {} as React.CSSProperties;
+  }
+}
+
+export function RuntimeRenderer({ template, projectId, values, onValueChange }: Props) {
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [activeSectionIndex, setActiveSectionIndex] = useState(0);
   const activePage = template.pages[activePageIndex];
@@ -29,11 +44,11 @@ export function RuntimeRenderer({ template, values, onValueChange }: Props) {
   }, [activePageIndex]);
 
   if (!activePage) {
-    return <main className="runtime-shell"><h1>{template.name}</h1><p>Sin paginas configuradas.</p></main>;
+    return <main className="runtime-shell" style={themeStyle(template.theme_json)}><h1>{template.name}</h1><p>Sin paginas configuradas.</p></main>;
   }
 
   return (
-    <main className="runtime-shell">
+    <main className="runtime-shell" style={themeStyle(template.theme_json)}>
       <h1>{template.name}</h1>
       <RuntimeStepper pages={template.pages} activePageIndex={activePageIndex} onSelect={setActivePageIndex} />
       <section key={activePage.id} className="runtime-page">
@@ -47,7 +62,7 @@ export function RuntimeRenderer({ template, values, onValueChange }: Props) {
                 {row.columns.map((column) => (
                   <div key={column.id} className="runtime-column" style={widthStyle(column)}>
                     {column.components.map((component) => (
-                      <RuntimeField key={component.id} component={component} values={values} onChange={onValueChange} />
+                      <RuntimeField key={component.id} component={component} projectId={projectId} values={values} onChange={onValueChange} />
                     ))}
                   </div>
                 ))}

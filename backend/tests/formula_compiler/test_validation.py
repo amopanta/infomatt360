@@ -20,3 +20,10 @@ def test_validate_expression_rejects_unbalanced_parentheses():
 def test_validate_expression_rejects_unknown_function():
     with pytest.raises(FormulaCompilerError, match="Funcion desconocida"):
         formula_compiler.validate_expression("desconocida(${cantidad})")
+
+
+def test_validate_expression_accepts_pulldata():
+    formula_compiler.validate_expression(
+        "pulldata('municipios', 'nombre', 'codigo', ${municipio_id})",
+        known_fields={"municipio_id"},
+    )

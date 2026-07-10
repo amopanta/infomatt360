@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { AppShell } from '../../components/AppShell';
+import { PROJECT_KEY } from '../auth/session';
 import { fetchRuntimeTemplate, saveRuntimeRecord } from './api';
-import { RuntimeRenderer } from './RuntimeRenderer';
+import { RuntimeRenderer, themeStyle } from './RuntimeRenderer';
 import { useRuntimeDraft } from './useRuntimeDraft';
-import type { RuntimeTemplate } from './types';
+import type { RuntimeFormValue, RuntimeTemplate } from './types';
 
 function getTemplateIdFromPath(): string {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -16,7 +17,7 @@ export function RuntimeApp() {
   const [status, setStatus] = useState('Cargando formulario...');
 
   const templateId = getTemplateIdFromPath();
-  const projectId = localStorage.getItem('infomatt360_project_id') ?? '';
+  const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const { values, setValues, clearDraft } = useRuntimeDraft(templateId || 'sin-template');
 
   useEffect(() => {
@@ -33,13 +34,13 @@ export function RuntimeApp() {
       .catch((error: Error) => setStatus(error.message));
   }, [templateId]);
 
-  function updateValue(fieldName: string, value: string | number | boolean | null) {
+  function updateValue(fieldName: string, value: RuntimeFormValue) {
     setValues((current) => ({ ...current, [fieldName]: value }));
   }
 
   async function save() {
     if (!template || !projectId) {
-      setStatus('Falta project_id en localStorage o plantilla runtime.');
+      setStatus('Falta proyecto activo en la sesion o plantilla runtime.');
       return;
     }
 
@@ -58,10 +59,12 @@ export function RuntimeApp() {
 
   return (
     <AppShell title="Vista de Formulario">
-      <RuntimeRenderer template={template} values={values} onValueChange={updateValue} />
-      <div className="runtime-actions">
-        <button onClick={save}>Guardar respuesta</button>
-        {status ? <p>{status}</p> : null}
+      <div className="runtime-themed" style={themeStyle(template.theme_json)}>
+        <RuntimeRenderer template={template} projectId={projectId} values={values} onValueChange={updateValue} />
+        <div className="runtime-actions">
+          <button onClick={save}>Guardar respuesta</button>
+          {status ? <p>{status}</p> : null}
+        </div>
       </div>
     </AppShell>
   );

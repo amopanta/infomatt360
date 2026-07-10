@@ -16,9 +16,9 @@ Builder
 
 - Backend ejecutandose.
 - Frontend ejecutandose.
-- Base de datos migrada hasta `0022_runtime_records`.
-- Usuario autenticado con token en `localStorage.infomatt360_token`.
-- Proyecto activo en `localStorage.infomatt360_project_id`.
+- Base de datos migrada hasta la cabeza Alembic vigente.
+- Usuario autenticado con access token en memoria y refresh token en cookie httpOnly.
+- Proyecto activo seleccionado en `localStorage.infomatt360_project_id`.
 
 ## Flujo de prueba
 
@@ -95,9 +95,20 @@ Lista de registros guardados con sus valores.
 ## Criterio de aceptacion
 El MVP queda funcional si el registro creado desde Runtime aparece en la consulta de registros de la plantilla.
 
+## Automatizacion backend
+
+El flujo completo Builder -> Layout -> Runtime -> Guardar -> Consultar se
+ejecuta en la suite automatizada sobre una base aislada. La misma prueba valida
+que un usuario sin asignacion al proyecto reciba `403` al intentar consultar la
+plantilla, modificar su jerarquia Builder o consultar sus registros. Tambien se
+impide asociar una columna de una plantilla con componentes de otra.
+
+## Validacion adicional actual
+
+- `scripts/check-full-stack.cmd` valida backend, frontend, login demo, sesion y modulos principales.
+- `scripts/check-browser-cors.cmd` valida CORS real de navegador para `localhost` y `127.0.0.1`.
+- Frontend cuenta con contrato de rutas y permisos administrativos testeado con Vitest.
+
 ## Pendientes detectados
 
-- Integrar login real en frontend.
-- Remplazar localStorage manual por contexto de sesion.
-- Crear vista web de consulta de registros.
-- Automatizar esta prueba con Playwright o Cypress.
+- Automatizar interaccion visual profunda con Playwright o Cypress si se incorpora una dependencia e2e.

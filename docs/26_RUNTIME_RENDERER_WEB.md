@@ -43,8 +43,9 @@ El frontend lee:
 
 ```text
 VITE_API_BASE_URL
-localStorage.infomatt360_token
-localStorage.infomatt360_project_id
+access token en memoria de sesion
+refresh token en cookie httpOnly
+localStorage.infomatt360_project_id para proyecto activo
 ```
 
 ## Componentes MVP
@@ -52,14 +53,22 @@ localStorage.infomatt360_project_id
 - TEXT;
 - NUMBER;
 - DATE;
-- BOOLEAN basico pendiente de refinar;
-- TEXTAREA.
+- BOOLEAN con valor booleano real;
+- SELECT y MULTISELECT configurables mediante `config_json.options` o `config_json.choices`;
+- TEXTAREA;
+- FILE, PDF, MULTIFILE, IMAGE, AUDIO y VIDEO con carga multipart;
+- SIGNATURE con lienzo tactil y exportacion PNG;
+- GPS, GEOTRACE y GEOSHAPE con captura GeoJSON;
+- visor GIS vectorial offline con captura tactil;
+- columnas responsive para escritorio, tableta y movil.
+- inicio de sesion, seleccion de proyecto y cambio obligatorio de clave temporal;
+- recuperacion por token y administracion de correo/clave por usuario autorizado.
+- consulta web de formularios y registros en `/records`, con busqueda y detalle expandible.
 
 ## Pendientes
 
-- mejorar SELECT;
-- usar ancho responsive de columnas;
-- integrar login real;
-- manejar errores visuales;
-- pruebas de renderizado;
-- conectar con dashboard administrativo.
+- agregar capas cartograficas externas opcionales;
+- configurar las credenciales SMTP del ambiente de despliegue;
+- unificar el manejo visual de errores;
+- ampliar pruebas visuales de renderizado;
+- seguir enriqueciendo dashboard administrativo segun piloto.

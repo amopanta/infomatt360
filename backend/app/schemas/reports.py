@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -24,3 +26,21 @@ class ReportLinkCreate(BaseModel):
 
 class ReportLinkRead(ReportLinkCreate):
     id: str
+
+
+class ReportTemplateMetric(BaseModel):
+    template_id: str
+    template_name: str
+    template_status: str
+    records_total: int
+    records_by_status: dict[str, int]
+    percent_of_total: float
+    last_record_at: datetime | None = None
+
+
+class ReportProjectSummary(BaseModel):
+    project_id: str
+    records_total: int
+    records_by_status: dict[str, int]
+    templates: list[ReportTemplateMetric]
+    generated_at: datetime

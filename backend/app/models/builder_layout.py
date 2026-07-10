@@ -5,6 +5,7 @@ from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.core.time import utc_now
 
 
 def new_uuid() -> str:
@@ -20,7 +21,7 @@ class BuilderPage(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     visible: Mapped[str] = mapped_column(String(10), default="true", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
 
 class BuilderSection(Base):
@@ -33,7 +34,7 @@ class BuilderSection(Base):
     collapsible: Mapped[str] = mapped_column(String(10), default="false", nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     visible: Mapped[str] = mapped_column(String(10), default="true", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
 
 class BuilderRow(Base):
@@ -43,7 +44,7 @@ class BuilderRow(Base):
     section_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     responsive: Mapped[str] = mapped_column(String(10), default="true", nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
 
 class BuilderColumn(Base):
@@ -55,4 +56,4 @@ class BuilderColumn(Base):
     tablet_width: Mapped[int] = mapped_column(Integer, default=12, nullable=False)
     mobile_width: Mapped[int] = mapped_column(Integer, default=12, nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

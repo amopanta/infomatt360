@@ -8,9 +8,10 @@ Notas: Permite que formularios complejos consuman bases externas sin congelar da
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import DateTime, String, Text
+from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.time import utc_now
 from app.db.base import Base
 
 
@@ -37,7 +38,7 @@ class ExternalDataSource(Base):
     sync_mode: Mapped[str] = mapped_column(String(40), nullable=False, default="on_open")
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="active")
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
 
 class FormDataSourceBinding(Base):
@@ -54,7 +55,20 @@ class FormDataSourceBinding(Base):
     data_source_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     alias: Mapped[str] = mapped_column(String(120), nullable=False)
     filter_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+
+
+class ExternalDataSnapshot(Base):
+    """Version normalizada y cacheada de una fuente externa."""
+
+    __tablename__ = "external_data_snapshots"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    data_source_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    version: Mapped[str] = mapped_column(String(120), nullable=False)
+    rows_json: Mapped[str] = mapped_column(Text, nullable=False)
+    row_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
 
 class BulkPublishJob(Base):
@@ -73,4 +87,4 @@ class BulkPublishJob(Base):
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="queued")
     result_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

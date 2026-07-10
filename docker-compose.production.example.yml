@@ -1,0 +1,93 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: infomatt360
+      POSTGRES_USER: infomatt360
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?configure_POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U infomatt360 -d infomatt360"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/backend.Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: postgresql+psycopg2://infomatt360:${POSTGRES_PASSWORD}@postgres:5432/infomatt360
+      REDIS_URL: redis://redis:6379/0
+      API_RATE_LIMIT_BACKEND: redis
+      AUTH_THROTTLE_BACKEND: redis
+      AUTO_CREATE_TABLES: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/var/lib/infomatt360/uploads
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  worker-bulk:
+    build:
+      context: .
+      dockerfile: deploy/backend.Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: postgresql+psycopg2://infomatt360:${POSTGRES_PASSWORD}@postgres:5432/infomatt360
+      REDIS_URL: redis://redis:6379/0
+      API_RATE_LIMIT_BACKEND: redis
+      AUTH_THROTTLE_BACKEND: redis
+      AUTO_CREATE_TABLES: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/var/lib/infomatt360/uploads
+    command: ["python", "-m", "app.cli.process_bulk_jobs", "--limit", "50", "--loop", "--sleep-seconds", "5", "--worker-id", "worker-bulk-01"]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/frontend.Dockerfile
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:

@@ -52,9 +52,37 @@ bulk_publish_jobs
 
 ## Pendientes tecnicos
 
-- conectar router external-data al router principal;
 - motor de sincronizacion de fuente externa;
-- cache por version de fuente;
-- evaluador de expresiones pulldata;
 - UI de acciones masivas;
-- motor repeat con reconciliacion de cantidad.
+
+## Avance External Data
+
+Rutas disponibles bajo `/api/v1/external-data`:
+
+- crear y listar fuentes externas;
+- vincular una fuente con una plantilla;
+- encolar publicacion masiva de plantillas.
+
+Todas las operaciones validan la asignacion del usuario al proyecto. Los
+bindings y trabajos masivos rechazan mezclas de fuentes o plantillas entre
+proyectos distintos.
+
+## Evaluacion Pulldata
+
+El motor de expresiones admite la firma compatible con XLSForm:
+
+```text
+pulldata('municipios', 'nombre', 'codigo', ${municipio_id})
+```
+
+Runtime entrega las fuentes sincronizadas mediante `context.__pulldata__`. Cada
+alias puede contener directamente una lista de filas o un objeto versionado con
+la forma `{ "version": "...", "rows": [...] }`. Los datos permanecen fuera de
+la plantilla y pueden refrescarse sin recompilar el formulario.
+
+Las versiones normalizadas se guardan como snapshots. Runtime obtiene la ultima
+version de todas las fuentes vinculadas mediante:
+
+```text
+GET /api/v1/external-data/runtime-cache/{template_id}
+```

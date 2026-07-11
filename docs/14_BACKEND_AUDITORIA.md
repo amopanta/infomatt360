@@ -31,6 +31,16 @@ POST /api/v1/audit/
 GET /api/v1/audit/
 ```
 
+## Vista operativa
+
+La pantalla web `/audit` lista eventos recientes del proyecto seleccionado,
+con filtro por modulo. La respuesta incluye `created_at` para ordenar y mostrar
+fecha/hora del evento.
+
+Cuando se consulta sin `project_id`, el backend limita la respuesta a eventos
+globales/personales del usuario autenticado. Para auditoria operativa de
+proyecto, la UI siempre envia `project_id` y el API valida asignacion activa.
+
 ## Pendientes
 
 - integracion automatica en servicios;

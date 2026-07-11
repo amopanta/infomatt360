@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 
 class ExternalDataSourceCreate(BaseModel):
@@ -26,10 +28,26 @@ class FormDataSourceBindingRead(FormDataSourceBindingCreate):
     id: str
 
 
+class ExternalDataSnapshotCreate(BaseModel):
+    version: str
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
+class ExternalDataSnapshotRead(ExternalDataSnapshotCreate):
+    id: str
+    data_source_id: str
+    row_count: int
+
+
+class PulldataCacheEntry(BaseModel):
+    version: str
+    rows: list[dict[str, Any]] = Field(default_factory=list)
+
+
 class BulkPublishRequest(BaseModel):
     project_id: str
     action: str
-    target_template_ids: list[str]
+    target_template_ids: list[str] = Field(..., min_length=1)
 
 
 class BulkPublishRead(BaseModel):

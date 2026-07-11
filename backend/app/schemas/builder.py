@@ -1,4 +1,6 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
+
+from app.core.field_types import normalize_field_type
 
 
 class BuilderTemplateCreate(BaseModel):
@@ -8,6 +10,7 @@ class BuilderTemplateCreate(BaseModel):
     name: str
     description: str | None = None
     status: str = "draft"
+    theme_json: str | None = None
 
 
 class BuilderTemplateRead(BuilderTemplateCreate):
@@ -30,6 +33,11 @@ class BuilderComponentCreate(BaseModel):
     rules_json: str | None = None
     sort_order: int = 0
 
+    @field_validator("component_type")
+    @classmethod
+    def validate_component_type(cls, value: str) -> str:
+        return normalize_field_type(value)
+
 
 class BuilderComponentRead(BuilderComponentCreate):
     id: str
@@ -40,7 +48,7 @@ class BuilderVersionCreate(BaseModel):
 
     template_id: str
     version_number: int = 1
-    schema_json: str
+    schema_content: str = Field(alias="schema_json")
     status: str = "draft"
 
 

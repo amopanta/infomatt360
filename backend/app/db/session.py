@@ -14,7 +14,23 @@ from app.core.config import settings
 # SQLite necesita este parametro para funcionar correctamente con TestClient.
 connect_args = {"check_same_thread": False} if settings.database_url.startswith("sqlite") else {}
 
-engine = create_engine(settings.database_url, connect_args=connect_args)
+
+def engine_options(database_url: str) -> dict[str, object]:
+    options: dict[str, object] = {"connect_args": {"check_same_thread": False} if database_url.startswith("sqlite") else {}}
+    if not database_url.startswith("sqlite"):
+        options.update(
+        {
+            "pool_size": settings.db_pool_size,
+            "max_overflow": settings.db_max_overflow,
+            "pool_timeout": settings.db_pool_timeout_seconds,
+            "pool_recycle": settings.db_pool_recycle_seconds,
+            "pool_pre_ping": True,
+        }
+        )
+    return options
+
+
+engine = create_engine(settings.database_url, **engine_options(settings.database_url))
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

@@ -8,7 +8,14 @@ httpx
 sqlalchemy
 psycopg2-binary
 alembic
+redis
 passlib[bcrypt]
+bcrypt<4.1
 python-jose[cryptography]
 python-multipart
 email-validator
+cryptography
+qrcode[pil]
+openpyxl
+jinja2
+xhtml2pdf

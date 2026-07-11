@@ -22,6 +22,7 @@ class StorageProfile(Base):
     bucket_name: Mapped[str | None] = mapped_column(String(180), nullable=True)
     endpoint_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     credentials_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    oauth_tokens_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     max_file_size_mb: Mapped[int] = mapped_column(Integer, default=25, nullable=False)
     is_default: Mapped[str] = mapped_column(String(10), default="false", nullable=False)
     status: Mapped[str] = mapped_column(String(40), default="active", nullable=False)

@@ -13,3 +13,4 @@ class ParticipantCreate(BaseModel):
 
 class ParticipantRead(ParticipantCreate):
     id: str
+    duplicate_flag: str = "none"

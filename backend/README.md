@@ -45,10 +45,20 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
+Desde la raiz del proyecto tambien se puede usar:
+
+```powershell
+.\scripts\dev-backend.cmd
+.\scripts\seed-demo.cmd
+.\scripts\run-tests.cmd
+.\scripts\check-health.cmd
+```
+
 ## Endpoints iniciales
 
 - `GET /health` estado simple del servicio.
 - `GET /api/v1/health` estado versionado de API.
+- `GET /api/v1/health/ready` readiness operativo con chequeo de base de datos y advertencias de configuracion.
 
 ## Reglas de desarrollo
 

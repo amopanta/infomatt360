@@ -58,6 +58,7 @@ class ProjectCreate(BaseModel):
     name: str = Field(..., min_length=3)
     description: str | None = None
     status: ProjectStatus = ProjectStatus.active
+    organization_id: str | None = None
 
 
 class ProjectRead(ProjectCreate):

@@ -31,15 +31,27 @@ POST /api/v1/gis/layers
 GET /api/v1/gis/layers/{project_id}
 POST /api/v1/gis/features
 GET /api/v1/gis/features/{project_id}
+GET /api/v1/gis/map/{project_id}
 ```
+
+## Mapa operativo MVP
+
+El endpoint `/map/{project_id}` consolida en una sola respuesta:
+
+- elementos creados en `gis_features`;
+- coordenadas guardadas dentro de respuestas Runtime (`Point`, `LineString`,
+  `Polygon` o valores simples `lat/lng`);
+- metadatos de formulario, registro y campo cuando el origen es Runtime.
+
+La pantalla web `/maps` consume este endpoint y renderiza un mapa SVG local,
+sin depender todavia de proveedores externos de cartografia. Para lineas y
+poligonos se calcula un punto representativo visual, conservando la geometria
+original en `geometry_json`.
 
 ## Pendientes
 
-- GeoJSON real;
+- capas cartograficas externas opcionales;
 - exportacion para QGIS;
 - integracion ArcGIS;
 - mapas de calor;
-- poligonos;
-- rutas;
-- validacion de coordenadas;
-- visor de mapa en frontend.
+- exportacion GeoJSON masiva.

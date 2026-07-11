@@ -26,6 +26,11 @@ cantidad esperada = 8 -> conserva 5 y agrega 3 nuevos
 
 ## Pendiente
 
-- Integrar REPEAT como tipo real de componente Runtime.
-- Virtualizar listas largas.
 - Recalcular dependientes al cambiar cantidad.
+
+## Integracion Runtime
+
+Los componentes `REPEAT` usan `config_json.count_field` para tomar la cantidad
+desde otro campo, o `config_json.count` para una cantidad fija. La reconciliacion
+se ejecuta como efecto de React, conserva identificadores y valores estables,
+elimina sobrantes y ajusta la ventana virtual al reducir la lista.

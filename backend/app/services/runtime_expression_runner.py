@@ -41,6 +41,13 @@ class RuntimeExpressionRunner:
         sobrescribir directamente el valor capturado.
         """
         results: dict[str, Any] = {}
+        # Constraint, required y otras reglas locales deben reevaluarse cuando
+        # cambia su propio campo. No forman aristas del grafo porque no calculan
+        # un nuevo valor para ese campo.
+        for expression in self._local_rules_for_field(changed_field):
+            result_key = f"{changed_field}.{expression.expression_type}"
+            results[result_key] = self._evaluate_runtime_expression(expression, context)
+
         for field in self.graph.get_execution_order(changed_field):
             for expression in self._expressions_for_field(field):
                 value = self._evaluate_runtime_expression(expression, {**context, **results})
@@ -50,6 +57,13 @@ class RuntimeExpressionRunner:
 
     def _expressions_for_field(self, field: str) -> list[RuntimeExpression]:
         return [expression for expression in self.package.expression_map.values() if expression.field == field]
+
+    def _local_rules_for_field(self, field: str) -> list[RuntimeExpression]:
+        return [
+            expression
+            for expression in self._expressions_for_field(field)
+            if expression.expression_type != "calculate"
+        ]
 
     def _evaluate_runtime_expression(self, expression: RuntimeExpression, context: dict[str, Any]) -> Any:
         if expression.expression_type == "calculate":

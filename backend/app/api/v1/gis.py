@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.identity import User
-from app.schemas.gis import GisFeatureCreate, GisFeatureRead, GisLayerCreate, GisLayerRead
+from app.schemas.gis import GisFeatureCreate, GisFeatureRead, GisLayerCreate, GisLayerRead, GisProjectMap
 from app.services.assignment_service import assignment_service
 from app.services.gis_service import gis_service
 
@@ -37,3 +37,10 @@ def list_features(project_id: str, layer_id: str | None = None, db: Session = De
     if not assignment_service.user_has_project_access(db, current_user.id, project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
     return gis_service.list_features(db, project_id, layer_id)
+
+
+@router.get("/map/{project_id}", response_model=GisProjectMap)
+def project_map(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> GisProjectMap:
+    if not assignment_service.user_has_project_access(db, current_user.id, project_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    return gis_service.project_map(db, project_id)

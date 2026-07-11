@@ -34,6 +34,8 @@ backend/app/api/v1/runtime.py
 POST /api/v1/runtime/save
 GET /api/v1/runtime/record/{record_id}
 GET /api/v1/runtime/template/{template_id}/records
+GET /api/v1/runtime/template/{template_id}/records/search?search=&status=&limit=25&offset=0
+GET /api/v1/runtime/template/{template_id}/records/export.csv?search=&status=
 ```
 
 ## Flujo
@@ -61,6 +63,10 @@ archived
 
 `field_value_json` permite guardar texto, numeros, listas, GPS, firmas, archivos, OCR y estructuras futuras sin cambiar el modelo.
 
+Antes de persistir, el API valida que cada valor sea JSON correcto y que no
+existan nombres de campo duplicados. La cabecera y todos sus valores se guardan
+en una sola transaccion; cualquier fallo revierte el registro completo.
+
 Ejemplo GPS:
 
 ```json
@@ -73,10 +79,23 @@ Ejemplo archivo:
 {"fileId": "abc123", "url": "/storage/file.pdf"}
 ```
 
+## Consulta y exportacion
+
+Las consultas Runtime validan la asignacion activa del usuario al proyecto. La
+ruta `/records` ofrece busqueda, filtro por estado, detalle web y paginacion
+desde servidor. El endpoint paginado devuelve:
+
+```text
+items: registros de la pagina
+total: total filtrado
+limit: tamano de pagina
+offset: desplazamiento actual
+```
+
+La exportacion CSV acepta los mismos filtros `search` y `status`, genera UTF-8
+compatible con Excel y protege columnas/celdas contra formulas inyectadas.
+
 ## Pendientes
 
-- pruebas de integracion Builder -> Runtime -> Guardar -> Consultar;
 - auditoria automatica;
-- permisos por proyecto en consultas Runtime;
-- frontend Runtime Renderer;
-- reportes basicos sobre runtime_records.
+- exportacion XLSX nativa y trabajos asincronos para archivos grandes.

@@ -13,6 +13,7 @@ from sqlalchemy import DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
+from app.core.time import utc_now
 
 
 def new_uuid() -> str:
@@ -33,12 +34,17 @@ class RuntimeRecord(Base):
     project_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     template_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     version_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    approval_flow_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    approval_flow_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    approval_flow_snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(40), default="submitted", nullable=False)
     submitted_by: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     device_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(80), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    duplicate_flag: Mapped[str] = mapped_column(String(20), default="none", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
 
 class RuntimeRecordValue(Base):
@@ -55,4 +61,4 @@ class RuntimeRecordValue(Base):
     component_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     field_name: Mapped[str] = mapped_column(String(180), nullable=False, index=True)
     field_value_json: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

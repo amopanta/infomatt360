@@ -4,21 +4,19 @@
  * Responsabilidad: Centralizar llamadas al backend del constructor visual.
  */
 
+import { jsonAuthHeaders } from '../auth/session';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
 
 function authHeaders(): HeadersInit {
-  const token = localStorage.getItem('infomatt360_token');
-  return {
-    'Content-Type': 'application/json',
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
+  return jsonAuthHeaders();
 }
 
-export async function createTemplate(params: { projectId: string; name: string; description?: string }) {
+export async function createTemplate(params: { projectId: string; name: string; description?: string; status?: string; themeJson?: string | null }) {
   const response = await fetch(`${API_BASE_URL}/builder/templates`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ project_id: params.projectId, name: params.name, description: params.description ?? null }),
+    body: JSON.stringify({ project_id: params.projectId, name: params.name, description: params.description ?? null, status: params.status ?? 'draft', theme_json: params.themeJson ?? null }),
   });
   if (!response.ok) throw new Error('No fue posible crear la plantilla.');
   return response.json();
@@ -64,11 +62,11 @@ export async function createColumn(params: { rowId: string; desktopWidth: number
   return response.json();
 }
 
-export async function createComponent(params: { templateId: string; columnId: string; type: string; name: string; label: string; sortOrder?: number }) {
+export async function createComponent(params: { templateId: string; columnId: string; type: string; name: string; label: string; configJson?: string | null; sortOrder?: number }) {
   const response = await fetch(`${API_BASE_URL}/builder/components`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ template_id: params.templateId, column_id: params.columnId, component_type: params.type, name: params.name, label: params.label, sort_order: params.sortOrder ?? 0 }),
+    body: JSON.stringify({ template_id: params.templateId, column_id: params.columnId, component_type: params.type, name: params.name, label: params.label, config_json: params.configJson ?? null, sort_order: params.sortOrder ?? 0 }),
   });
   if (!response.ok) throw new Error('No fue posible crear el componente.');
   return response.json();

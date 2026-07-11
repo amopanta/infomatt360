@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.builder_access import require_column_access, require_template_access, template_id_for_column
 from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.builder import BuilderComponentCreate, BuilderComponentRead, BuilderTemplateCreate, BuilderTemplateRead, BuilderVersionCreate, BuilderVersionRead
@@ -34,16 +35,27 @@ def add_component(payload: BuilderComponentCreate, db: Session = Depends(get_db)
     El campo puede quedar asociado a una columna para que el Runtime lo ubique
     correctamente dentro del layout responsive.
     """
+    require_template_access(db, current_user.id, payload.template_id)
+    if payload.column_id:
+        column = require_column_access(db, current_user.id, payload.column_id)
+        if template_id_for_column(db, column) != payload.template_id:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La columna no pertenece a la plantilla")
     return builder_service.add_component(db, payload)
 
 
 @router.get("/components/{template_id}", response_model=list[BuilderComponentRead])
 def list_components(template_id: str, column_id: str | None = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[BuilderComponentRead]:
     """Lista componentes de una plantilla, opcionalmente por columna."""
+    require_template_access(db, current_user.id, template_id)
+    if column_id:
+        column = require_column_access(db, current_user.id, column_id)
+        if template_id_for_column(db, column) != template_id:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La columna no pertenece a la plantilla")
     return builder_service.list_components(db, template_id, column_id)
 
 
 @router.post("/versions", response_model=BuilderVersionRead)
 def create_version(payload: BuilderVersionCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> BuilderVersionRead:
     """Guarda una version JSON de una plantilla."""
+    require_template_access(db, current_user.id, payload.template_id)
     return builder_service.create_version(db, payload)

@@ -21,5 +21,6 @@ class Participant(Base):
     full_name: Mapped[str] = mapped_column(String(220), nullable=False, index=True)
     participant_type: Mapped[str] = mapped_column(String(80), default="person", nullable=False)
     status: Mapped[str] = mapped_column(String(40), default="active", nullable=False)
+    duplicate_flag: Mapped[str] = mapped_column(String(20), default="none", nullable=False)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

@@ -5,7 +5,7 @@ Responsabilidad: Evaluar AST generado por Formula Compiler sobre un contexto de 
 """
 
 from collections.abc import Iterable
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
 from app.services.formula_compiler import ASTNode, formula_compiler
@@ -22,7 +22,7 @@ class ExpressionEngine:
     - operadores aritmeticos;
     - operadores comparadores;
     - campos desde contexto;
-    - funciones basicas: if, sum, count, round, concat, selected, true, false, today, now.
+    - funciones basicas: if, sum, count, round, concat, selected, pulldata, true, false, today, now.
     """
 
     def evaluate(self, ast: ASTNode, context: dict[str, Any]) -> Any:
@@ -129,6 +129,8 @@ class ExpressionEngine:
             if isinstance(value, Iterable):
                 return option in value
             return False
+        if name == "pulldata":
+            return self._evaluate_pulldata(evaluated, context)
         if name == "true":
             return True
         if name == "false":
@@ -136,9 +138,36 @@ class ExpressionEngine:
         if name == "today":
             return date.today().isoformat()
         if name == "now":
-            return datetime.utcnow().isoformat()
+            return datetime.now(timezone.utc).isoformat()
 
         raise ExpressionEngineError(f"Funcion no soportada: {name}")
+
+    def _evaluate_pulldata(self, args: list[Any], context: dict[str, Any]) -> Any:
+        """Busca un valor en el cache dinamico de fuentes externas del Runtime.
+
+        Firma compatible con XLSForm:
+            pulldata(fuente, columna_resultado, columna_busqueda, valor_busqueda)
+
+        El cache vive en ``context["__pulldata__"]`` y cada alias acepta una
+        lista de filas o un objeto versionado con ``rows``.
+        """
+        if len(args) != 4:
+            raise ExpressionEngineError("pulldata requiere 4 argumentos")
+
+        source_name, return_column, lookup_column, lookup_value = args
+        sources = context.get("__pulldata__", {})
+        if not isinstance(sources, dict) or source_name not in sources:
+            raise ExpressionEngineError(f"Fuente pulldata no disponible: {source_name}")
+
+        source = sources[source_name]
+        rows = source.get("rows") if isinstance(source, dict) else source
+        if not isinstance(rows, list):
+            raise ExpressionEngineError(f"Cache pulldata invalido: {source_name}")
+
+        for row in rows:
+            if isinstance(row, dict) and row.get(str(lookup_column)) == lookup_value:
+                return row.get(str(return_column))
+        return None
 
     def _flatten_numbers(self, values: list[Any]) -> list[float]:
         numbers: list[float] = []

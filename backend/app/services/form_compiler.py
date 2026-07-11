@@ -8,9 +8,12 @@ import re
 from collections import defaultdict
 from typing import Any
 
+from app.core.field_types import normalize_field_type
 from app.schemas.runtime_package import RuntimeExpression, RuntimeFieldSchema, RuntimePackage, RuntimePackageManifest, RuntimePerformanceProfile, RuntimeSchema
+from app.services.formula_compiler import FormulaCompilerError, formula_compiler
 
 FIELD_REF_PATTERN = re.compile(r"\$\{([a-zA-Z0-9_\.\-]+)\}")
+FIELD_NAME_PATTERN = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_\.\-]*$")
 EXPRESSION_KEYS = ("calculate", "relevant", "constraint", "required", "choice_filter")
 
 
@@ -28,6 +31,7 @@ class FormCompiler:
     def compile(self, template: dict[str, Any]) -> RuntimePackage:
         fields = self._extract_fields(template)
         expression_map = self._extract_expressions(fields)
+        self._validate_expressions(expression_map, {field.name for field in fields})
         dependency_graph = self._build_dependency_graph(expression_map)
         self._assert_no_cycles(dependency_graph)
         profile = self._build_performance_profile(fields, expression_map, dependency_graph)
@@ -37,9 +41,28 @@ class FormCompiler:
 
     def _extract_fields(self, template: dict[str, Any]) -> list[RuntimeFieldSchema]:
         raw_fields = template.get("fields", [])
+        if not isinstance(raw_fields, list) or not raw_fields:
+            raise CompilerError("La plantilla debe contener al menos un campo")
+
         fields: list[RuntimeFieldSchema] = []
-        for raw in raw_fields:
-            fields.append(RuntimeFieldSchema(name=str(raw.get("name")), label=str(raw.get("label", raw.get("name"))), type=str(raw.get("type", "text")), required=bool(raw.get("required", False)), page_id=raw.get("page_id"), section_id=raw.get("section_id"), config=raw.get("config", {})))
+        known_names: set[str] = set()
+        for index, raw in enumerate(raw_fields):
+            if not isinstance(raw, dict):
+                raise CompilerError(f"Campo invalido en posicion {index}")
+            raw_name = raw.get("name")
+            if not isinstance(raw_name, str) or not raw_name.strip():
+                raise CompilerError(f"Campo sin nombre en posicion {index}")
+            name = raw_name.strip()
+            if not FIELD_NAME_PATTERN.fullmatch(name):
+                raise CompilerError(f"Nombre de campo invalido: {name}")
+            if name in known_names:
+                raise CompilerError(f"Nombre de campo duplicado: {name}")
+            known_names.add(name)
+            try:
+                field_type = normalize_field_type(str(raw.get("type", "text")))
+            except ValueError as exc:
+                raise CompilerError(f"Tipo invalido en campo {name}: {exc}") from exc
+            fields.append(RuntimeFieldSchema(name=name, label=str(raw.get("label", name)), type=field_type, required=bool(raw.get("required", False)), page_id=raw.get("page_id"), section_id=raw.get("section_id"), config=raw.get("config", {})))
         return fields
 
     def _extract_expressions(self, fields: list[RuntimeFieldSchema]) -> dict[str, RuntimeExpression]:
@@ -54,10 +77,23 @@ class FormCompiler:
     def _extract_dependencies(self, expression: str) -> list[str]:
         return sorted(set(FIELD_REF_PATTERN.findall(expression)))
 
+    def _validate_expressions(self, expression_map: dict[str, RuntimeExpression], known_fields: set[str]) -> None:
+        """Bloquea paquetes con formulas invalidas o referencias inexistentes."""
+        for expression_key, expression in expression_map.items():
+            try:
+                formula_compiler.validate_expression(expression.expression, known_fields=known_fields)
+            except FormulaCompilerError as exc:
+                raise CompilerError(f"Expresion invalida en {expression_key}: {exc}") from exc
+
     def _build_dependency_graph(self, expression_map: dict[str, RuntimeExpression]) -> dict[str, list[str]]:
         graph: dict[str, set[str]] = defaultdict(set)
         for expression in expression_map.values():
             for dependency in expression.dependencies:
+                # Una regla de validacion puede consultar el valor del mismo
+                # campo sin crear una dependencia de recalculo. En cambio, un
+                # calculate autorreferenciado si es un ciclo real.
+                if dependency == expression.field and expression.expression_type != "calculate":
+                    continue
                 graph[dependency].add(expression.field)
             graph.setdefault(expression.field, set())
         return {field: sorted(dependents) for field, dependents in graph.items()}

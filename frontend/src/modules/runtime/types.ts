@@ -45,7 +45,23 @@ export type RuntimeTemplate = {
   template_id: string;
   name: string;
   status: string;
+  theme_json?: string | null;
   pages: RuntimePage[];
 };
 
-export type RuntimeFormValues = Record<string, string | number | boolean | null>;
+export type RepeatItem = {
+  id: string;
+  index: number;
+  values: Record<string, unknown>;
+};
+
+export type RuntimeScalarValue = string | number | boolean | null;
+export type RuntimeFileValue = {
+  file_asset_id: string;
+  name: string;
+  mime_type?: string | null;
+  size_bytes: number;
+};
+export type RuntimeFormValue = RuntimeScalarValue | string[] | RepeatItem[] | RuntimeFileValue | RuntimeFileValue[] | RuntimeGeoValue;
+export type RuntimeFormValues = Record<string, RuntimeFormValue>;
+import type { RuntimeGeoValue } from './geoEngine';

@@ -4,6 +4,7 @@ Este servicio centraliza la logica de usuarios, proyectos y roles usando
 SQLAlchemy. Los routers solo deben recibir solicitudes y delegar reglas.
 """
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
@@ -39,6 +40,7 @@ def _project_to_read(project: Project) -> ProjectRead:
         name=project.name,
         description=project.description,
         status=project.status,
+        organization_id=project.organization_id,
     )
 
 
@@ -73,13 +75,14 @@ class IdentityService:
         return [_user_to_read(user) for user in db.query(User).order_by(User.created_at.desc()).all()]
 
     def get_user_by_email(self, db: Session, email: str) -> User | None:
-        return db.query(User).filter(User.email == email).first()
+        return db.query(User).filter(func.lower(User.email) == email.strip().lower()).first()
 
     def create_project(self, db: Session, payload: ProjectCreate) -> ProjectRead:
         project = Project(
             name=payload.name,
             description=payload.description,
             status=payload.status.value,
+            organization_id=payload.organization_id,
         )
         db.add(project)
         db.commit()

@@ -81,7 +81,7 @@ class RuntimeService:
                 )
             )
 
-        return RuntimeTemplate(template_id=template.id, name=template.name, status=template.status, pages=runtime_pages)
+        return RuntimeTemplate(template_id=template.id, name=template.name, status=template.status, theme_json=template.theme_json, pages=runtime_pages)
 
 
 runtime_service = RuntimeService()

@@ -7,7 +7,11 @@
 export function getVirtualWindow<T>(items: T[], activeIndex: number, windowSize: number): { visibleItems: T[]; start: number; end: number } {
   const safeWindow = Math.max(1, windowSize);
   const half = Math.floor(safeWindow / 2);
-  const start = Math.max(0, activeIndex - half);
+  const safeActiveIndex = items.length === 0
+    ? 0
+    : Math.min(items.length - 1, Math.max(0, activeIndex));
+  const desiredStart = Math.max(0, safeActiveIndex - half);
+  const start = Math.max(0, Math.min(desiredStart, items.length - safeWindow));
   const end = Math.min(items.length, start + safeWindow);
 
   return {

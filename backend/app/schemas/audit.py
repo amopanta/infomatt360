@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -16,3 +18,4 @@ class AuditCreate(BaseModel):
 class AuditRead(AuditCreate):
     id: str
     user_id: str | None = None
+    created_at: datetime

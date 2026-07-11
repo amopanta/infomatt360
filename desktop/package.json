@@ -1,0 +1,39 @@
+{
+  "name": "infomatt360-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Aplicacion de escritorio InfoMatt360: envuelve el frontend web con soporte offline y sincronizacion por lotes.",
+  "main": "src/main.js",
+  "scripts": {
+    "dev": "electron .",
+    "build:win": "electron-builder --win",
+    "build:linux": "electron-builder --linux",
+    "build:mac": "electron-builder --mac",
+    "test": "node --test src/*.test.js"
+  },
+  "build": {
+    "appId": "org.infomatt360.desktop",
+    "productName": "InfoMatt360",
+    "files": [
+      "src/**/*",
+      "!src/**/*.test.js",
+      "resources/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "../frontend/dist",
+        "to": "frontend-dist"
+      }
+    ],
+    "directories": {
+      "output": "release"
+    }
+  },
+  "devDependencies": {
+    "electron": "latest",
+    "electron-builder": "latest"
+  },
+  "dependencies": {
+    "sql.js": "^1.14.1"
+  }
+}

@@ -85,6 +85,19 @@ individuales.
 envios del proyecto. Requiere alguno de `messages.read`, `records.review`
 o `records.approve`.
 
+## Pantalla en el frontend
+
+`frontend/src/modules/admin/WhatsAppApp.tsx` (ruta `/admin/whatsapp`,
+mismos permisos que el endpoint): resumen de conteos por estado
+(enviado/fallido/omitido), filtro por estado, y tabla con fecha,
+destinatario, registro relacionado, mensaje (con el enlace magico
+incluido) y error si aplica. Si todas las notificaciones estan
+`omitidas`, muestra un aviso explicando que falta configurar
+`WAHA_BASE_URL`. Cliente API en
+`frontend/src/modules/admin/whatsappApi.ts`. Verificado en navegador real
+contra un registro rechazado real: aparece con el motivo exacto del
+"omitido" cuando no hay proveedor configurado.
+
 ## Como levantar una instancia WAHA para activarlo
 
 WAHA es open-source y se levanta con Docker:
@@ -107,8 +120,6 @@ WAHA_SESSION=default
 
 ## Limites conocidos
 
-- Sin pantalla propia en el frontend todavia (se opera por Swagger/API
-  directa para consultar el historial).
 - Sin recibos de lectura/entrega (requeriria webhook de WAHA).
 - Solo cubre rechazo/devolucion de registros; no cubre las notificaciones
   de sincronizacion, backup o carga masiva por WhatsApp que menciona la

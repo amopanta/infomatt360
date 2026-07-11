@@ -7,6 +7,7 @@ import { ApprovalFlowsApp } from './modules/admin/ApprovalFlowsApp';
 import { BulkJobsApp } from './modules/admin/BulkJobsApp';
 import { ErpApp } from './modules/admin/ErpApp';
 import { OperationalMetricsApp } from './modules/admin/OperationalMetricsApp';
+import { WhatsAppApp } from './modules/admin/WhatsAppApp';
 import { AuditApp } from './modules/audit/AuditApp';
 import { AuthGate } from './modules/auth/AuthGate';
 import { applyFallbackBranding, loadOrganizationBranding } from './modules/branding/brandingLoader';
@@ -78,6 +79,7 @@ function renderRoute(route: AppRoute) {
       case 'approvalFlows': return <ApprovalFlowsApp />;
       case 'apiKeys': return <ApiKeysApp />;
       case 'erp': return <ErpApp />;
+      case 'whatsapp': return <WhatsAppApp />;
       case 'adminUsers': return <AdminUserSecurityApp />;
       case 'accountSecurity': return <AccountSecurityApp />;
       case 'records': return <RecordsApp />;

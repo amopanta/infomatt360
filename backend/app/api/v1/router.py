@@ -13,6 +13,7 @@ from app.api.v1.builder_layout import router as builder_layout_router
 from app.api.v1.compiler import router as compiler_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.enrollment import router as enrollment_router
+from app.api.v1.erp import router as erp_router
 from app.api.v1.etl import router as etl_router
 from app.api.v1.excel_import import router as excel_import_router
 from app.api.v1.external_data import router as external_data_router
@@ -75,5 +76,6 @@ api_v1_router.include_router(gis_router, prefix="/gis", tags=["gis"])
 api_v1_router.include_router(builder_router, prefix="/builder", tags=["builder"])
 api_v1_router.include_router(builder_layout_router, prefix="/builder", tags=["builder-layout"])
 api_v1_router.include_router(xlsform_router, prefix="/xlsform", tags=["xlsform"])
+api_v1_router.include_router(erp_router, prefix="/erp", tags=["erp"])
 api_v1_router.include_router(runtime_router, prefix="/runtime", tags=["runtime"])
 api_v1_router.include_router(compiler_router, prefix="/compiler", tags=["compiler"])

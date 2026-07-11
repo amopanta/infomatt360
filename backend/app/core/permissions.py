@@ -9,6 +9,7 @@ IDENTITY_USERS_MANAGE = "identity.users.manage"
 ORGANIZATIONS_MANAGE = "organizations.manage"
 ORGANIZATIONS_BRANDING_MANAGE = "organizations.branding.manage"
 BACKUPS_MANAGE = "backups.manage"
+ERP_MANAGE = "erp.manage"
 
 RECORDS_READ = "records.read"
 RECORDS_WRITE = "records.write"
@@ -40,6 +41,7 @@ ALL_PERMISSIONS = {
     ORGANIZATIONS_MANAGE,
     ORGANIZATIONS_BRANDING_MANAGE,
     BACKUPS_MANAGE,
+    ERP_MANAGE,
     RECORDS_READ,
     RECORDS_WRITE,
     RECORDS_REVIEW,

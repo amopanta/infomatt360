@@ -10,6 +10,7 @@ from app.models.review import ReviewAction
 from app.models.runtime_record import RuntimeRecord
 from app.schemas.review import ReviewActionCreate, ReviewActionRead
 from app.services.approval_flow_service import approval_flow_service
+from app.services.erp_service import erp_service
 
 
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
@@ -62,6 +63,12 @@ class ReviewService:
                 record.updated_by = user_id
             if hasattr(record, "updated_at"):
                 record.updated_at = utc_now()
+            # Liquidacion ERP (inventario + honorarios): si la plantilla no
+            # tiene ErpTemplateConfig, es un no-op. Si lanza ValueError (SKU
+            # inexistente, stock insuficiente), la excepcion se propaga antes
+            # de cualquier commit y descarta tambien este cambio de estado.
+            if isinstance(record, RuntimeRecord) and payload.to_status == "approved":
+                erp_service.settle_record(db, record)
 
         row = ReviewAction(
             project_id=payload.project_id,

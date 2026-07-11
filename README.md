@@ -239,7 +239,8 @@ Antes de produccion real:
 - generador de actas PDF: [docs/80_GENERADOR_ACTAS_PDF.md](docs/80_GENERADOR_ACTAS_PDF.md);
 - importador XLSForm/ODK/KoboToolbox: [docs/81_IMPORTADOR_XLSFORM_ODK_KOBO.md](docs/81_IMPORTADOR_XLSFORM_ODK_KOBO.md);
 - aplicacion de escritorio Electron: [docs/82_APLICACION_ESCRITORIO_ELECTRON.md](docs/82_APLICACION_ESCRITORIO_ELECTRON.md);
-- PWA instalable y offline: [docs/83_PWA_OFFLINE_INSTALABLE.md](docs/83_PWA_OFFLINE_INSTALABLE.md).
+- PWA instalable y offline: [docs/83_PWA_OFFLINE_INSTALABLE.md](docs/83_PWA_OFFLINE_INSTALABLE.md);
+- ERP headless (inventario y honorarios): [docs/84_ERP_HEADLESS_INVENTARIO_NOMINA.md](docs/84_ERP_HEADLESS_INVENTARIO_NOMINA.md).
 
 Validar configuracion productiva:
 

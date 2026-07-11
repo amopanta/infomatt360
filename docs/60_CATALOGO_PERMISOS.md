@@ -34,6 +34,7 @@ o permisos escritos de forma diferente.
 | `organizations.manage` | Crear y listar organizaciones (tenants logicos) y asociarlas a proyectos. |
 | `organizations.branding.manage` | Configurar marca blanca (logo, colores, eslogan) de una organizacion. |
 | `backups.manage` | Ejecutar y consultar respaldos de base de datos desde la web. |
+| `erp.manage` | Administrar inventario, configuracion ERP por plantilla y honorarios del motor contable headless. |
 
 ## Grupos operativos actuales
 

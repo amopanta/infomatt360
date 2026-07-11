@@ -2,7 +2,7 @@ export type RecordValue = { id: string; field_name: string; field_value_json: st
 export type RuntimeRecord = { id: string; status: string; submitted_by?: string | null; approval_flow_id?: string | null; approval_flow_version?: string | null; created_at: string; updated_at: string; values: RecordValue[] };
 export type RuntimeRecordPage = { items: RuntimeRecord[]; total: number; limit: number; offset: number };
 export type TemplateSummary = { id: string; name: string; description?: string | null; status: string };
-export type ReviewAction = { id: string; project_id: string; record_id: string; from_status?: string | null; to_status: string; action: string; notes?: string | null; user_id: string; approval_flow_id?: string | null; approval_flow_version?: number | null; created_at?: string | null };
+export type ReviewAction = { id: string; project_id: string; record_id: string; from_status?: string | null; to_status: string; action: string; notes?: string | null; rejected_field_name?: string | null; user_id: string; approval_flow_id?: string | null; approval_flow_version?: number | null; created_at?: string | null };
 export type ReviewNextAction = { label: string; to_status: string; action: string; required_permission?: string | null; source: string };
 export type ReviewApprovalProgress = {
   label: string;
@@ -78,6 +78,13 @@ export async function fetchTemplateRecords(templateId: string): Promise<RuntimeR
   return response.json();
 }
 
+/** Consulta un registro puntual por id, sin depender de paginacion/filtros de la busqueda. */
+export async function fetchRecord(recordId: string): Promise<RuntimeRecord> {
+  const response = await fetch(`${API_BASE_URL}/runtime/record/${recordId}`, { headers: headers() });
+  if (!response.ok) throw new Error('No fue posible consultar el registro.');
+  return response.json();
+}
+
 export async function searchTemplateRecords(params: { templateId: string; search?: string; status?: string; limit?: number; offset?: number }): Promise<RuntimeRecordPage> {
   const query = new URLSearchParams();
   if (params.search) query.set('search', params.search);
@@ -113,7 +120,7 @@ export async function fetchReviewActions(recordId: string): Promise<ReviewAction
   return response.json();
 }
 
-export async function applyReviewAction(payload: { projectId: string; recordId: string; toStatus: string; action: string; notes?: string }): Promise<ReviewAction> {
+export async function applyReviewAction(payload: { projectId: string; recordId: string; toStatus: string; action: string; notes?: string; rejectedFieldName?: string }): Promise<ReviewAction> {
   const response = await fetch(`${API_BASE_URL}/review/actions`, {
     method: 'POST',
     headers: jsonHeaders(),
@@ -123,6 +130,7 @@ export async function applyReviewAction(payload: { projectId: string; recordId: 
       to_status: payload.toStatus,
       action: payload.action,
       notes: payload.notes || null,
+      rejected_field_name: payload.rejectedFieldName || null,
     }),
   });
   if (!response.ok) throw new Error('No fue posible aplicar la acción de revisión.');

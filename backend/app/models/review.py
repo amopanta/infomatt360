@@ -21,6 +21,7 @@ class ReviewAction(Base):
     to_status: Mapped[str] = mapped_column(String(40), nullable=False)
     action: Mapped[str] = mapped_column(String(60), nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rejected_field_name: Mapped[str | None] = mapped_column(String(180), nullable=True)
     user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     approval_flow_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     approval_flow_version: Mapped[int | None] = mapped_column(Integer, nullable=True)

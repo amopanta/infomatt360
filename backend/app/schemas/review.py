@@ -9,6 +9,7 @@ class ReviewActionCreate(BaseModel):
     to_status: str = Field(pattern="^[a-z0-9_]{1,60}$")
     action: str = Field(min_length=1, max_length=60)
     notes: str | None = Field(default=None, max_length=2000)
+    rejected_field_name: str | None = Field(default=None, max_length=180)
 
 
 class ReviewActionRead(ReviewActionCreate):

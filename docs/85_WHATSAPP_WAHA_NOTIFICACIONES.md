@@ -17,7 +17,19 @@ web + PWA + escritorio Electron (ver
 [82_APLICACION_ESCRITORIO_ELECTRON.md](82_APLICACION_ESCRITORIO_ELECTRON.md),
 [83_PWA_OFFLINE_INSTALABLE.md](83_PWA_OFFLINE_INSTALABLE.md)), sin app
 nativa que capture ese esquema. El enlace se adapta a una URL HTTPS real
-hacia la pantalla de registros: `{frontend_url}/records?recordId={id}`.
+hacia la pantalla de registros: `{frontend_url}/records/{template_id}?recordId={id}`,
+y si el revisor indico el campo puntual con el error
+(`ReviewActionCreate.rejected_field_name`), agrega `&campo={campo}` -- el
+equivalente funcional del `&campo=...` del esquema nativo original, pero
+resuelto como parametro de consulta real sobre una URL que el frontend
+efectivamente interpreta (ver "Deep-link al campo especifico" abajo).
+
+**Correccion de paso**: el enlace anterior (`/records?recordId={id}`, sin
+`template_id`) no funcionaba en absoluto -- el frontend no leia `recordId`
+de la URL en ningun punto, asi que el "enlace magico" original solo
+llevaba a la lista generica de formularios. El enlace corregido incluye el
+`template_id` (ya disponible en el registro) y el frontend ahora si
+resuelve `recordId`/`campo` de la URL.
 
 Tambien quedan fuera de este alcance minimo los recibos de lectura/entrega
 (exigirian configurar un webhook de WAHA de vuelta hacia el backend) y las
@@ -97,6 +109,28 @@ incluido) y error si aplica. Si todas las notificaciones estan
 `frontend/src/modules/admin/whatsappApi.ts`. Verificado en navegador real
 contra un registro rechazado real: aparece con el motivo exacto del
 "omitido" cuando no hay proveedor configurado.
+
+### Deep-link al campo especifico (`RecordsApp.tsx`)
+
+Al elegir "Rechazar" o "Devolver" en el panel de revision
+(`frontend/src/modules/records/RecordsApp.tsx`), aparece un selector
+"Campo con error (para el enlace de correccion por WhatsApp)" poblado con
+los `field_name` del registro; el valor elegido viaja como
+`rejected_field_name` en `POST /review/actions`.
+
+Al abrir el enlace del WhatsApp (`/records/{template_id}?recordId=X&campo=Y`),
+`RecordTable` lee `recordId`/`campo` de la URL, consulta ese registro
+puntual con `GET /runtime/record/{id}` (sin depender de en que pagina de
+la lista paginada caiga) y lo muestra en una tarjeta destacada arriba de
+la tabla ("Registro señalado para corrección"), con el campo indicado por
+`campo` resaltado (`scrollIntoView` + contorno rojo) para que el gestor lo
+ubique de inmediato sin tener que leer todo el formulario de nuevo.
+
+Verificado en navegador real: se rechazo un registro submitted indicando
+el campo `ubicacion`, el historial reflejo "Campo: ubicacion", y al abrir
+la URL `/records/{template_id}?recordId={id}&campo=ubicacion` la tarjeta
+destacada aparecio con el campo `ubicacion` resaltado
+(`outline: 3px solid rgb(214, 69, 69)`, confirmado via el DOM real).
 
 ## Como levantar una instancia WAHA para activarlo
 

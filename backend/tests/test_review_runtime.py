@@ -107,6 +107,39 @@ def test_review_action_updates_runtime_record_and_lists_history():
         Base.metadata.drop_all(bind=engine)
 
 
+def test_review_action_persists_rejected_field_name_and_reflects_in_history():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "approver-review@example.com", "Approver12345!")
+            response = client.post(
+                "/api/v1/review/actions",
+                headers=headers,
+                json={
+                    "project_id": "review-project",
+                    "record_id": "review-record",
+                    "to_status": "rejected",
+                    "action": "reject",
+                    "notes": "Foto borrosa",
+                    "rejected_field_name": "foto_evidencia",
+                },
+            )
+            assert response.status_code == 200
+            assert response.json()["rejected_field_name"] == "foto_evidencia"
+
+            with sessions() as db:
+                record = db.get(RuntimeRecord, "review-record")
+                assert record is not None
+                assert record.status == "rejected"
+
+            history = client.get("/api/v1/review/records/review-record/actions", headers=headers)
+            assert history.status_code == 200
+            assert history.json()[0]["rejected_field_name"] == "foto_evidencia"
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
 def test_review_rejects_invalid_transition_and_cross_project_access():
     engine, _sessions = setup_client()
     try:

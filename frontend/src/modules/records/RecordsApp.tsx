@@ -1,9 +1,11 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
-import { applyReviewAction, downloadTemplateRecords, fetchProjectTemplates, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, searchTemplateRecords } from './api';
+import { applyReviewAction, downloadTemplateRecords, fetchProjectTemplates, fetchRecord, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
+
+const REJECTION_STATUSES = new Set(['rejected', 'returned']);
 
 const PAGE_SIZE = 25;
 
@@ -71,10 +73,12 @@ function ReviewPanel({
   const [approvalProgress, setApprovalProgress] = useState<ReviewApprovalProgress[]>([]);
   const [flowComparison, setFlowComparison] = useState<ReviewFlowComparison | null>(null);
   const [notes, setNotes] = useState('');
+  const [rejectedFieldName, setRejectedFieldName] = useState('');
   const fallbackActions = REVIEW_ACTIONS[record.status] ?? [];
   const actions = nextActions.length
     ? nextActions.map((item) => ({ label: item.label, toStatus: item.to_status, action: item.action, source: item.source }))
     : fallbackActions;
+  const showFieldSelector = actions.some((item) => REJECTION_STATUSES.has(item.toStatus));
 
   async function loadReviewState() {
     await Promise.all([
@@ -91,7 +95,8 @@ function ReviewPanel({
 
   async function submit(action: { label: string; toStatus: string; action: string }) {
     try {
-      await applyReviewAction({ projectId, recordId: record.id, toStatus: action.toStatus, action: action.action, notes });
+      const fieldName = REJECTION_STATUSES.has(action.toStatus) ? rejectedFieldName : undefined;
+      await applyReviewAction({ projectId, recordId: record.id, toStatus: action.toStatus, action: action.action, notes, rejectedFieldName: fieldName || undefined });
       await loadReviewState();
       onMessage(`Acción aplicada: ${action.label}.`);
     } catch (error) {
@@ -134,6 +139,15 @@ function ReviewPanel({
         Observación
         <textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />
       </label>
+      {showFieldSelector ? (
+        <label>
+          Campo con error (para el enlace de corrección por WhatsApp)
+          <select value={rejectedFieldName} onChange={(event) => setRejectedFieldName(event.target.value)}>
+            <option value="">Sin campo específico</option>
+            {record.values.map((value) => <option key={value.id} value={value.field_name}>{value.field_name}</option>)}
+          </select>
+        </label>
+      ) : null}
       <div className="review-actions">
         {actions.length ? (
           actions.map((item) => <button key={item.action} onClick={() => void submit(item)}>{item.label}</button>)
@@ -149,6 +163,7 @@ function ReviewPanel({
               {item.created_at ? new Date(item.created_at).toLocaleString() : ''} · {item.action}: {item.from_status || '—'} → {item.to_status}
               {item.approval_flow_version ? ` · flujo v${item.approval_flow_version}` : ''}
               {item.notes ? ` · ${item.notes}` : ''}
+              {item.rejected_field_name ? ` · Campo: ${item.rejected_field_name}` : ''}
             </p>
           ))
         ) : (
@@ -196,6 +211,47 @@ function TemplateList() {
   );
 }
 
+function DeepLinkedRecordCard({
+  projectId,
+  record,
+  highlightField,
+  onMessage,
+}: {
+  projectId: string;
+  record: RuntimeRecord;
+  highlightField: string;
+  onMessage: (value: string) => void;
+}) {
+  const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  useEffect(() => {
+    if (!highlightField) return;
+    fieldRefs.current[highlightField]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightField, record.id]);
+
+  return (
+    <section className="record-deep-link-card">
+      <header>
+        <strong>Registro señalado para corrección</strong>
+        <span className={`record-status ${record.status}`}>{record.status}</span>
+      </header>
+      <dl className="record-detail">
+        {record.values.map((value) => (
+          <div
+            key={value.id}
+            ref={(node) => { fieldRefs.current[value.field_name] = node; }}
+            className={value.field_name === highlightField ? 'record-field-highlighted' : undefined}
+          >
+            <dt>{value.field_name}</dt>
+            <dd>{formatValue(value.field_value_json, true)}</dd>
+          </div>
+        ))}
+      </dl>
+      <ReviewPanel projectId={projectId} record={record} onMessage={onMessage} />
+    </section>
+  );
+}
+
 function RecordTable({ templateId }: { templateId: string }) {
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [records, setRecords] = useState<RuntimeRecord[]>([]);
@@ -205,6 +261,19 @@ function RecordTable({ templateId }: { templateId: string }) {
   const [total, setTotal] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [message, setMessage] = useState('Cargando registros...');
+  const [deepLink] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    return { recordId: params.get('recordId') ?? '', campo: params.get('campo') ?? '' };
+  });
+  const [deepLinkedRecord, setDeepLinkedRecord] = useState<RuntimeRecord | null>(null);
+  const [deepLinkError, setDeepLinkError] = useState('');
+
+  useEffect(() => {
+    if (!deepLink.recordId) return;
+    fetchRecord(deepLink.recordId)
+      .then(setDeepLinkedRecord)
+      .catch((error: Error) => setDeepLinkError(error.message));
+  }, [deepLink.recordId]);
 
   useEffect(() => {
     let active = true;
@@ -237,6 +306,11 @@ function RecordTable({ templateId }: { templateId: string }) {
   return (
     <AppShell title="Registros del formulario">
       <main className="records-shell">
+        {deepLinkedRecord ? (
+          <DeepLinkedRecordCard projectId={projectId} record={deepLinkedRecord} highlightField={deepLink.campo} onMessage={setMessage} />
+        ) : deepLinkError ? (
+          <p role="alert">{deepLinkError}</p>
+        ) : null}
         <div className="records-toolbar">
           <a href="/records">Volver a formularios</a>
           <div className="records-toolbar-actions">

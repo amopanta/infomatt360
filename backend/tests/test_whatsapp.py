@@ -100,7 +100,14 @@ def test_rejecting_record_sends_whatsapp_when_configured_and_owner_has_phone():
             response = client.post(
                 "/api/v1/review/actions",
                 headers=headers,
-                json={"project_id": "wa-project", "record_id": "wa-record-1", "to_status": "rejected", "action": "reject", "notes": "Foto borrosa"},
+                json={
+                    "project_id": "wa-project",
+                    "record_id": "wa-record-1",
+                    "to_status": "rejected",
+                    "action": "reject",
+                    "notes": "Foto borrosa",
+                    "rejected_field_name": "foto_evidencia",
+                },
             )
             assert response.status_code == 200, response.text
 
@@ -108,7 +115,8 @@ def test_rejecting_record_sends_whatsapp_when_configured_and_owner_has_phone():
             url, kwargs = sent_requests[0]
             assert url == "https://waha.example.com/api/sendText"
             assert kwargs["json"]["chatId"] == "573001234567@c.us"
-            assert "/records?recordId=wa-record-1" in kwargs["json"]["text"]
+            assert "/records/wa-template?recordId=wa-record-1&campo=foto_evidencia" in kwargs["json"]["text"]
+            assert "Campo a corregir: foto_evidencia" in kwargs["json"]["text"]
             assert kwargs["headers"]["X-Api-Key"] == "test-key"
 
             with sessions() as db:

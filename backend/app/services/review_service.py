@@ -1,3 +1,5 @@
+from urllib.parse import quote
+
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -40,6 +42,7 @@ def to_read(row: ReviewAction) -> ReviewActionRead:
         to_status=row.to_status,
         action=row.action,
         notes=row.notes,
+        rejected_field_name=row.rejected_field_name,
         user_id=row.user_id,
         approval_flow_id=row.approval_flow_id,
         approval_flow_version=row.approval_flow_version,
@@ -84,6 +87,7 @@ class ReviewService:
             to_status=payload.to_status,
             action=payload.action,
             notes=payload.notes,
+            rejected_field_name=payload.rejected_field_name,
             user_id=user_id,
             approval_flow_id=configured_step.flow_id if configured_step else None,
             approval_flow_version=self._configured_step_flow_version(db, configured_step),
@@ -208,13 +212,22 @@ class ReviewService:
         # notificaciones por WhatsApp"). El "Enlace Magico" original asume una
         # app movil nativa con esquema infomatt://; como el sistema real es
         # web/PWA/escritorio, se adapta a un enlace HTTPS real hacia la
-        # pantalla de registros. No interrumpe el flujo si WAHA no esta
+        # pantalla de registros -- y, si el revisor indico el campo puntual
+        # con el error (payload.rejected_field_name), el enlace apunta
+        # directo a ese registro y ese campo (?recordId=X&campo=Y), no solo
+        # a la pantalla general. No interrumpe el flujo si WAHA no esta
         # configurado o falla (ver whatsapp_service.send_text).
         if payload.to_status in {"rejected", "returned"}:
             recipient = db.query(User).filter(User.id == recipient_id).first()
             if recipient and recipient.phone:
-                magic_link = f"{settings.frontend_url.rstrip('/')}/records?recordId={payload.record_id}"
-                whatsapp_message = f"{body}\n\nCorrige aqui: {magic_link}"
+                template_id = self._record_template_id(record)
+                base_path = f"/records/{template_id}" if template_id else "/records"
+                magic_link = f"{settings.frontend_url.rstrip('/')}{base_path}?recordId={payload.record_id}"
+                if payload.rejected_field_name:
+                    magic_link = f"{magic_link}&campo={quote(payload.rejected_field_name)}"
+                    whatsapp_message = f"{body}\n\nCampo a corregir: {payload.rejected_field_name}\nCorrige aqui: {magic_link}"
+                else:
+                    whatsapp_message = f"{body}\n\nCorrige aqui: {magic_link}"
                 whatsapp_service.send_text(
                     db,
                     project_id=payload.project_id,

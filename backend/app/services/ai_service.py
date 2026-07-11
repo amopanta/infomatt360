@@ -5,7 +5,7 @@ from app.schemas.ai import AiCheckCreate, AiCheckRead, ExecutiveAnalysisCreate, 
 
 
 def check_to_read(row: AiCheck) -> AiCheckRead:
-    return AiCheckRead(id=row.id, project_id=row.project_id, record_id=row.record_id, file_id=row.file_id, check_type=row.check_type, status=row.status, result_json=row.result_json, created_by=row.created_by)
+    return AiCheckRead(id=row.id, project_id=row.project_id, record_id=row.record_id, file_id=row.file_id, check_type=row.check_type, status=row.status, result_json=row.result_json, created_by=row.created_by, created_at=row.created_at)
 
 
 def ocr_to_read(row: OcrResult) -> OcrResultRead:

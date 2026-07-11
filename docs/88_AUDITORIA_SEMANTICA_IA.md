@@ -88,7 +88,23 @@ o una respuesta no parseable se trata como `status="error"`.
 | `POST` | `/records/{record_id}/analyze` | `ai.audit.manage` (reanalisis manual, ej. si la config se agrego despues de capturado el registro) |
 
 Los resultados (`AiCheck`) se consultan con el endpoint ya existente
-`GET /api/v1/ai/checks/{project_id}`.
+`GET /api/v1/ai/checks/{project_id}` (de paso se agrego `created_at` al
+schema `AiCheckRead`, que existia en el modelo pero no se exponia).
+
+## Pantalla en el frontend
+
+`frontend/src/modules/admin/AiAuditApp.tsx` (ruta `/admin/ai-audit`,
+permiso `ai.audit.manage`), con dos pestañas: **Alertas** (tabla de
+`AiCheck` filtrada a `check_type="semantic_audit"`, con fecha, estado,
+registro, razonamiento y frases señaladas; incluye un campo para
+reanalizar manualmente un registro por id) y **Configuracion por
+plantilla** (vincular una plantilla con su campo de texto y modo de
+reaccion, y consultar la configuracion de una plantilla existente).
+Cliente API en `frontend/src/modules/admin/aiAuditApi.ts`. Verificado en
+navegador real: se vinculo una plantilla en modo mixto, se guardo un
+registro con una observacion de ejemplo (sin proveedor de IA
+configurado), y la alerta aparecio con el motivo exacto del estado
+"omitido"; el reanalisis manual tambien se probo y agrego una fila nueva.
 
 ## Como activarlo
 
@@ -101,7 +117,6 @@ Los resultados (`AiCheck`) se consultan con el endpoint ya existente
 
 ## Limites conocidos
 
-- Sin pantalla propia en el frontend todavia (se opera por Swagger/API directa).
 - La llamada al LLM es sincrona dentro de la peticion de guardado: en un
   formulario con auditoria activa, guardar un registro tarda lo que tarde
   el proveedor de IA en responder (con timeout de 20s). No hay cola en

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { AccountSecurityApp } from './modules/account/AccountSecurityApp';
 import { AdminUserSecurityApp } from './modules/admin/AdminUserSecurityApp';
+import { AiAuditApp } from './modules/admin/AiAuditApp';
 import { ApiKeysApp } from './modules/admin/ApiKeysApp';
 import { ApprovalFlowsApp } from './modules/admin/ApprovalFlowsApp';
 import { BulkJobsApp } from './modules/admin/BulkJobsApp';
@@ -82,6 +83,7 @@ function renderRoute(route: AppRoute) {
       case 'erp': return <ErpApp />;
       case 'whatsapp': return <WhatsAppApp />;
       case 'donorSync': return <DonorSyncApp />;
+      case 'aiAudit': return <AiAuditApp />;
       case 'adminUsers': return <AdminUserSecurityApp />;
       case 'accountSecurity': return <AccountSecurityApp />;
       case 'records': return <RecordsApp />;

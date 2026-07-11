@@ -26,6 +26,7 @@ class AiCheckCreate(BaseModel):
 class AiCheckRead(AiCheckCreate):
     id: str
     created_by: str | None = None
+    created_at: datetime
 
 
 class OcrResultCreate(BaseModel):

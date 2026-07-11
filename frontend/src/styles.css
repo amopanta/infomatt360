@@ -574,4 +574,10 @@ body { margin: 0; }
 .ds-map-card small { margin-top: 4px; color: #536878; }
 .ds-map-card code { display: block; margin-top: 8px; padding: 8px; border-radius: 8px; background: #f5f8fb; overflow-wrap: anywhere; }
 @media (max-width: 1024px) { .ds-sources, .ds-maps { grid-template-columns: 1fr; } }
+
+.ai-analyze-inline { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 16px; }
+.ai-analyze-inline label { flex: 1; display: flex; flex-direction: column; gap: 7px; font-weight: 800; margin-bottom: 0; }
+.ai-analyze-inline input { border: 1px solid #cfd8e3; border-radius: 10px; padding: 11px; font: inherit; }
+.ai-analyze-inline button { border: 1px solid #0066cc; border-radius: 10px; padding: 11px 16px; background: #ffffff; color: #0066cc; font-weight: 800; cursor: pointer; }
+.ai-analyze-inline button:disabled { opacity: 0.45; cursor: not-allowed; }
 @media (max-width: 760px) { .review-flow-comparison > div { grid-template-columns: 1fr; } .review-flow-comparison header { flex-direction: column; } }

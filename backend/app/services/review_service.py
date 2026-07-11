@@ -12,6 +12,7 @@ from app.models.runtime_record import RuntimeRecord
 from app.schemas.review import ReviewActionCreate, ReviewActionRead
 from app.services.approval_flow_service import approval_flow_service
 from app.services.erp_service import erp_service
+from app.services.integration_service import integration_service
 from app.services.whatsapp_service import whatsapp_service
 
 
@@ -71,6 +72,10 @@ class ReviewService:
             # de cualquier commit y descarta tambien este cambio de estado.
             if isinstance(record, RuntimeRecord) and payload.to_status == "approved":
                 erp_service.settle_record(db, record)
+                # Interoperabilidad con plataformas de donantes (ActivityInfo/
+                # TolaData u otras via conector generico): fire-and-forget, no
+                # bloquea la aprobacion si el envio externo falla.
+                integration_service.push_approved_record(db, record)
 
         row = ReviewAction(
             project_id=payload.project_id,

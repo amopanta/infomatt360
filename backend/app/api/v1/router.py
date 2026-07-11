@@ -16,6 +16,7 @@ from app.api.v1.enrollment import router as enrollment_router
 from app.api.v1.erp import router as erp_router
 from app.api.v1.etl import router as etl_router
 from app.api.v1.excel_import import router as excel_import_router
+from app.api.v1.external_api import router as external_api_router
 from app.api.v1.external_data import router as external_data_router
 from app.api.v1.files import router as files_router
 from app.api.v1.forms import router as forms_router
@@ -68,6 +69,7 @@ api_v1_router.include_router(audit_router, prefix="/audit", tags=["audit"])
 api_v1_router.include_router(integrations_router, prefix="/integrations", tags=["integrations"])
 api_v1_router.include_router(etl_router, prefix="/etl", tags=["etl"])
 api_v1_router.include_router(external_data_router, prefix="/external-data", tags=["external-data"])
+api_v1_router.include_router(external_api_router, prefix="/external-api", tags=["external-api"])
 api_v1_router.include_router(mirror_router, prefix="/mirror", tags=["mirror"])
 api_v1_router.include_router(scheduler_router, prefix="/scheduler", tags=["scheduler"])
 api_v1_router.include_router(reports_router, prefix="/reports", tags=["reports"])

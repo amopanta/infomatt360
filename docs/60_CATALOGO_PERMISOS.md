@@ -35,6 +35,7 @@ o permisos escritos de forma diferente.
 | `organizations.branding.manage` | Configurar marca blanca (logo, colores, eslogan) de una organizacion. |
 | `backups.manage` | Ejecutar y consultar respaldos de base de datos desde la web. |
 | `erp.manage` | Administrar inventario, configuracion ERP por plantilla y honorarios del motor contable headless. |
+| `integrations.donor_sync.manage` | Configurar fuentes externas (ActivityInfo/TolaData u otras), mapeos de campos y consultar el historial de envios. |
 
 ## Grupos operativos actuales
 

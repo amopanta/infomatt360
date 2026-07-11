@@ -240,7 +240,8 @@ Antes de produccion real:
 - importador XLSForm/ODK/KoboToolbox: [docs/81_IMPORTADOR_XLSFORM_ODK_KOBO.md](docs/81_IMPORTADOR_XLSFORM_ODK_KOBO.md);
 - aplicacion de escritorio Electron: [docs/82_APLICACION_ESCRITORIO_ELECTRON.md](docs/82_APLICACION_ESCRITORIO_ELECTRON.md);
 - PWA instalable y offline: [docs/83_PWA_OFFLINE_INSTALABLE.md](docs/83_PWA_OFFLINE_INSTALABLE.md);
-- ERP headless (inventario y honorarios): [docs/84_ERP_HEADLESS_INVENTARIO_NOMINA.md](docs/84_ERP_HEADLESS_INVENTARIO_NOMINA.md).
+- ERP headless (inventario y honorarios): [docs/84_ERP_HEADLESS_INVENTARIO_NOMINA.md](docs/84_ERP_HEADLESS_INVENTARIO_NOMINA.md);
+- notificaciones WhatsApp via WAHA: [docs/85_WHATSAPP_WAHA_NOTIFICACIONES.md](docs/85_WHATSAPP_WAHA_NOTIFICACIONES.md).
 
 Validar configuracion productiva:
 

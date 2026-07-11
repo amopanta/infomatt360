@@ -37,6 +37,7 @@ from app.api.v1.runtime import router as runtime_router
 from app.api.v1.scheduler import router as scheduler_router
 from app.api.v1.security import router as security_router
 from app.api.v1.storage import router as storage_router
+from app.api.v1.whatsapp import router as whatsapp_router
 from app.api.v1.xlsform import router as xlsform_router
 
 api_v1_router = APIRouter()
@@ -77,5 +78,6 @@ api_v1_router.include_router(builder_router, prefix="/builder", tags=["builder"]
 api_v1_router.include_router(builder_layout_router, prefix="/builder", tags=["builder-layout"])
 api_v1_router.include_router(xlsform_router, prefix="/xlsform", tags=["xlsform"])
 api_v1_router.include_router(erp_router, prefix="/erp", tags=["erp"])
+api_v1_router.include_router(whatsapp_router, prefix="/whatsapp", tags=["whatsapp"])
 api_v1_router.include_router(runtime_router, prefix="/runtime", tags=["runtime"])
 api_v1_router.include_router(compiler_router, prefix="/compiler", tags=["compiler"])

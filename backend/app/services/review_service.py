@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.time import utc_now
 from app.models.assignment import UserProjectAssignment
 from typing import Any
@@ -11,6 +12,7 @@ from app.models.runtime_record import RuntimeRecord
 from app.schemas.review import ReviewActionCreate, ReviewActionRead
 from app.services.approval_flow_service import approval_flow_service
 from app.services.erp_service import erp_service
+from app.services.whatsapp_service import whatsapp_service
 
 
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
@@ -195,6 +197,27 @@ class ReviewService:
             body=body,
             status="unread",
         ))
+
+        # Notificacion WhatsApp solo ante rechazo/devolucion (ver 4.4 de la
+        # especificacion original: "ante un rechazo, envia automaticamente
+        # notificaciones por WhatsApp"). El "Enlace Magico" original asume una
+        # app movil nativa con esquema infomatt://; como el sistema real es
+        # web/PWA/escritorio, se adapta a un enlace HTTPS real hacia la
+        # pantalla de registros. No interrumpe el flujo si WAHA no esta
+        # configurado o falla (ver whatsapp_service.send_text).
+        if payload.to_status in {"rejected", "returned"}:
+            recipient = db.query(User).filter(User.id == recipient_id).first()
+            if recipient and recipient.phone:
+                magic_link = f"{settings.frontend_url.rstrip('/')}/records?recordId={payload.record_id}"
+                whatsapp_message = f"{body}\n\nCorrige aqui: {magic_link}"
+                whatsapp_service.send_text(
+                    db,
+                    project_id=payload.project_id,
+                    recipient_phone=recipient.phone,
+                    recipient_user_id=recipient_id,
+                    reference_record_id=payload.record_id,
+                    message=whatsapp_message,
+                )
 
     def _record_owner_id(self, record: RuntimeRecord | Record) -> str | None:
         if isinstance(record, RuntimeRecord):

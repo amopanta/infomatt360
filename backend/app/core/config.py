@@ -80,6 +80,12 @@ class Settings(BaseSettings):
     google_oauth_client_id: str = ""
     google_oauth_client_secret: str = ""
     google_oauth_redirect_uri: str = ""
+
+    # Gateway opcional de WhatsApp via WAHA (https://waha.devlike.pro). Vacio
+    # por defecto: sin URL configurada, el canal queda inactivo.
+    waha_base_url: str = ""
+    waha_api_key: str = ""
+    waha_session: str = "default"
     security_headers_enabled: bool = True
     content_security_policy: str = "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
     referrer_policy: str = "no-referrer"

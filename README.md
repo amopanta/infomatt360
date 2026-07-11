@@ -225,6 +225,22 @@ Antes de produccion real:
 - registrar evidencia UAT con [docs/69_PLANTILLA_EVIDENCIA_UAT.md](docs/69_PLANTILLA_EVIDENCIA_UAT.md).
 - ejecutar escenarios por modulo con [docs/70_GUIA_EJECUCION_UAT_MODULOS.md](docs/70_GUIA_EJECUCION_UAT_MODULOS.md).
 
+## Modulos de alineacion con la especificacion original (fases 0-4)
+
+- organizaciones y tenant logico: [docs/71_ORGANIZACIONES_TENANT_LOGICO.md](docs/71_ORGANIZACIONES_TENANT_LOGICO.md);
+- marca blanca dinamica: [docs/72_MARCA_BLANCA_DINAMICA.md](docs/72_MARCA_BLANCA_DINAMICA.md);
+- instalador de primer arranque: [docs/73_INSTALADOR_SETUP_WIZARD.md](docs/73_INSTALADOR_SETUP_WIZARD.md);
+- QR de enrolamiento por gestor: [docs/74_QR_ENROLAMIENTO_GESTOR.md](docs/74_QR_ENROLAMIENTO_GESTOR.md);
+- correo autoconfigurado: [docs/75_CORREO_AUTOCONFIGURADO.md](docs/75_CORREO_AUTOCONFIGURADO.md);
+- carga masiva Excel con mapeo y aprobacion: [docs/76_CARGA_MASIVA_EXCEL_MAPEO.md](docs/76_CARGA_MASIVA_EXCEL_MAPEO.md);
+- anti-duplicidad: [docs/77_ANTI_DUPLICIDAD.md](docs/77_ANTI_DUPLICIDAD.md);
+- backups programables desde la web: [docs/78_BACKUPS_PROGRAMABLES_WEB.md](docs/78_BACKUPS_PROGRAMABLES_WEB.md);
+- conector Google Drive (OAuth): [docs/79_CONECTOR_GOOGLE_DRIVE.md](docs/79_CONECTOR_GOOGLE_DRIVE.md);
+- generador de actas PDF: [docs/80_GENERADOR_ACTAS_PDF.md](docs/80_GENERADOR_ACTAS_PDF.md);
+- importador XLSForm/ODK/KoboToolbox: [docs/81_IMPORTADOR_XLSFORM_ODK_KOBO.md](docs/81_IMPORTADOR_XLSFORM_ODK_KOBO.md);
+- aplicacion de escritorio Electron: [docs/82_APLICACION_ESCRITORIO_ELECTRON.md](docs/82_APLICACION_ESCRITORIO_ELECTRON.md);
+- PWA instalable y offline: [docs/83_PWA_OFFLINE_INSTALABLE.md](docs/83_PWA_OFFLINE_INSTALABLE.md).
+
 Validar configuracion productiva:
 
 ```powershell

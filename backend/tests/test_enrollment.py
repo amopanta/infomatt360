@@ -11,6 +11,12 @@ from app.models.assignment import UserProjectAssignment
 from app.models.identity import Project, Role, User
 
 
+def issue_qr_token(client: TestClient, admin_headers: dict[str, str], user_id: str = "qr-manager") -> str:
+    created = client.post("/api/v1/enrollment/qr", headers=admin_headers, json={"project_id": "qr-project", "user_id": user_id})
+    assert created.status_code == 200
+    return created.headers["x-enrollment-token"]
+
+
 def setup_client():
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     sessions = sessionmaker(bind=engine)
@@ -87,6 +93,65 @@ def test_qr_validation_lifecycle():
 
             reused = client.post("/api/v1/enrollment/validate", json={"token": raw_token})
             assert reused.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_device_lock_binds_on_first_enrollment_and_blocks_a_different_device():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            admin_headers = auth(client, "qr-admin@example.com", "Admin12345!")
+
+            first_token = issue_qr_token(client, admin_headers)
+            first = client.post("/api/v1/enrollment/validate", json={"token": first_token, "device_fingerprint": "device-A"})
+            assert first.status_code == 200
+
+            with sessions() as db:
+                user = db.query(User).filter(User.id == "qr-manager").one()
+                assert user.locked_device_fingerprint == "device-A"
+                assert user.device_lock_updated_at is not None
+
+            second_token = issue_qr_token(client, admin_headers)
+            blocked = client.post("/api/v1/enrollment/validate", json={"token": second_token, "device_fingerprint": "device-B"})
+            assert blocked.status_code == 403
+
+            # El token del segundo intento (rechazado por dispositivo distinto) no se consume.
+            with sessions() as db:
+                user = db.query(User).filter(User.id == "qr-manager").one()
+                assert user.locked_device_fingerprint == "device-A"
+
+            same_device = client.post("/api/v1/enrollment/validate", json={"token": second_token, "device_fingerprint": "device-A"})
+            assert same_device.status_code == 200
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_admin_can_reset_device_lock_to_allow_a_new_device():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            admin_headers = auth(client, "qr-admin@example.com", "Admin12345!")
+            manager_headers = auth(client, "qr-manager@example.com", "Manager12345!")
+
+            first_token = issue_qr_token(client, admin_headers)
+            client.post("/api/v1/enrollment/validate", json={"token": first_token, "device_fingerprint": "device-A"})
+
+            denied = client.post("/api/v1/enrollment/reset-device", headers=manager_headers, json={"project_id": "qr-project", "user_id": "qr-manager"})
+            assert denied.status_code == 403
+
+            reset = client.post("/api/v1/enrollment/reset-device", headers=admin_headers, json={"project_id": "qr-project", "user_id": "qr-manager"})
+            assert reset.status_code == 204
+
+            with sessions() as db:
+                user = db.query(User).filter(User.id == "qr-manager").one()
+                assert user.locked_device_fingerprint is None
+
+            new_token = issue_qr_token(client, admin_headers)
+            revalidated = client.post("/api/v1/enrollment/validate", json={"token": new_token, "device_fingerprint": "device-B"})
+            assert revalidated.status_code == 200
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

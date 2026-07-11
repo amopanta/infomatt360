@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # entregado por variable de entorno o gestor de secretos.
     secret_key: str = "CHANGE_ME_IN_PRODUCTION"
     access_token_expire_minutes: int = 60
+    # Sesion extendida para dispositivos de campo ya enrolados (ManagerQrToken),
+    # que trabajan largas jornadas rurales sin conectividad para renovar el token.
+    access_token_expire_minutes_field_device: int = 600
     refresh_token_expire_days: int = 7
     refresh_cookie_name: str = "infomatt360_refresh"
     refresh_cookie_secure: bool = False

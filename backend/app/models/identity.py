@@ -36,6 +36,8 @@ class User(Base):
     mfa_secret_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     mfa_recovery_hashes: Mapped[str | None] = mapped_column(Text, nullable=True)
     mfa_last_counter: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    locked_device_fingerprint: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    device_lock_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
 

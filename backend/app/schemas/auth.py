@@ -12,6 +12,7 @@ def validate_bcrypt_password(value: str | None) -> str | None:
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(..., min_length=6)
+    device_fingerprint: str | None = None
 
     _password_fits_bcrypt = field_validator("password")(validate_bcrypt_password)
 
@@ -56,6 +57,7 @@ class MfaConfirmResponse(BaseModel):
 class MfaVerifyRequest(BaseModel):
     challenge_token: str = Field(..., min_length=32)
     code: str = Field(..., min_length=6, max_length=64)
+    device_fingerprint: str | None = None
 
 
 class MfaDisableRequest(BaseModel):

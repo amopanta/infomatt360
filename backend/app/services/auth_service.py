@@ -19,6 +19,12 @@ from app.services.mfa_service import mfa_service
 
 
 class AuthService:
+    def _field_device_expiry(self, user: User, device_fingerprint: str | None) -> timedelta | None:
+        """Sesion extendida solo si el dispositivo coincide con el enrolado y bloqueado para este gestor."""
+        if device_fingerprint and user.locked_device_fingerprint and device_fingerprint == user.locked_device_fingerprint:
+            return timedelta(minutes=settings.access_token_expire_minutes_field_device)
+        return None
+
     def login(self, db: Session, payload: LoginRequest) -> LoginResponse:
         user = identity_service.get_user_by_email(db, str(payload.email))
         if user is None or not verify_password(payload.password, user.password_hash):
@@ -33,11 +39,11 @@ class AuthService:
         raw_refresh, family_id = self._create_refresh_token(db, user)
         db.commit()
         return LoginResponse(
-            access_token=create_access_token(user.id, user.auth_version, family_id),
+            access_token=create_access_token(user.id, user.auth_version, family_id, expires_delta=self._field_device_expiry(user, payload.device_fingerprint)),
             refresh_token=raw_refresh,
         )
 
-    def complete_mfa_login(self, db: Session, user: User, code: str) -> TokenResponse:
+    def complete_mfa_login(self, db: Session, user: User, code: str, device_fingerprint: str | None = None) -> TokenResponse:
         valid = mfa_service.verify_totp(user, code) or mfa_service.consume_recovery_code(user, code)
         if not user.mfa_enabled or not valid:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Codigo MFA invalido")
@@ -45,7 +51,7 @@ class AuthService:
         db.add(AuditLog(user_id=user.id, module="identity", action="mfa_login", entity_type="user", entity_id=user.id))
         db.commit()
         return TokenResponse(
-            access_token=create_access_token(user.id, user.auth_version, family_id),
+            access_token=create_access_token(user.id, user.auth_version, family_id, expires_delta=self._field_device_expiry(user, device_fingerprint)),
             refresh_token=raw_refresh,
         )
 

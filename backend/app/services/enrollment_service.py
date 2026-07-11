@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.time import utc_now
 from app.models.enrollment import ManagerQrToken
+from app.models.identity import User
 from app.schemas.enrollment import QrGenerateRequest, QrValidateRequest, QrValidateResponse
 
 
@@ -47,11 +48,31 @@ class EnrollmentService:
         now = utc_now()
         if row is None or row.used_at is not None or row.expires_at <= now:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Codigo QR invalido o vencido")
-        row.used_at = now
+
         if payload.device_fingerprint:
+            user = db.query(User).filter(User.id == row.user_id).first()
+            if user is not None:
+                if user.locked_device_fingerprint and user.locked_device_fingerprint != payload.device_fingerprint:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Este gestor ya tiene un dispositivo autorizado. Solicita a un administrador que libere el dispositivo anterior antes de enrolar uno nuevo.",
+                    )
+                if not user.locked_device_fingerprint:
+                    user.locked_device_fingerprint = payload.device_fingerprint
+                    user.device_lock_updated_at = now
             row.device_fingerprint = payload.device_fingerprint
+
+        row.used_at = now
         db.commit()
         return QrValidateResponse(valid=True, project_id=row.project_id, user_id=row.user_id)
+
+    def reset_device_lock(self, db: Session, user_id: str) -> None:
+        user = db.query(User).filter(User.id == user_id).first()
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no encontrado")
+        user.locked_device_fingerprint = None
+        user.device_lock_updated_at = utc_now()
+        db.commit()
 
 
 enrollment_service = EnrollmentService()

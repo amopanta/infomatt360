@@ -16,3 +16,8 @@ class QrValidateResponse(BaseModel):
     valid: bool
     project_id: str | None = None
     user_id: str | None = None
+
+
+class DeviceResetRequest(BaseModel):
+    project_id: str
+    user_id: str

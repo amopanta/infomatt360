@@ -49,10 +49,23 @@ acceso al proyecto (`404` si no) antes de emitir el codigo.
   valida directo; si no, abre la camara (`getUserMedia`) y decodifica cada
   cuadro con `jsqr` hasta encontrar un QR valido.
 
+## Asset lock: el dispositivo enrolado queda bloqueado al gestor
+
+Desde `docs/91_ASSET_LOCK_Y_SESION_EXTENDIDA_CAMPO.md`, la primera
+validacion exitosa con `device_fingerprint` **bloquea** ese dispositivo al
+gestor (`User.locked_device_fingerprint`). Validaciones posteriores del
+mismo gestor desde un `device_fingerprint` distinto se rechazan con `403`
+hasta que un administrador libere el dispositivo anterior
+(`POST /enrollment/reset-device`). Antes de este cambio,
+`device_fingerprint` solo se registraba sin ninguna consecuencia.
+
 ## Limites conocidos
 
 - El enrolamiento valida el token y confirma acceso al proyecto, pero no
   crea todavia una sesion autenticada por si solo: el dispositivo enrolado
   sigue necesitando iniciar sesion con las credenciales del gestor. El
   enrolamiento resuelve la distribucion segura del acceso inicial al
-  proyecto, no reemplaza el login.
+  proyecto, no reemplaza el login. Ver
+  `docs/91_ASSET_LOCK_Y_SESION_EXTENDIDA_CAMPO.md` para como ese login
+  posterior obtiene una sesion extendida si el dispositivo coincide con el
+  bloqueado.

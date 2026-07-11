@@ -7,7 +7,7 @@ from app.api.permissions import require_project_permission
 from app.core.permissions import IDENTITY_USERS_MANAGE
 from app.db.session import get_db
 from app.models.identity import User
-from app.schemas.enrollment import QrGenerateRequest, QrValidateRequest, QrValidateResponse
+from app.schemas.enrollment import DeviceResetRequest, QrGenerateRequest, QrValidateRequest, QrValidateResponse
 from app.services.assignment_service import assignment_service
 from app.services.auth_throttle_service import auth_throttle_service
 from app.services.enrollment_service import enrollment_service
@@ -42,3 +42,11 @@ def validate_qr(payload: QrValidateRequest, request: Request, db: Session = Depe
         raise
     auth_throttle_service.clear(db, "qr-validate-ip", ip_address)
     return result
+
+
+@router.post("/reset-device", status_code=status.HTTP_204_NO_CONTENT, summary="Liberar el dispositivo autorizado de un gestor")
+def reset_device(payload: DeviceResetRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> None:
+    require_project_permission(db, current_user.id, payload.project_id, IDENTITY_USERS_MANAGE)
+    if not assignment_service.user_has_project_access(db, payload.user_id, payload.project_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El gestor no tiene acceso a ese proyecto")
+    enrollment_service.reset_device_lock(db, payload.user_id)

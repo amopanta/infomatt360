@@ -109,7 +109,7 @@ def verify_mfa(payload: MfaVerifyRequest, request: Request, response: Response, 
         ).first()
         if user is None:
             raise JWTError("usuario invalido")
-        token_response = auth_service.complete_mfa_login(db, user, payload.code)
+        token_response = auth_service.complete_mfa_login(db, user, payload.code, payload.device_fingerprint)
         _set_refresh_cookie(response, token_response.refresh_token)
         token_response.refresh_token = None
         return token_response

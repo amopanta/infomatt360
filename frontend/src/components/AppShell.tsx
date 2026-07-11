@@ -17,6 +17,7 @@ const menu = [
   { label: 'API keys', href: '/admin/api-keys', permissions: ['integrations.api_keys.manage'] },
   { label: 'ERP', href: '/admin/erp', permissions: ['erp.manage'] },
   { label: 'WhatsApp', href: '/admin/whatsapp', permissions: ['messages.read', 'records.review', 'records.approve'] },
+  { label: 'Donantes', href: '/admin/donor-sync', permissions: ['integrations.donor_sync.manage'] },
   { label: 'Sincronizacion', href: '/admin/bulk-jobs', permissions: ['integrations.api_keys.manage', 'records.write'] },
   { label: 'Metricas', href: '/admin/metrics', permissions: ['identity.users.manage', 'integrations.api_keys.manage', 'records.approve', 'records.write'] },
   { label: 'Mi seguridad', href: '/account/security' },

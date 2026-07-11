@@ -6,6 +6,7 @@ export type AppRouteKey =
   | 'apiKeys'
   | 'erp'
   | 'whatsapp'
+  | 'donorSync'
   | 'adminUsers'
   | 'accountSecurity'
   | 'records'
@@ -37,6 +38,7 @@ export function resolveAppRoute(pathname: string): AppRoute {
   if (pathname.startsWith('/admin/api-keys')) return { key: 'apiKeys', permissions: ['integrations.api_keys.manage'] };
   if (pathname.startsWith('/admin/erp')) return { key: 'erp', permissions: ['erp.manage'] };
   if (pathname.startsWith('/admin/whatsapp')) return { key: 'whatsapp', permissions: ['messages.read', 'records.review', 'records.approve'] };
+  if (pathname.startsWith('/admin/donor-sync')) return { key: 'donorSync', permissions: ['integrations.donor_sync.manage'] };
   if (pathname.startsWith('/admin/users')) return { key: 'adminUsers', permissions: ['identity.users.manage'] };
   if (pathname.startsWith('/account/security')) return { key: 'accountSecurity' };
   if (pathname.startsWith('/records')) return { key: 'records' };

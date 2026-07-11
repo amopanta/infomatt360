@@ -84,9 +84,22 @@ acceso al proyecto -- se corrigio como parte de completar el modulo.
 2. Crear el mapeo: `POST /integrations/maps` con `source_id`, `template_id` (la plantilla del Builder que representa el formulario a reportar) y `fields_json` (diccionario campo-del-formulario → columna que espera tu base de ActivityInfo/TolaData).
 3. Aprobar un registro de esa plantilla — el envio ocurre automaticamente.
 
+## Pantalla en el frontend
+
+`frontend/src/modules/admin/DonorSyncApp.tsx` (ruta `/admin/donor-sync`,
+permiso `integrations.donor_sync.manage`), con tres pestañas: **Fuentes**
+(alta de fuente con URL base y credenciales, lista con indicador
+"con/sin credenciales" sin exponer el secreto), **Mapeos de campos**
+(crear mapeo para la fuente seleccionada, editor de texto para el JSON de
+mapeo) y **Historial de envios** (tabla de `IntegrationJob` con estado,
+modo, registro y resultado). Cliente API en
+`frontend/src/modules/admin/donorSyncApi.ts`. Verificado en navegador real
+contra un servidor HTTP simulando la plataforma del donante: la fuente, el
+mapeo y el envio (con el payload correctamente traducido) aparecieron en
+la UI sin recargar la pagina.
+
 ## Limites conocidos
 
-- Sin pantalla propia en el frontend todavia (se opera por Swagger/API directa).
 - No hay reintento automatico de envios fallidos; el ledger (`IntegrationJob`) permite identificarlos para reintento manual.
 - Solo push saliente al aprobar; no hay sincronizacion bidireccional ni consulta de estado desde la plataforma del donante.
 - El payload es un `POST` JSON simple con `Authorization: Bearer`; si la cuenta real exige un esquema de autenticacion distinto (OAuth, firma HMAC, etc.), se debe extender `integration_service.push_approved_record` para ese caso especifico.

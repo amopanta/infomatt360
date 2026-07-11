@@ -5,6 +5,7 @@ import { AdminUserSecurityApp } from './modules/admin/AdminUserSecurityApp';
 import { ApiKeysApp } from './modules/admin/ApiKeysApp';
 import { ApprovalFlowsApp } from './modules/admin/ApprovalFlowsApp';
 import { BulkJobsApp } from './modules/admin/BulkJobsApp';
+import { DonorSyncApp } from './modules/admin/DonorSyncApp';
 import { ErpApp } from './modules/admin/ErpApp';
 import { OperationalMetricsApp } from './modules/admin/OperationalMetricsApp';
 import { WhatsAppApp } from './modules/admin/WhatsAppApp';
@@ -80,6 +81,7 @@ function renderRoute(route: AppRoute) {
       case 'apiKeys': return <ApiKeysApp />;
       case 'erp': return <ErpApp />;
       case 'whatsapp': return <WhatsAppApp />;
+      case 'donorSync': return <DonorSyncApp />;
       case 'adminUsers': return <AdminUserSecurityApp />;
       case 'accountSecurity': return <AccountSecurityApp />;
       case 'records': return <RecordsApp />;

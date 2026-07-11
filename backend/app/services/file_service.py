@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.models.files import FileAsset
 from app.models.storage import StorageProfile
 from app.schemas.files import FileAssetCreate, FileAssetRead
+from app.services.s3_storage_service import s3_storage_service
 
 
 def to_read(row: FileAsset) -> FileAssetRead:
@@ -61,6 +62,98 @@ class FileService:
         base_path = Path(profile.base_path if profile and profile.base_path else settings.upload_directory)
         max_size_mb = profile.max_file_size_mb if profile else settings.default_max_file_size_mb
         return base_path, max(1, max_size_mb)
+
+    def active_s3_profile(self, db: Session, project_id: str) -> StorageProfile | None:
+        return (
+            db.query(StorageProfile)
+            .filter(
+                StorageProfile.project_id == project_id,
+                StorageProfile.provider == "s3",
+                StorageProfile.status == "active",
+                StorageProfile.is_default == "true",
+            )
+            .order_by(StorageProfile.created_at.desc())
+            .first()
+        )
+
+    async def upload(
+        self,
+        db: Session,
+        *,
+        project_id: str,
+        asset_type: str,
+        upload: UploadFile,
+        user_id: str,
+        participant_id: str | None = None,
+        record_id: str | None = None,
+    ) -> FileAssetRead:
+        profile = self.active_s3_profile(db, project_id)
+        if profile is not None and s3_storage_service.is_configured(profile):
+            return await self.upload_s3(
+                db,
+                profile,
+                project_id=project_id,
+                asset_type=asset_type,
+                upload=upload,
+                user_id=user_id,
+                participant_id=participant_id,
+                record_id=record_id,
+            )
+        return await self.upload_local(
+            db,
+            project_id=project_id,
+            asset_type=asset_type,
+            upload=upload,
+            user_id=user_id,
+            participant_id=participant_id,
+            record_id=record_id,
+        )
+
+    async def upload_s3(
+        self,
+        db: Session,
+        profile: StorageProfile,
+        *,
+        project_id: str,
+        asset_type: str,
+        upload: UploadFile,
+        user_id: str,
+        participant_id: str | None = None,
+        record_id: str | None = None,
+    ) -> FileAssetRead:
+        max_bytes = max(1, profile.max_file_size_mb) * 1024 * 1024
+        original_name = Path(upload.filename or "archivo").name[:250]
+        buffer = bytearray()
+
+        try:
+            while chunk := await upload.read(1024 * 1024):
+                buffer.extend(chunk)
+                if len(buffer) > max_bytes:
+                    raise ValueError(f"El archivo supera el limite de {profile.max_file_size_mb} MB")
+
+            result = s3_storage_service.upload_file(
+                db,
+                profile,
+                project_id=project_id,
+                original_name=original_name,
+                content=bytes(buffer),
+                mime_type=upload.content_type,
+            )
+            payload = FileAssetCreate(
+                project_id=project_id,
+                participant_id=participant_id,
+                record_id=record_id,
+                asset_type=asset_type.upper(),
+                original_name=result["original_name"],
+                storage_provider="s3",
+                storage_path=result["storage_path"],
+                mime_type=result["mime_type"],
+                size_bytes=result["size_bytes"],
+                checksum=result["checksum"],
+            )
+            return self.create_asset(db, payload, user_id)
+        finally:
+            await upload.close()
 
     async def upload_local(
         self,

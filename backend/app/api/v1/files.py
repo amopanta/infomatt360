@@ -45,7 +45,7 @@ async def upload_file_asset(
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Tipo de evidencia no soportado")
     validate_asset_relations(db, project_id, participant_id, record_id)
     try:
-        return await file_service.upload_local(
+        return await file_service.upload(
             db,
             project_id=project_id,
             asset_type=asset_type,

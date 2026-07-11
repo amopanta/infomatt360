@@ -4,9 +4,10 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.identity import User
-from app.schemas.storage import StorageProfileCreate, StorageProfileRead
+from app.schemas.storage import S3StorageProfileConnect, StorageProfileCreate, StorageProfileRead
 from app.services.assignment_service import assignment_service
 from app.services.gdrive_storage_service import gdrive_storage_service
+from app.services.s3_storage_service import s3_storage_service
 from app.services.storage_service import storage_service
 
 router = APIRouter()
@@ -24,6 +25,13 @@ def gdrive_oauth_callback(code: str, state: str, db: Session = Depends(get_db)) 
     project_id = gdrive_storage_service.verify_state(state)
     tokens = gdrive_storage_service.exchange_code_for_tokens(code)
     return gdrive_storage_service.connect_profile(db, project_id, tokens)
+
+
+@router.post("/s3/connect", response_model=StorageProfileRead, summary="Conectar boveda S3/MinIO para evidencias multimedia")
+def connect_s3_storage(payload: S3StorageProfileConnect, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> StorageProfileRead:
+    if not assignment_service.user_has_project_access(db, current_user.id, payload.project_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    return s3_storage_service.connect_profile(db, payload)
 
 
 @router.post("/", response_model=StorageProfileRead)

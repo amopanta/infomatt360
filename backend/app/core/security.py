@@ -47,8 +47,9 @@ def create_access_token(
     auth_version: int = 0,
     session_id: str | None = None,
     organization_id: str | None = None,
+    expires_delta: timedelta | None = None,
 ) -> str:
-    expires_at = datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes)
+    expires_at = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.access_token_expire_minutes))
     payload = {"sub": subject, "ver": auth_version, "exp": expires_at}
     if session_id:
         payload["sid"] = session_id

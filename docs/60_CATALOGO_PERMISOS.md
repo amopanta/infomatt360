@@ -37,6 +37,8 @@ o permisos escritos de forma diferente.
 | `erp.manage` | Administrar inventario, configuracion ERP por plantilla y honorarios del motor contable headless. |
 | `integrations.donor_sync.manage` | Configurar fuentes externas (ActivityInfo/TolaData u otras), mapeos de campos y consultar el historial de envios. |
 | `ai.audit.manage` | Configurar la auditoria semantica con IA por plantilla (campo a analizar, modo de rechazo) y disparar reanalisis manual. |
+| `organizations.tenant_clean` | Ejecutar la purga controlada de datos de prueba de una organizacion (accion critica, requiere 2FA y confirmacion explicita del slug). |
+| `support.tickets.manage` | Revisar y resolver manualmente tickets de la mesa de ayuda que no se resolvieron por el motor de reglas automatico. |
 
 ## Grupos operativos actuales
 

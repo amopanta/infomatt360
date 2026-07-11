@@ -8,9 +8,11 @@ PROJECT_READ = "projects.read"
 IDENTITY_USERS_MANAGE = "identity.users.manage"
 ORGANIZATIONS_MANAGE = "organizations.manage"
 ORGANIZATIONS_BRANDING_MANAGE = "organizations.branding.manage"
+ORGANIZATIONS_TENANT_CLEAN = "organizations.tenant_clean"
 BACKUPS_MANAGE = "backups.manage"
 ERP_MANAGE = "erp.manage"
 AI_AUDIT_MANAGE = "ai.audit.manage"
+SUPPORT_TICKETS_MANAGE = "support.tickets.manage"
 
 RECORDS_READ = "records.read"
 RECORDS_WRITE = "records.write"
@@ -42,9 +44,11 @@ ALL_PERMISSIONS = {
     IDENTITY_USERS_MANAGE,
     ORGANIZATIONS_MANAGE,
     ORGANIZATIONS_BRANDING_MANAGE,
+    ORGANIZATIONS_TENANT_CLEAN,
     BACKUPS_MANAGE,
     ERP_MANAGE,
     AI_AUDIT_MANAGE,
+    SUPPORT_TICKETS_MANAGE,
     RECORDS_READ,
     RECORDS_WRITE,
     RECORDS_REVIEW,

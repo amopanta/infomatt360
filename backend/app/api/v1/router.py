@@ -13,6 +13,7 @@ from app.api.v1.builder import router as builder_router
 from app.api.v1.builder_layout import router as builder_layout_router
 from app.api.v1.compiler import router as compiler_router
 from app.api.v1.dashboard import router as dashboard_router
+from app.api.v1.emergency_access import router as emergency_access_router
 from app.api.v1.enrollment import router as enrollment_router
 from app.api.v1.erp import router as erp_router
 from app.api.v1.etl import router as etl_router
@@ -39,6 +40,7 @@ from app.api.v1.runtime import router as runtime_router
 from app.api.v1.scheduler import router as scheduler_router
 from app.api.v1.security import router as security_router
 from app.api.v1.storage import router as storage_router
+from app.api.v1.support import router as support_router
 from app.api.v1.whatsapp import router as whatsapp_router
 from app.api.v1.xlsform import router as xlsform_router
 
@@ -56,6 +58,8 @@ api_v1_router.include_router(organizations_router, prefix="/organizations", tags
 api_v1_router.include_router(backups_router, prefix="/backups", tags=["backups"])
 api_v1_router.include_router(assignments_router, prefix="/assignments", tags=["assignments"])
 api_v1_router.include_router(enrollment_router, prefix="/enrollment", tags=["enrollment"])
+api_v1_router.include_router(emergency_access_router, prefix="/emergency-access", tags=["emergency-access"])
+api_v1_router.include_router(support_router, prefix="/support", tags=["support"])
 api_v1_router.include_router(project_context_router, prefix="/projects", tags=["project-context"])
 api_v1_router.include_router(forms_router, prefix="/forms", tags=["forms"])
 api_v1_router.include_router(participants_router, prefix="/participants", tags=["participants"])

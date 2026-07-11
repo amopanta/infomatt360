@@ -1,4 +1,17 @@
-from pydantic import BaseModel
+from datetime import datetime
+
+from pydantic import BaseModel, Field
+
+
+class AiAuditConfigCreate(BaseModel):
+    template_id: str
+    text_field_name: str
+    mode: str = Field(default="human", pattern="^(human|automatic|mixed)$")
+
+
+class AiAuditConfigRead(AiAuditConfigCreate):
+    id: str
+    created_at: datetime
 
 
 class AiCheckCreate(BaseModel):

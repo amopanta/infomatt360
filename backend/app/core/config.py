@@ -86,6 +86,17 @@ class Settings(BaseSettings):
     waha_base_url: str = ""
     waha_api_key: str = ""
     waha_session: str = "default"
+
+    # Auditoria semantica con IA/LLM. Vacio por defecto: sin proveedor
+    # configurado, el analisis queda inactivo (se registra "skipped").
+    # ai_audit_provider: "anthropic" | "openai_compatible" (cubre OpenAI,
+    # DeepSeek, Zhipu/GLM y cualquier otro proveedor que implemente el
+    # esquema de chat completions de OpenAI, cambiando solo la URL base) |
+    # "gemini".
+    ai_audit_provider: str = ""
+    ai_audit_api_key: str = ""
+    ai_audit_base_url: str = ""
+    ai_audit_model: str = ""
     security_headers_enabled: bool = True
     content_security_policy: str = "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
     referrer_policy: str = "no-referrer"

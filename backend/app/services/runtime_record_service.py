@@ -9,6 +9,7 @@ Notas: El servicio no contiene logica HTTP; los routers solo exponen la API.
 import csv
 import hashlib
 import json
+import logging
 from datetime import timedelta
 from io import StringIO
 from uuid import uuid4
@@ -22,8 +23,11 @@ from app.models.files import FileAsset
 from app.models.bulk_import import BulkImportJob
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
 from app.schemas.runtime_record import RuntimeBulkJobDetail, RuntimeBulkJobRead, RuntimeBulkJobSummary, RuntimeBulkSaveItemResult, RuntimeBulkSaveRequest, RuntimeBulkSaveResponse, RuntimeRecordCreate, RuntimeRecordPage, RuntimeRecordRead, RuntimeValueRead
+from app.services.ai_audit_service import ai_audit_service
 from app.services.approval_flow_service import approval_flow_service
 from app.services.metrics_service import metrics_service
+
+logger = logging.getLogger(__name__)
 
 
 def value_to_read(row: RuntimeRecordValue) -> RuntimeValueRead:
@@ -129,6 +133,16 @@ class RuntimeRecordService:
             raise
 
         db.refresh(record)
+
+        # Auditoria semantica con IA (ver docs/88): se ejecuta despues de que
+        # el registro ya quedo guardado, nunca antes -- la captura de campo
+        # no debe perderse ni demorarse por una llamada a IA lenta o caida.
+        # No-op silencioso si la plantilla no tiene AiAuditConfig.
+        try:
+            ai_audit_service.audit_record(db, record)
+        except Exception:
+            logger.warning("La auditoria semantica del registro %s fallo de forma inesperada", record.id, exc_info=True)
+
         return record_to_read(db, record)
 
     def save_records_bulk(self, db: Session, payload: RuntimeBulkSaveRequest, user_id: str | None) -> RuntimeBulkSaveResponse:

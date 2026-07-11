@@ -243,7 +243,8 @@ Antes de produccion real:
 - ERP headless (inventario y honorarios): [docs/84_ERP_HEADLESS_INVENTARIO_NOMINA.md](docs/84_ERP_HEADLESS_INVENTARIO_NOMINA.md);
 - notificaciones WhatsApp via WAHA: [docs/85_WHATSAPP_WAHA_NOTIFICACIONES.md](docs/85_WHATSAPP_WAHA_NOTIFICACIONES.md);
 - interoperabilidad con plataformas de donantes, salida por evento (ActivityInfo/TolaData): [docs/86_INTEROPERABILIDAD_DONANTES.md](docs/86_INTEROPERABILIDAD_DONANTES.md);
-- API de lectura para sistemas externos, salida por consulta: [docs/87_API_LECTURA_EXTERNA.md](docs/87_API_LECTURA_EXTERNA.md).
+- API de lectura para sistemas externos, salida por consulta: [docs/87_API_LECTURA_EXTERNA.md](docs/87_API_LECTURA_EXTERNA.md);
+- auditoria semantica con IA (multi-proveedor): [docs/88_AUDITORIA_SEMANTICA_IA.md](docs/88_AUDITORIA_SEMANTICA_IA.md).
 
 Validar configuracion productiva:
 

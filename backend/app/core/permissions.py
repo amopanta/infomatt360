@@ -10,6 +10,7 @@ ORGANIZATIONS_MANAGE = "organizations.manage"
 ORGANIZATIONS_BRANDING_MANAGE = "organizations.branding.manage"
 BACKUPS_MANAGE = "backups.manage"
 ERP_MANAGE = "erp.manage"
+AI_AUDIT_MANAGE = "ai.audit.manage"
 
 RECORDS_READ = "records.read"
 RECORDS_WRITE = "records.write"
@@ -43,6 +44,7 @@ ALL_PERMISSIONS = {
     ORGANIZATIONS_BRANDING_MANAGE,
     BACKUPS_MANAGE,
     ERP_MANAGE,
+    AI_AUDIT_MANAGE,
     RECORDS_READ,
     RECORDS_WRITE,
     RECORDS_REVIEW,

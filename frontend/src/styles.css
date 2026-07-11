@@ -503,4 +503,40 @@ body { margin: 0; }
 .review-actions button { border: 0; border-radius: 9px; padding: 9px 12px; color: #ffffff; background: #0066cc; font-weight: 800; cursor: pointer; }
 .review-history { display: grid; gap: 6px; color: #536878; }
 .review-history p { margin: 0; }
+
+.erp-shell { max-width: 1180px; margin: 28px auto; padding: 0 24px; }
+.erp-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+.erp-tabs button { border: 1px solid #dce7f2; border-radius: 10px; padding: 10px 16px; background: #ffffff; font-weight: 800; color: #536878; cursor: pointer; }
+.erp-tabs button.active { background: #0066cc; color: #ffffff; border-color: #0066cc; }
+.erp-message { margin: 0 0 14px; }
+.erp-inventory { display: grid; grid-template-columns: 300px 320px 1fr; gap: 20px; }
+.erp-payroll { display: grid; gap: 16px; }
+.erp-config { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.erp-inventory-create, .erp-inventory-list, .erp-inventory-detail, .erp-config-create, .erp-config-lookup, .erp-payroll-filter, .erp-payroll-list { border: 1px solid #dce7f2; border-radius: 16px; background: #ffffff; box-shadow: 0 10px 26px rgba(10, 37, 64, 0.06); padding: 20px; }
+.erp-inventory-create h2, .erp-inventory-list h2, .erp-inventory-detail h2, .erp-config-create h2, .erp-config-lookup h2 { margin-top: 0; }
+.erp-inventory-create label, .erp-config-create label, .erp-config-lookup label, .erp-payroll-filter label { display: flex; flex-direction: column; gap: 7px; margin-bottom: 12px; font-weight: 800; }
+.erp-inventory-create input, .erp-config-create input, .erp-config-lookup input, .erp-payroll-filter input { border: 1px solid #cfd8e3; border-radius: 10px; padding: 11px; font: inherit; }
+.erp-inventory-create .primary, .erp-config-create .primary { border: 0; border-radius: 10px; padding: 10px 14px; color: #ffffff; background: #0066cc; font-weight: 800; cursor: pointer; }
+.erp-inventory-create .primary:disabled, .erp-config-create .primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.erp-item-card { border: 1px solid #dce7f2; border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+.erp-item-card.active { border-color: #0066cc; }
+.erp-item-card button { width: 100%; text-align: left; border: 0; background: transparent; padding: 12px; cursor: pointer; }
+.erp-item-card strong, .erp-item-card span, .erp-item-card small { display: block; }
+.erp-item-card small { margin-top: 4px; color: #536878; }
+.erp-movement-card { padding: 12px; border: 1px solid #dce7f2; border-radius: 12px; margin-bottom: 10px; }
+.erp-movement-card strong, .erp-movement-card span, .erp-movement-card small { display: block; }
+.erp-movement-card small { margin-top: 4px; color: #536878; }
+.erp-payroll-filter { display: flex; align-items: flex-end; gap: 12px; }
+.erp-payroll-filter label { flex: 1; margin-bottom: 0; }
+.erp-payroll-filter button { border: 1px solid #0066cc; border-radius: 10px; padding: 11px 16px; background: #ffffff; color: #0066cc; font-weight: 800; cursor: pointer; }
+.erp-payroll-card { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px; border: 1px solid #dce7f2; border-radius: 12px; margin-bottom: 10px; }
+.erp-payroll-card.paid { opacity: 0.7; }
+.erp-payroll-card strong, .erp-payroll-card span, .erp-payroll-card small { display: block; }
+.erp-payroll-card small { margin-top: 4px; color: #536878; }
+.erp-payroll-card button { border: 0; border-radius: 10px; padding: 10px 14px; color: #ffffff; background: #0066cc; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.erp-paid-badge { color: #15803d; font-weight: 800; white-space: nowrap; }
+.erp-config-create p, .erp-config-lookup p { color: #536878; }
+.erp-config-lookup dl { display: grid; gap: 8px; margin-top: 12px; }
+.erp-config-lookup dl div { display: flex; justify-content: space-between; border-bottom: 1px dashed #dce7f2; padding-bottom: 6px; }
+@media (max-width: 1024px) { .erp-inventory, .erp-config { grid-template-columns: 1fr; } }
 @media (max-width: 760px) { .review-flow-comparison > div { grid-template-columns: 1fr; } .review-flow-comparison header { flex-direction: column; } }

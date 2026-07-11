@@ -5,6 +5,7 @@ import { AdminUserSecurityApp } from './modules/admin/AdminUserSecurityApp';
 import { ApiKeysApp } from './modules/admin/ApiKeysApp';
 import { ApprovalFlowsApp } from './modules/admin/ApprovalFlowsApp';
 import { BulkJobsApp } from './modules/admin/BulkJobsApp';
+import { ErpApp } from './modules/admin/ErpApp';
 import { OperationalMetricsApp } from './modules/admin/OperationalMetricsApp';
 import { AuditApp } from './modules/audit/AuditApp';
 import { AuthGate } from './modules/auth/AuthGate';
@@ -76,6 +77,7 @@ function renderRoute(route: AppRoute) {
       case 'metrics': return <OperationalMetricsApp />;
       case 'approvalFlows': return <ApprovalFlowsApp />;
       case 'apiKeys': return <ApiKeysApp />;
+      case 'erp': return <ErpApp />;
       case 'adminUsers': return <AdminUserSecurityApp />;
       case 'accountSecurity': return <AccountSecurityApp />;
       case 'records': return <RecordsApp />;

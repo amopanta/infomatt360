@@ -83,10 +83,27 @@ transaccion de SQLAlchemy en vez de una transaccion explicita separada.
 tambien una fila de movimiento (`reason="alta_inicial"`) para que el
 ledger sea completo desde el primer registro del item.
 
+## Pantalla en el frontend
+
+`frontend/src/modules/admin/ErpApp.tsx` (ruta `/admin/erp`, permiso
+`erp.manage`), con tres pestañas:
+
+- **Inventario**: alta de items, lista de stock actual, historial de
+  movimientos del item seleccionado (mismo patron lista+detalle que
+  `BulkJobsApp`).
+- **Honorarios**: lista de honorarios por proyecto (filtrable por
+  `gestor_user_id`), boton "Marcar pagado" para los que estan `accrued`.
+- **Configuracion por plantilla**: vincular un `template_id` del Builder
+  al motor ERP (campo SKU, campo cantidad, tarifa), y consultar la
+  configuracion de una plantilla existente.
+
+El cliente API vive en `frontend/src/modules/admin/erpApi.ts`. Verificado
+de punta a punta en navegador real: alta de item -> vinculo de plantilla
+-> aprobacion de un registro via API -> descuento de stock y honorario
+visibles en la UI sin recargar -> marcar pagado.
+
 ## Limites conocidos
 
-- Sin pantalla propia en el frontend todavia (se opera por Swagger/API
-  directa, igual que Excel import y backups).
 - No hay endpoint para deshacer una liquidacion ya aplicada (ej. si un
   registro aprobado se revierte despues) — el ledger de movimientos
   permite auditar que paso, pero la reversion manual del stock/honorario

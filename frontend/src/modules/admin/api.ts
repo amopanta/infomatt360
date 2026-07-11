@@ -28,3 +28,10 @@ export async function resetUserMfa(projectId: string, userId: string, adminPassw
   if (!response.ok) throw new Error('No fue posible reiniciar MFA. Verifica permisos y contraseña administrativa.');
   return (await response.json()).message;
 }
+
+export async function generateEnrollmentQr(projectId: string, userId: string): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/enrollment/qr`, { method: 'POST', headers: headers(), body: JSON.stringify({ project_id: projectId, user_id: userId }) });
+  if (!response.ok) throw new Error('No fue posible generar el codigo QR. Verifica permisos y que el usuario pertenezca al proyecto.');
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
+}

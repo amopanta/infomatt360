@@ -17,3 +17,5 @@ email-validator
 cryptography
 qrcode[pil]
 openpyxl
+jinja2
+xhtml2pdf

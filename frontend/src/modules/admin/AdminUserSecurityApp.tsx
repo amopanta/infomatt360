@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
-import { fetchAdminUsers, resetUserMfa, resetUserPassword, updateUserEmail } from './api';
+import { fetchAdminUsers, generateEnrollmentQr, resetUserMfa, resetUserPassword, updateUserEmail } from './api';
 import type { AdminUser } from './api';
 
 export function AdminUserSecurityApp() {
@@ -43,6 +43,7 @@ function AdminUserCard({ projectId, user, onUpdated }: { projectId: string; user
   const [adminPassword, setAdminPassword] = useState('');
   const [temporary, setTemporary] = useState('');
   const [result, setResult] = useState('');
+  const [qrImageUrl, setQrImageUrl] = useState('');
 
   async function changeEmail() {
     if (!window.confirm(`Vas a cambiar el correo de ${user.email} a ${email}. ¿Continuar?`)) return;
@@ -80,6 +81,14 @@ function AdminUserCard({ projectId, user, onUpdated }: { projectId: string; user
     }
   }
 
+  async function generateQr() {
+    try {
+      setQrImageUrl(await generateEnrollmentQr(projectId, user.id));
+    } catch (error) {
+      setResult(error instanceof Error ? error.message : 'Error.');
+    }
+  }
+
   return (
     <section className="admin-user-card">
       <h3>{user.full_name}</h3>
@@ -100,7 +109,14 @@ function AdminUserCard({ projectId, user, onUpdated }: { projectId: string; user
         <button onClick={() => void changeEmail()}>Corregir correo</button>
         <button onClick={() => void resetPassword()}>Reiniciar contrasena</button>
         {user.mfa_enabled ? <button onClick={() => void resetMfa()}>Reiniciar MFA</button> : null}
+        <button className="secondary" onClick={() => void generateQr()}>Generar QR de enrolamiento</button>
       </div>
+      {qrImageUrl ? (
+        <div className="enrollment-qr-preview">
+          <img src={qrImageUrl} alt={`Codigo QR de enrolamiento para ${user.full_name}`} width={180} height={180} />
+          <small>Valido por 15 minutos. Escanealo desde la app movil en /enroll.</small>
+        </div>
+      ) : null}
       {result ? <p role="status">{result}</p> : null}
     </section>
   );

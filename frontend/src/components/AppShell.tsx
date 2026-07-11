@@ -1,4 +1,5 @@
 import { BrandLogo } from './BrandLogo';
+import { OfflineSyncStatus } from './OfflineSyncStatus';
 import { clearStoredSession, currentProjectPermissions, currentSessionProjects, PROJECT_KEY, storeSelectedProjectPermissions } from '../modules/auth/session';
 import { logout } from '../modules/auth/api';
 import { navigateTo } from '../routeConfig';
@@ -74,6 +75,7 @@ export function AppShell({ title, children }: Props) {
                 </select>
               </label>
             ) : projects[0] ? <span>{projects[0].name}</span> : null}
+            <OfflineSyncStatus />
             <button className="app-logout" onClick={() => void closeSession()}>Cerrar sesion</button>
           </div>
         </header>

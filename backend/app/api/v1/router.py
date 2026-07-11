@@ -1,5 +1,6 @@
 from fastapi import APIRouter
 
+from app.api.v1.acta import router as acta_router
 from app.api.v1.ai import router as ai_router
 from app.api.v1.api_keys import router as api_keys_router
 from app.api.v1.approval_flows import router as approval_flows_router
@@ -35,6 +36,7 @@ from app.api.v1.runtime import router as runtime_router
 from app.api.v1.scheduler import router as scheduler_router
 from app.api.v1.security import router as security_router
 from app.api.v1.storage import router as storage_router
+from app.api.v1.xlsform import router as xlsform_router
 
 api_v1_router = APIRouter()
 
@@ -67,9 +69,11 @@ api_v1_router.include_router(external_data_router, prefix="/external-data", tags
 api_v1_router.include_router(mirror_router, prefix="/mirror", tags=["mirror"])
 api_v1_router.include_router(scheduler_router, prefix="/scheduler", tags=["scheduler"])
 api_v1_router.include_router(reports_router, prefix="/reports", tags=["reports"])
+api_v1_router.include_router(acta_router, prefix="/acta-templates", tags=["acta"])
 api_v1_router.include_router(ai_router, prefix="/ai", tags=["ai"])
 api_v1_router.include_router(gis_router, prefix="/gis", tags=["gis"])
 api_v1_router.include_router(builder_router, prefix="/builder", tags=["builder"])
 api_v1_router.include_router(builder_layout_router, prefix="/builder", tags=["builder-layout"])
+api_v1_router.include_router(xlsform_router, prefix="/xlsform", tags=["xlsform"])
 api_v1_router.include_router(runtime_router, prefix="/runtime", tags=["runtime"])
 api_v1_router.include_router(compiler_router, prefix="/compiler", tags=["compiler"])

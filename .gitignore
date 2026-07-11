@@ -13,3 +13,5 @@ backend/uploads/
 node_modules/
 dist/
 backups/
+release/
+.claude/

@@ -37,6 +37,13 @@ export async function fetchRuntimeTemplate(templateId: string): Promise<RuntimeT
   return response.json();
 }
 
+export function toRuntimeValueList(values: RuntimeFormValues): { field_name: string; field_value_json: string }[] {
+  return Object.entries(values).map(([fieldName, value]) => ({
+    field_name: fieldName,
+    field_value_json: JSON.stringify(value),
+  }));
+}
+
 export async function saveRuntimeRecord(params: {
   projectId: string;
   templateId: string;
@@ -48,10 +55,7 @@ export async function saveRuntimeRecord(params: {
     template_id: params.templateId,
     version_id: params.versionId ?? null,
     status: 'submitted',
-    values: Object.entries(params.values).map(([fieldName, value]) => ({
-      field_name: fieldName,
-      field_value_json: JSON.stringify(value),
-    })),
+    values: toRuntimeValueList(params.values),
   };
 
   const response = await fetch(`${API_BASE_URL}/runtime/save`, {

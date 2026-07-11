@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
-import { fetchRuntimeTemplate, saveRuntimeRecord } from './api';
+import { enqueueRecord } from '../offline/offlineSync';
+import { fetchRuntimeTemplate, saveRuntimeRecord, toRuntimeValueList } from './api';
 import { RuntimeRenderer, themeStyle } from './RuntimeRenderer';
 import { useRuntimeDraft } from './useRuntimeDraft';
 import type { RuntimeFormValue, RuntimeTemplate } from './types';
@@ -44,9 +45,22 @@ export function RuntimeApp() {
       return;
     }
 
-    await saveRuntimeRecord({ projectId, templateId: template.template_id, values });
-    clearDraft();
-    setStatus('Respuesta guardada correctamente. Borrador local limpiado.');
+    try {
+      await saveRuntimeRecord({ projectId, templateId: template.template_id, values });
+      clearDraft();
+      setStatus('Respuesta guardada correctamente. Borrador local limpiado.');
+    } catch (error) {
+      // TypeError = fetch no pudo conectarse (sin red); un error HTTP real
+      // (validacion, permisos, etc.) no se debe encolar porque volveria a
+      // fallar igual al sincronizar.
+      if (error instanceof TypeError) {
+        await enqueueRecord({ projectId, templateId: template.template_id, values: toRuntimeValueList(values) });
+        clearDraft();
+        setStatus('Sin conexion: la respuesta quedo guardada localmente. Sincronizala desde el boton de la barra superior cuando vuelva la red.');
+        return;
+      }
+      setStatus(error instanceof Error ? error.message : 'No fue posible guardar la respuesta.');
+    }
   }
 
   if (!template) {

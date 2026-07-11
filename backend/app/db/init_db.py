@@ -1,6 +1,6 @@
 from app.db.base import Base
 from app.db.session import engine
-from app.models import assignment, backup, enrollment, excel_import, identity, installation, organization  # noqa: F401
+from app.models import acta, assignment, backup, enrollment, excel_import, identity, installation, organization  # noqa: F401
 from sqlalchemy import inspect, text
 
 

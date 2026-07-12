@@ -33,7 +33,8 @@ que usa `POST /api/v1/files/upload` en vez de llamar directo a
 
 ## Conectar una boveda S3/MinIO
 
-`POST /api/v1/storage/s3/connect` (requiere acceso al proyecto):
+`POST /api/v1/storage/s3/connect` (requiere el permiso `storage.manage`
+en el proyecto):
 
 ```json
 {
@@ -62,6 +63,29 @@ perfiles de almacenamiento (`GET /api/v1/storage/project/{id}`), aunque
 ese campo no lo usaba todavia ningun proveedor. Se removio del schema de
 lectura y del endpoint generico de creacion; ahora solo el flujo dedicado
 de S3 (`connect_profile`) escribe ese campo, siempre cifrado.
+
+**Correccion de seguridad**: `POST /storage/s3/connect`,
+`GET /storage/oauth/gdrive/authorize` y `POST /storage/` (generico) solo
+exigian pertenencia activa al proyecto (`user_has_project_access`), sin
+ningun permiso de gestion -- a diferencia de acciones equivalentes de
+"conectar credencial externa" en otros modulos (`integrations.py`,
+`ai_audit.py`, `erp.py`), que ya usaban un permiso dedicado. Como
+`S3StorageProfileConnect.is_default` es `True` por defecto y
+`file_service.upload()` enruta automaticamente **todas** las subidas
+futuras del proyecto al perfil S3 activo marcado como predeterminado, sin
+mas verificacion, cualquier miembro del proyecto -- incluso uno con solo
+`records.write` -- podia redirigir en silencio las subidas de evidencias
+de todos los demas usuarios a un bucket o cuenta de Google Drive propios.
+Se agrego el permiso `storage.manage`
+(ver [docs/60_CATALOGO_PERMISOS.md](60_CATALOGO_PERMISOS.md)) y se exige
+en los tres endpoints de escritura (`require_project_permission`); listar
+perfiles (`GET /storage/project/{id}`) sigue solo requiriendo acceso al
+proyecto, igual que otros endpoints de solo lectura. Cubierto por
+`test_connect_requires_project_access_and_hides_secrets` en
+`backend/tests/test_s3_storage.py`, que ahora distingue explicitamente un
+usuario sin ningun acceso al proyecto (403 por falta de asignacion) de
+uno con acceso al proyecto pero sin `storage.manage` (403 por falta de
+permiso, caso "low-priv").
 
 ## Flujo de subida
 

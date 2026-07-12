@@ -13,6 +13,7 @@ BACKUPS_MANAGE = "backups.manage"
 ERP_MANAGE = "erp.manage"
 AI_AUDIT_MANAGE = "ai.audit.manage"
 SUPPORT_TICKETS_MANAGE = "support.tickets.manage"
+STORAGE_MANAGE = "storage.manage"
 
 RECORDS_READ = "records.read"
 RECORDS_WRITE = "records.write"
@@ -49,6 +50,7 @@ ALL_PERMISSIONS = {
     ERP_MANAGE,
     AI_AUDIT_MANAGE,
     SUPPORT_TICKETS_MANAGE,
+    STORAGE_MANAGE,
     RECORDS_READ,
     RECORDS_WRITE,
     RECORDS_REVIEW,

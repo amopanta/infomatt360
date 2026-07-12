@@ -17,8 +17,11 @@ bloquea ni revierte la aprobacion del registro. Se registra en
 manualmente.
 """
 
+import ipaddress
 import json
 import logging
+import socket
+from urllib.parse import urlsplit
 
 import httpx
 from sqlalchemy.orm import Session
@@ -38,6 +41,39 @@ from app.schemas.integrations import (
 logger = logging.getLogger(__name__)
 
 PUSH_TIMEOUT_SECONDS = 15
+
+
+class UnsafeIntegrationUrlError(ValueError):
+    """`base_url` resuelve a un destino no permitido (host interno/privado)."""
+
+
+def _assert_safe_outbound_url(url: str) -> None:
+    """Bloquea SSRF: rechaza esquemas distintos de http(s) y cualquier host
+    que resuelva a una IP privada, loopback, link-local (incluye el
+    servicio de metadatos de nube 169.254.169.254) o reservada.
+
+    `IntegrationSource.base_url` es texto libre configurado por cualquier
+    usuario con `integrations.donor_sync.manage`, y el envio ocurre desde
+    la red del propio backend -- sin esta validacion, un proyecto podria
+    usarlo para hacer que el servidor consulte servicios internos en su
+    nombre.
+    """
+    parsed = urlsplit(url)
+    if parsed.scheme not in ("http", "https") or not parsed.hostname:
+        raise UnsafeIntegrationUrlError(f"Esquema o host invalido en base_url: {url!r}")
+
+    try:
+        resolved = socket.getaddrinfo(parsed.hostname, None)
+    except socket.gaierror:
+        # No se pudo resolver: no hay forma de confirmar que apunte a un
+        # destino privado, y la peticion saliente fallara de todos modos
+        # (se maneja como cualquier otro error de red mas abajo).
+        return
+
+    for family, _type, _proto, _canonname, sockaddr in resolved:
+        ip = ipaddress.ip_address(sockaddr[0])
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast or ip.is_unspecified:
+            raise UnsafeIntegrationUrlError(f"base_url resuelve a una direccion no permitida: {ip}")
 
 
 def source_to_read(row: IntegrationSource) -> IntegrationSourceRead:
@@ -138,12 +174,23 @@ class IntegrationService:
         }
         payload = {target_key: values.get(source_field) for source_field, target_key in field_mapping.items()}
 
+        try:
+            _assert_safe_outbound_url(source.base_url)
+        except UnsafeIntegrationUrlError as exc:
+            return self._record_job(
+                db, integration_map, reference_record_id=record.id, source_id=source.id,
+                status_value="failed", result=str(exc)[:500],
+            )
+
         headers = {"Content-Type": "application/json"}
         if source.credentials_encrypted:
             headers["Authorization"] = f"Bearer {decrypt_text(source.credentials_encrypted)}"
 
         try:
-            response = httpx.post(source.base_url, json=payload, headers=headers, timeout=PUSH_TIMEOUT_SECONDS)
+            response = httpx.post(
+                source.base_url, json=payload, headers=headers,
+                timeout=PUSH_TIMEOUT_SECONDS, follow_redirects=False,
+            )
             if response.status_code >= 400:
                 return self._record_job(
                     db, integration_map, reference_record_id=record.id, source_id=source.id,

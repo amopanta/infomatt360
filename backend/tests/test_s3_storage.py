@@ -15,7 +15,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.assignment import UserProjectAssignment
-from app.models.identity import User
+from app.models.identity import Role, User
 from app.models.storage import StorageProfile
 
 
@@ -43,12 +43,19 @@ def s3_client(monkeypatch):
     sessions = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     Base.metadata.create_all(bind=engine)
     with sessions() as db:
+        storage_role = Role(id="s3-storage-role", name="Almacenamiento", permissions="storage.manage")
+        low_priv_role = Role(id="s3-low-priv-role", name="Solo campo", permissions="records.write")
         member = User(id="s3-member", full_name="Member", document_id="s3-member-doc", email="s3-member@example.com", password_hash=hash_password("Member12345!"))
         outsider = User(id="s3-outsider", full_name="Outsider", document_id="s3-outsider-doc", email="s3-outsider@example.com", password_hash=hash_password("Outsider12345!"))
+        low_priv = User(id="s3-low-priv", full_name="Gestor de campo", document_id="s3-low-priv-doc", email="s3-low-priv@example.com", password_hash=hash_password("LowPriv12345!"))
         db.add_all([
+            storage_role,
+            low_priv_role,
             member,
             outsider,
-            UserProjectAssignment(user_id=member.id, project_id="s3-project", status="active"),
+            low_priv,
+            UserProjectAssignment(user_id=member.id, project_id="s3-project", role_id=storage_role.id, status="active"),
+            UserProjectAssignment(user_id=low_priv.id, project_id="s3-project", role_id=low_priv_role.id, status="active"),
         ])
         db.commit()
 
@@ -80,6 +87,14 @@ def test_connect_requires_project_access_and_hides_secrets(s3_client):
         headers=outsider_headers,
     )
     assert denied.status_code == 403
+
+    low_priv_headers = auth(client, "s3-low-priv@example.com", "LowPriv12345!")
+    denied_low_priv = client.post(
+        "/api/v1/storage/s3/connect",
+        json={"project_id": "s3-project", "bucket_name": "evidencias", "access_key_id": "AKIA", "secret_access_key": "shh"},
+        headers=low_priv_headers,
+    )
+    assert denied_low_priv.status_code == 403
 
     response = client.post(
         "/api/v1/storage/s3/connect",

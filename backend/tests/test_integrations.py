@@ -248,3 +248,74 @@ def test_map_and_job_endpoints_require_project_permission_via_source():
     finally:
         app.dependency_overrides.clear()
         engine.dispose()
+
+
+def test_approving_record_blocks_ssrf_to_private_and_loopback_targets():
+    """Regresion SSRF: un `base_url` que resuelve a loopback/red privada nunca
+    debe generar una peticion saliente real; debe registrarse como fallo."""
+    engine, sessions = setup_client()
+    _create_source_and_map(sessions, base_url="http://127.0.0.1:9999/internal-admin")
+    _create_record(sessions, "ds-record-ssrf")
+
+    called = False
+
+    def fail_if_called(url, **kwargs):
+        nonlocal called
+        called = True
+        return FakeResponse(200, "no deberia llegar aqui")
+
+    original_post = integration_service_module.httpx.post
+    integration_service_module.httpx.post = fail_if_called
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "ds-approver@example.com", "Approver12345!")
+            response = client.post(
+                "/api/v1/review/actions",
+                headers=headers,
+                json={"project_id": "ds-project", "record_id": "ds-record-ssrf", "to_status": "approved", "action": "approve"},
+            )
+            assert response.status_code == 200, response.text
+            assert called is False
+
+            with sessions() as db:
+                job = db.query(IntegrationJob).filter(IntegrationJob.reference_record_id == "ds-record-ssrf").first()
+                assert job.status == "failed"
+                assert "no permitida" in job.last_result or "resuelve" in job.last_result
+    finally:
+        integration_service_module.httpx.post = original_post
+        app.dependency_overrides.clear()
+        engine.dispose()
+
+
+def test_approving_record_blocks_ssrf_via_invalid_scheme():
+    engine, sessions = setup_client()
+    _create_source_and_map(sessions, base_url="file:///etc/passwd")
+    _create_record(sessions, "ds-record-scheme")
+
+    called = False
+
+    def fail_if_called(url, **kwargs):
+        nonlocal called
+        called = True
+        return FakeResponse(200, "no deberia llegar aqui")
+
+    original_post = integration_service_module.httpx.post
+    integration_service_module.httpx.post = fail_if_called
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "ds-approver@example.com", "Approver12345!")
+            response = client.post(
+                "/api/v1/review/actions",
+                headers=headers,
+                json={"project_id": "ds-project", "record_id": "ds-record-scheme", "to_status": "approved", "action": "approve"},
+            )
+            assert response.status_code == 200, response.text
+            assert called is False
+
+            with sessions() as db:
+                job = db.query(IntegrationJob).filter(IntegrationJob.reference_record_id == "ds-record-scheme").first()
+                assert job.status == "failed"
+    finally:
+        integration_service_module.httpx.post = original_post
+        app.dependency_overrides.clear()
+        engine.dispose()

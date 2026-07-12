@@ -15,7 +15,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.assignment import UserProjectAssignment
-from app.models.identity import Project, User
+from app.models.identity import Project, Role, User
 from app.models.storage import StorageProfile
 
 
@@ -34,13 +34,15 @@ def setup_client():
     Base.metadata.create_all(bind=engine)
     with sessions() as db:
         project = Project(id="gdrive-project", name="GDrive Project")
+        storage_role = Role(id="gdrive-storage-role", name="Almacenamiento", permissions="storage.manage")
         member = User(id="gdrive-member", full_name="Member", document_id="gdrive-member-doc", email="gdrive-member@example.com", password_hash=hash_password("Member12345!"))
         outsider = User(id="gdrive-outsider", full_name="Outsider", document_id="gdrive-outsider-doc", email="gdrive-outsider@example.com", password_hash=hash_password("Outsider12345!"))
         db.add_all([
             project,
+            storage_role,
             member,
             outsider,
-            UserProjectAssignment(user_id=member.id, project_id=project.id, status="active"),
+            UserProjectAssignment(user_id=member.id, project_id=project.id, role_id=storage_role.id, status="active"),
         ])
         db.commit()
 

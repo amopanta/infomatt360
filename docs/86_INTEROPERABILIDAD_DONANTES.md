@@ -58,6 +58,27 @@ tiene:
    `Authorization: Bearer {credenciales descifradas}` si hay credenciales.
 4. Registra el resultado en `IntegrationJob` (`sent`/`failed`).
 
+**Correccion de seguridad (SSRF)**: `base_url` es texto libre que
+cualquier usuario con `integrations.donor_sync.manage` puede fijar al
+crear una fuente, y el envio ocurre desde la red del propio backend. Sin
+validacion, una fuente apuntada a un host interno (`http://127.0.0.1:...`,
+el servicio de metadatos de nube `169.254.169.254`, un panel admin en la
+red privada) hacia que el servidor consultara ese destino en nombre del
+usuario, y la respuesta (hasta 500 caracteres) quedaba legible via
+`GET /jobs/{source_id}` con el mismo permiso -- una fuga de datos internos
+disfrazada de "fallo de integracion". `_assert_safe_outbound_url()`
+(`backend/app/services/integration_service.py`) ahora se ejecuta antes de
+cada envio: rechaza esquemas distintos de `http`/`https`, resuelve el
+host y rechaza IPs privadas, loopback, link-local (incluye el servicio de
+metadatos) o reservadas; si el host no resuelve, deja que la peticion
+falle por su cuenta (no hay forma de confirmar que sea privada, y de
+todas formas nunca llegaria a ningun lado). El cliente `httpx` tambien
+deja de seguir redirecciones (`follow_redirects=False`), para que un
+destino permitido no pueda redirigir la peticion hacia uno privado.
+Cubierto por `test_approving_record_blocks_ssrf_to_private_and_loopback_targets`
+y `test_approving_record_blocks_ssrf_via_invalid_scheme` en
+`backend/tests/test_integrations.py`.
+
 **Nunca bloquea la aprobacion**: a diferencia del motor ERP (que si
 bloquea si el stock es insuficiente, ver
 [84_ERP_HEADLESS_INVENTARIO_NOMINA.md](84_ERP_HEADLESS_INVENTARIO_NOMINA.md)),

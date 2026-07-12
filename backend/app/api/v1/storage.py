@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.permissions import require_project_permission
+from app.core.permissions import STORAGE_MANAGE
 from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.storage import S3StorageProfileConnect, StorageProfileCreate, StorageProfileRead
@@ -15,8 +17,7 @@ router = APIRouter()
 
 @router.get("/oauth/gdrive/authorize", summary="Iniciar autorizacion de Google Drive para un proyecto")
 def authorize_gdrive(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict[str, str]:
-    if not assignment_service.user_has_project_access(db, current_user.id, project_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    require_project_permission(db, current_user.id, project_id, STORAGE_MANAGE)
     return {"authorization_url": gdrive_storage_service.build_authorization_url(project_id)}
 
 
@@ -29,15 +30,13 @@ def gdrive_oauth_callback(code: str, state: str, db: Session = Depends(get_db)) 
 
 @router.post("/s3/connect", response_model=StorageProfileRead, summary="Conectar boveda S3/MinIO para evidencias multimedia")
 def connect_s3_storage(payload: S3StorageProfileConnect, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> StorageProfileRead:
-    if not assignment_service.user_has_project_access(db, current_user.id, payload.project_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    require_project_permission(db, current_user.id, payload.project_id, STORAGE_MANAGE)
     return s3_storage_service.connect_profile(db, payload)
 
 
 @router.post("/", response_model=StorageProfileRead)
 def create_storage_profile(payload: StorageProfileCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> StorageProfileRead:
-    if not assignment_service.user_has_project_access(db, current_user.id, payload.project_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    require_project_permission(db, current_user.id, payload.project_id, STORAGE_MANAGE)
     return storage_service.create_profile(db, payload)
 
 

@@ -38,10 +38,20 @@ El archivo se guarda en `settings.backup_directory` (la misma carpeta
 | `POST` | `/api/v1/backups/run?project_id=...` | `backups.manage` |
 | `GET` | `/api/v1/backups/project/{project_id}` | `backups.manage` |
 
+## Pantalla en el frontend
+
+`frontend/src/modules/admin/BackupsApp.tsx` (ruta `/admin/backups`,
+permiso `backups.manage`): boton "Ejecutar respaldo ahora" que dispara
+`POST /backups/run` para el proyecto activo, y una tabla con el historial
+(inicio, estado, tamaño, ruta del archivo, error si aplica). Cliente API
+en `frontend/src/modules/admin/backupsApi.ts`.
+
+Verificado contra backend real (demo sobre SQLite): el boton ejecuto la
+copia del archivo, el resultado aparecio de inmediato en la tabla con
+estado "Exitoso" y el tamaño real del archivo generado.
+
 ## Limites conocidos
 
-- Sin pantalla propia en el frontend todavia (se opera por Swagger/API
-  directa).
 - Un backup fallido (ej. `pg_dump` no esta en el `PATH` del servidor) queda
   registrado con `status="failed"` y el error truncado a 4000 caracteres en
   `BackupJob.error`, pero no reintenta automaticamente.

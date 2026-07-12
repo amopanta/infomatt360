@@ -45,10 +45,39 @@ eso usa su propio modelo (`ExcelImportJob`,
 | `GET` | `/api/v1/excel-import/{job_id}` | acceso al proyecto |
 | `GET` | `/api/v1/excel-import/project/{project_id}` | acceso al proyecto |
 
+## Pantalla en el frontend
+
+`frontend/src/modules/admin/ExcelImportApp.tsx` (ruta
+`/admin/excel-import`, permiso `identity.users.manage`): asistente de 3
+pasos que sigue el mismo flujo del backend.
+
+1. Selecciona tipo de entidad (participantes/usuarios) y archivo `.xlsx`,
+   sube y previsualiza.
+2. Muestra una tabla de mapeo -- una fila por columna del Excel, con un
+   selector del campo destino (prellenado con la deteccion automatica del
+   backend) y dos filas de ejemplo por columna para verificar visualmente
+   antes de confirmar.
+3. Tras confirmar el mapeo, el boton "Aprobar e importar" ejecuta la
+   importacion real y muestra el conteo final de filas importadas/fallidas
+   y el detalle de errores por fila si los hay.
+
+Debajo, un historial de todos los lotes del proyecto (archivo, tipo,
+estado, conteo). Cliente API en
+`frontend/src/modules/admin/excelImportApi.ts` (usa `FormData` para la
+subida, no JSON).
+
+Verificado contra backend real: se creo un `.xlsx` de prueba con
+`openpyxl` (2 filas, columnas `documento`/`nombre completo`/`codigo`), se
+subio y confirmo el mapeo, se aprobo, y los 2 participantes aparecieron
+consultables en `GET /participants/project/{id}` -- el flujo completo
+subir->mapear->aprobar funciona de punta a punta. La seleccion de archivo
+en si se probo contra el endpoint (no hay control de dialogo nativo de
+archivos en el entorno de automatizacion del navegador usado para
+verificar), pero es la misma llamada `multipart/form-data` que el boton
+"Subir y previsualizar" del frontend invoca.
+
 ## Limites conocidos
 
-- Sin pantalla propia en el frontend todavia (se opera por Swagger/API
-  directa); ver la nota de prioridades en la auditoria original.
 - Un fallo por fila (ej. duplicado, campo invalido) no revierte el lote
   completo: las filas validas se importan y las invalidas quedan reportadas
   en `error_report_json` para corregir y reintentar.

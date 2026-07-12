@@ -8,6 +8,7 @@ import { ApprovalFlowsApp } from './modules/admin/ApprovalFlowsApp';
 import { BulkJobsApp } from './modules/admin/BulkJobsApp';
 import { DonorSyncApp } from './modules/admin/DonorSyncApp';
 import { ErpApp } from './modules/admin/ErpApp';
+import { GovernanceApp } from './modules/admin/GovernanceApp';
 import { OperationalMetricsApp } from './modules/admin/OperationalMetricsApp';
 import { WhatsAppApp } from './modules/admin/WhatsAppApp';
 import { AuditApp } from './modules/audit/AuditApp';
@@ -84,6 +85,7 @@ function renderRoute(route: AppRoute) {
       case 'whatsapp': return <WhatsAppApp />;
       case 'donorSync': return <DonorSyncApp />;
       case 'aiAudit': return <AiAuditApp />;
+      case 'governance': return <GovernanceApp />;
       case 'adminUsers': return <AdminUserSecurityApp />;
       case 'accountSecurity': return <AccountSecurityApp />;
       case 'records': return <RecordsApp />;

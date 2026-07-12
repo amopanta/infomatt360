@@ -158,12 +158,42 @@ capacidad nueva.
   descripciones no reconocidas escalan a humano, y solo
   `support.tickets.manage` puede resolver un ticket escalado.
 
+## Pantalla en el frontend
+
+`frontend/src/modules/admin/GovernanceApp.tsx` (ruta `/admin/governance`,
+visible en el menu si el usuario tiene al menos uno de
+`organizations.tenant_clean`, `identity.users.manage` o
+`support.tickets.manage`), con tres pestañas -- cada una solo se muestra si
+el usuario tiene el permiso correspondiente:
+
+- **Purga de organización**: formulario con `organization_id`,
+  `confirm_slug` y codigo 2FA; el boton "Ejecutar purga" pide una
+  confirmacion adicional del navegador (`window.confirm`) antes de llamar
+  al endpoint, como capa extra de proteccion sobre las ya existentes en el
+  backend (permiso + membresia + slug + 2FA). Muestra el conteo de filas
+  borradas por tabla al terminar.
+- **Credenciales de emergencia**: formulario para emitir (usuario, horas de
+  vigencia, proposito) con el codigo mostrado una sola vez; lista de
+  credenciales del proyecto activo con boton "Revocar" (oculto en llaves ya
+  usadas o revocadas).
+- **Mesa de ayuda**: formulario para reportar una falla (asunto +
+  descripcion), con el resultado de la clasificacion automatica mostrado de
+  inmediato (auto-resuelto con el tutorial, o escalado a humano); lista de
+  tickets del proyecto con filtro por estado y boton "Marcar resuelto" para
+  los tickets abiertos.
+
+Cliente API en `frontend/src/modules/admin/governanceApi.ts`. Verificado en
+navegador real: emision y revocacion de una credencial de emergencia
+reflejadas de inmediato en la lista, y un ticket con la palabra
+"sincronizacion" auto-resuelto mostrando el tutorial exacto del motor de
+reglas.
+
 ## Limites conocidos
 
-- Sin pantalla propia en el frontend todavia para ninguna de las tres
-  capacidades: se activan via Swagger/API, igual que otros modulos
-  administrativos en su primera version (WAHA, Google Drive) antes de
-  tener UI dedicada.
+- Sin selector de organizaciones en la pestaña de purga: el ID se escribe
+  a mano, ya que la gestion de organizaciones en si tampoco tiene pantalla
+  propia todavia (se crean via Swagger/API desde el instalador o
+  `POST /api/v1/organizations/`).
 - El motor de reglas de la mesa de ayuda es un arbol de decision por
   palabras clave literal (no usa el LLM de la auditoria semantica); frases
   que no contienen ninguna de las palabras clave configuradas siempre

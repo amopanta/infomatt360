@@ -583,4 +583,8 @@ body { margin: 0; }
 .ai-analyze-inline input { border: 1px solid #cfd8e3; border-radius: 10px; padding: 11px; font: inherit; }
 .ai-analyze-inline button { border: 1px solid #0066cc; border-radius: 10px; padding: 11px 16px; background: #ffffff; color: #0066cc; font-weight: 800; cursor: pointer; }
 .ai-analyze-inline button:disabled { opacity: 0.45; cursor: not-allowed; }
+.ai-analyze-inline button.danger { border-color: #fecaca; color: #b42318; background: #fff5f5; }
+.ds-map-list header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.ds-map-list header h2 { margin: 0; }
+.ds-map-card button { margin-top: 8px; border: 1px solid #cfd8e3; border-radius: 8px; padding: 8px 12px; background: #ffffff; cursor: pointer; font-weight: 700; }
 @media (max-width: 760px) { .review-flow-comparison > div { grid-template-columns: 1fr; } .review-flow-comparison header { flex-direction: column; } }

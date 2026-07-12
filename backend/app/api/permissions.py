@@ -51,6 +51,32 @@ def require_any_permission(db: Session, user_id: str, permissions: set[str]) -> 
     raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permiso insuficiente")
 
 
+def require_permission_in_organization(db: Session, user_id: str, organization_id: str, permission: str) -> UserProjectAssignment:
+    """Verifica que el permiso este concedido a traves de un proyecto que pertenezca a `organization_id`.
+
+    A diferencia de `require_any_permission` (que acepta el permiso concedido en
+    cualquier proyecto/organizacion), esta funcion evita que un permiso obtenido
+    en la Organizacion A autorice acciones sobre la Organizacion B solo porque el
+    usuario tambien tiene alguna asignacion (con cualquier permiso) ahi.
+    """
+    row = (
+        db.query(UserProjectAssignment, Role)
+        .join(Role, Role.id == UserProjectAssignment.role_id)
+        .join(Project, Project.id == UserProjectAssignment.project_id)
+        .filter(
+            UserProjectAssignment.user_id == user_id,
+            UserProjectAssignment.status == "active",
+            Project.organization_id == organization_id,
+        )
+        .all()
+    )
+    for assignment, role in row:
+        current_permissions = {item.strip() for item in role.permissions.split(",") if item.strip()}
+        if permission in current_permissions:
+            return assignment
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permiso insuficiente en esta organizacion")
+
+
 def get_user_organization_ids(db: Session, user_id: str) -> list[str]:
     """Organizaciones a las que el usuario tiene acceso, resueltas via sus proyectos asignados."""
     rows = (

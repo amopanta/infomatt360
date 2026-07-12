@@ -1,10 +1,12 @@
 from datetime import timedelta
 
+from jose import jwt
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from starlette.testclient import TestClient
 
+from app.core.config import settings
 from app.core.security import hash_password
 from app.core.time import utc_now
 from app.db.base import Base
@@ -27,6 +29,13 @@ def setup_client():
         issuer = User(id="emg-issuer", full_name="Issuer", document_id="emg-issuer-doc", email="emg-issuer@example.com", password_hash=hash_password("Issuer12345!"))
         outsider = User(id="emg-outsider", full_name="Outsider", document_id="emg-outsider-doc", email="emg-outsider@example.com", password_hash=hash_password("Outsider12345!"))
         target = User(id="emg-target", full_name="Gestor bloqueado", document_id="emg-target-doc", email="emg-target@example.com", password_hash=hash_password("Target12345!"))
+        unaffiliated_target = User(
+            id="emg-unaffiliated-target",
+            full_name="Sin acceso al proyecto",
+            document_id="emg-unaffiliated-target-doc",
+            email="emg-unaffiliated-target@example.com",
+            password_hash=hash_password("Unaffiliated12345!"),
+        )
 
         db.add_all([
             project,
@@ -35,6 +44,7 @@ def setup_client():
             issuer,
             outsider,
             target,
+            unaffiliated_target,
             UserProjectAssignment(user_id=issuer.id, project_id=project.id, role_id=issuer_role.id, status="active"),
             UserProjectAssignment(user_id=outsider.id, project_id=project.id, role_id=outsider_role.id, status="active"),
             UserProjectAssignment(user_id=target.id, project_id=project.id, role_id=outsider_role.id, status="active"),
@@ -66,6 +76,52 @@ def test_issue_requires_permission():
                 json={"project_id": "emg-project", "user_id": "emg-target", "hours_valid": 24},
             )
             assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_issue_rejects_target_user_without_project_access():
+    """Regresion IDOR: el emisor no deberia poder acuñar una credencial de
+    emergencia para un usuario que no tiene ninguna asignacion al proyecto
+    indicado, aunque el usuario exista en el sistema."""
+    engine, _sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "emg-issuer@example.com", "Issuer12345!")
+            response = client.post(
+                "/api/v1/emergency-access/keys",
+                headers=headers,
+                json={"project_id": "emg-project", "user_id": "emg-unaffiliated-target", "hours_valid": 24},
+            )
+            assert response.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_redeem_caps_session_length_to_normal_jwt_expiry():
+    """La sesion emitida al canjear nunca debe durar mas que la expiracion
+    normal de un JWT, aunque la llave de emergencia tenga mucho mas tiempo
+    restante (ej. hours_valid=168)."""
+    engine, _sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "emg-issuer@example.com", "Issuer12345!")
+            issued = client.post(
+                "/api/v1/emergency-access/keys",
+                headers=headers,
+                json={"project_id": "emg-project", "user_id": "emg-target", "hours_valid": 168},
+            ).json()
+
+            redeemed = client.post("/api/v1/emergency-access/redeem", json={"code": issued["code"]})
+            assert redeemed.status_code == 200
+            token = redeemed.json()["access_token"]
+
+            payload = jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
+            issued_at = utc_now()
+            token_lifetime = payload["exp"] - int(issued_at.timestamp())
+            assert token_lifetime <= settings.access_token_expire_minutes * 60 + 5
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

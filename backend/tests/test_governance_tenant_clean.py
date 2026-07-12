@@ -53,6 +53,15 @@ def setup_client():
             mfa_enabled=True,
             mfa_secret_encrypted=mfa_service.encrypt_secret(secret),
         )
+        cross_org = User(
+            id="gov-cross-org",
+            full_name="Con permiso en otra org",
+            document_id="gov-cross-org-doc",
+            email="gov-cross-org@example.com",
+            password_hash=hash_password("CrossOrg12345!"),
+            mfa_enabled=True,
+            mfa_secret_encrypted=mfa_service.encrypt_secret(secret),
+        )
 
         db.add_all([
             organization,
@@ -64,8 +73,13 @@ def setup_client():
             admin,
             outsider,
             unaffiliated,
+            cross_org,
             UserProjectAssignment(user_id=admin.id, project_id=project.id, role_id=clean_role.id, status="active"),
             UserProjectAssignment(user_id=outsider.id, project_id=project.id, role_id=outsider_role.id, status="active"),
+            # Tiene organizations.tenant_clean, pero solo via un proyecto de org-gov;
+            # ademas tiene una asignacion (sin ese permiso) en org-other.
+            UserProjectAssignment(user_id=cross_org.id, project_id=project.id, role_id=clean_role.id, status="active"),
+            UserProjectAssignment(user_id=cross_org.id, project_id=other_project.id, role_id=outsider_role.id, status="active"),
         ])
 
         db.add_all([
@@ -140,6 +154,25 @@ def test_tenant_clean_rejects_unaffiliated_organization():
                 "/api/v1/organizations/org-gov/tenant-clean",
                 headers=headers,
                 json={"confirm_slug": "org-gov", "totp_code": action_totp_for(secret)},
+            )
+            assert response.status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_tenant_clean_rejects_permission_granted_in_a_different_organization():
+    """Regresion: `organizations.tenant_clean` obtenido via un proyecto de org-gov
+    no debe autorizar la purga de org-other solo porque el usuario tambien tiene
+    alguna asignacion (con otro permiso) ahi."""
+    engine, sessions, secret = setup_client()
+    try:
+        with TestClient(app) as client:
+            headers = auth_with_mfa(client, "gov-cross-org@example.com", "CrossOrg12345!", secret)
+            response = client.post(
+                "/api/v1/organizations/org-other/tenant-clean",
+                headers=headers,
+                json={"confirm_slug": "org-other", "totp_code": action_totp_for(secret)},
             )
             assert response.status_code == 403
     finally:

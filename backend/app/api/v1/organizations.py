@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.permissions import get_user_organization_ids, require_any_permission
+from app.api.permissions import require_any_permission, require_permission_in_organization
 from app.core.permissions import ORGANIZATIONS_BRANDING_MANAGE, ORGANIZATIONS_MANAGE, ORGANIZATIONS_TENANT_CLEAN
 from app.db.session import get_db
 from app.models.identity import User
@@ -56,10 +56,7 @@ def tenant_clean(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> TenantCleanResult:
-    require_any_permission(db, current_user.id, {ORGANIZATIONS_TENANT_CLEAN})
-
-    if organization_id not in get_user_organization_ids(db, current_user.id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso a esta organizacion")
+    require_permission_in_organization(db, current_user.id, organization_id, ORGANIZATIONS_TENANT_CLEAN)
 
     organization = db.query(Organization).filter(Organization.id == organization_id).first()
     if organization is None:

@@ -17,6 +17,7 @@ from datetime import timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.security import create_access_token
 from app.core.time import utc_now
 from app.models.emergency_access import EmergencyAccessKey
@@ -27,6 +28,7 @@ from app.schemas.emergency_access import (
     EmergencyAccessKeyRead,
     EmergencyAccessRedeemResponse,
 )
+from app.services.assignment_service import assignment_service
 
 
 def _hash_code(raw_code: str) -> str:
@@ -52,6 +54,9 @@ class EmergencyAccessService:
         target_user = db.query(User).filter(User.id == payload.user_id).first()
         if target_user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El usuario indicado no existe")
+
+        if not assignment_service.user_has_project_access(db, payload.user_id, payload.project_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El gestor no tiene acceso a ese proyecto")
 
         raw_code = secrets.token_hex(4).upper()
         row = EmergencyAccessKey(
@@ -95,8 +100,9 @@ class EmergencyAccessService:
         db.commit()
 
         remaining = row.expires_at - now
-        token_expires_at = now + remaining
-        access_token = create_access_token(user.id, user.auth_version, expires_delta=remaining)
+        session_length = min(remaining, timedelta(minutes=settings.access_token_expire_minutes))
+        token_expires_at = now + session_length
+        access_token = create_access_token(user.id, user.auth_version, expires_delta=session_length)
         return EmergencyAccessRedeemResponse(access_token=access_token, expires_at=token_expires_at)
 
 

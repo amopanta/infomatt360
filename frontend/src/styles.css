@@ -16,6 +16,23 @@ body { margin: 0; }
 .auth-card button.secondary { color: #0066cc; border: 1px solid #0066cc; background: #ffffff; }
 .auth-card [role="alert"] { color: #b42318; font-weight: 700; }
 .app-logout { padding: 9px 13px; }
+.wizard-card { width: min(640px, 100%); }
+.wizard-steps { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 6px; padding: 0; list-style: none; }
+.wizard-steps li { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; padding: 5px 10px; border-radius: 999px; background: #eef1f8; color: #4b5468; }
+.wizard-steps li.active { background: #0066cc; color: #ffffff; }
+.wizard-steps li.done { background: #e4f4ea; color: #1c7a4c; }
+.wizard-fieldset { display: flex; flex-direction: column; gap: 14px; border: 0; padding: 0; margin: 0; }
+.wizard-toggle-row { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.wizard-toggle-row input { width: auto; }
+.wizard-actions { display: flex; justify-content: space-between; gap: 10px; margin-top: 6px; }
+.requirement-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.requirement-check { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 10px 12px; border-radius: 10px; background: #f5f6f9; font-weight: 700; }
+.requirement-check.status-ok { background: #e4f4ea; color: #1c7a4c; }
+.requirement-check.status-warning { background: #fbf0dd; color: #9a6512; }
+.requirement-check.status-error { background: #fbe9e8; color: #a5352f; }
+.requirement-check small { font-weight: 500; display: block; }
+.wizard-summary { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 6px; font-size: 0.92rem; }
+.wizard-summary li strong { display: inline-block; min-width: 160px; }
 .admin-users { max-width: 960px; margin: 28px auto; padding: 0 24px; }
 .admin-user-card { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0; padding: 20px; border: 1px solid #dce7f2; border-radius: 14px; background: #ffffff; }
 .admin-user-card h3, .admin-user-card small, .admin-user-card div, .admin-user-card p { grid-column: 1 / -1; margin: 0; }

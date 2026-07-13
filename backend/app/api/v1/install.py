@@ -10,7 +10,12 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.schemas.installation import InstallBootstrapRequest, InstallBootstrapResponse, InstallStatusResponse
+from app.schemas.installation import (
+    InstallBootstrapRequest,
+    InstallBootstrapResponse,
+    InstallRequirementsResponse,
+    InstallStatusResponse,
+)
 from app.services.installation_service import installation_service
 
 router = APIRouter()
@@ -19,6 +24,11 @@ router = APIRouter()
 @router.get("/status", response_model=InstallStatusResponse, summary="Consultar estado de instalacion")
 def get_install_status(db: Session = Depends(get_db)) -> InstallStatusResponse:
     return installation_service.status(db)
+
+
+@router.get("/requirements", response_model=InstallRequirementsResponse, summary="Verificar requisitos del servidor antes de instalar")
+def get_install_requirements(db: Session = Depends(get_db)) -> InstallRequirementsResponse:
+    return installation_service.requirements(db)
 
 
 @router.post("/bootstrap", response_model=InstallBootstrapResponse, summary="Completar instalacion de primer arranque")

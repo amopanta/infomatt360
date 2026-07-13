@@ -26,6 +26,7 @@ class Organization(Base):
     name: Mapped[str] = mapped_column(String(180), nullable=False)
     slug: Mapped[str] = mapped_column(String(80), unique=True, nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(30), default="active", nullable=False)
+    public_url: Mapped[str | None] = mapped_column(String(300), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
 

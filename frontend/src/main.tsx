@@ -11,7 +11,9 @@ import { DonorSyncApp } from './modules/admin/DonorSyncApp';
 import { ErpApp } from './modules/admin/ErpApp';
 import { ExcelImportApp } from './modules/admin/ExcelImportApp';
 import { GovernanceApp } from './modules/admin/GovernanceApp';
+import { MailProfilesApp } from './modules/admin/MailProfilesApp';
 import { OperationalMetricsApp } from './modules/admin/OperationalMetricsApp';
+import { StorageApp } from './modules/admin/StorageApp';
 import { WhatsAppApp } from './modules/admin/WhatsAppApp';
 import { AuditApp } from './modules/audit/AuditApp';
 import { AuthGate } from './modules/auth/AuthGate';
@@ -90,6 +92,8 @@ function renderRoute(route: AppRoute) {
       case 'governance': return <GovernanceApp />;
       case 'backups': return <BackupsApp />;
       case 'excelImport': return <ExcelImportApp />;
+      case 'storage': return <StorageApp />;
+      case 'mailProfiles': return <MailProfilesApp />;
       case 'adminUsers': return <AdminUserSecurityApp />;
       case 'accountSecurity': return <AccountSecurityApp />;
       case 'records': return <RecordsApp />;

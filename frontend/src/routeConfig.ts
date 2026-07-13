@@ -11,6 +11,8 @@ export type AppRouteKey =
   | 'governance'
   | 'backups'
   | 'excelImport'
+  | 'storage'
+  | 'mailProfiles'
   | 'adminUsers'
   | 'accountSecurity'
   | 'records'
@@ -47,6 +49,8 @@ export function resolveAppRoute(pathname: string): AppRoute {
   if (pathname.startsWith('/admin/governance')) return { key: 'governance', permissions: ['organizations.tenant_clean', 'identity.users.manage', 'support.tickets.manage'] };
   if (pathname.startsWith('/admin/backups')) return { key: 'backups', permissions: ['backups.manage'] };
   if (pathname.startsWith('/admin/excel-import')) return { key: 'excelImport', permissions: ['identity.users.manage'] };
+  if (pathname.startsWith('/admin/storage')) return { key: 'storage', permissions: ['storage.manage'] };
+  if (pathname.startsWith('/admin/mail-profiles')) return { key: 'mailProfiles', permissions: ['messages.write'] };
   if (pathname.startsWith('/admin/users')) return { key: 'adminUsers', permissions: ['identity.users.manage'] };
   if (pathname.startsWith('/account/security')) return { key: 'accountSecurity' };
   if (pathname.startsWith('/records')) return { key: 'records' };

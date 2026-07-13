@@ -141,9 +141,26 @@ sigue yendo a local, y que un fallo del cliente S3 se traduce en
 2. Crea el bucket (ej. `infomatt360-evidencias`) desde la consola de MinIO
    o `aws s3 mb`.
 3. `POST /api/v1/storage/s3/connect` con las credenciales del paso
-   anterior.
+   anterior (o el formulario "S3 / MinIO" en `/admin/storage`).
 4. A partir de ahi, toda subida de evidencias de ese proyecto va a la
    boveda S3/MinIO en vez de a disco local.
+
+## Pantalla en el frontend
+
+`frontend/src/modules/admin/StorageApp.tsx` (ruta `/admin/storage`,
+permiso `storage.manage`): dos pestañas, "S3 / MinIO" (formulario con
+bucket, endpoint opcional, region y credenciales) y "Google Drive" (boton
+que abre la autorizacion OAuth en una pestaña nueva -- ver
+[79_CONECTOR_GOOGLE_DRIVE.md](79_CONECTOR_GOOGLE_DRIVE.md)); debajo, una
+tabla comun con todos los destinos conectados del proyecto (nombre,
+proveedor, bucket/ruta, si es el predeterminado, estado) y un boton
+"Actualizar lista" para refrescarla despues de completar un flujo OAuth
+en la otra pestaña. Cliente API en
+`frontend/src/modules/admin/storageApi.ts`. Verificado contra backend
+real: el formulario S3 mostro el perfil recien conectado en la tabla
+inmediatamente, y el boton de Google Drive mostro el error real del
+backend ("El conector de Google Drive no esta configurado en este
+servidor") cuando las credenciales OAuth no estan configuradas.
 
 ## Limites conocidos
 

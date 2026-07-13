@@ -22,6 +22,8 @@ const menu = [
   { label: 'Gobernanza', href: '/admin/governance', permissions: ['organizations.tenant_clean', 'identity.users.manage', 'support.tickets.manage'] },
   { label: 'Backups', href: '/admin/backups', permissions: ['backups.manage'] },
   { label: 'Carga masiva Excel', href: '/admin/excel-import', permissions: ['identity.users.manage'] },
+  { label: 'Almacenamiento', href: '/admin/storage', permissions: ['storage.manage'] },
+  { label: 'Correo', href: '/admin/mail-profiles', permissions: ['messages.write'] },
   { label: 'Sincronizacion', href: '/admin/bulk-jobs', permissions: ['integrations.api_keys.manage', 'records.write'] },
   { label: 'Metricas', href: '/admin/metrics', permissions: ['identity.users.manage', 'integrations.api_keys.manage', 'records.approve', 'records.write'] },
   { label: 'Mi seguridad', href: '/account/security' },

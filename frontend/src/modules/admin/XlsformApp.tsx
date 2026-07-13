@@ -84,8 +84,8 @@ export function XlsformApp() {
         <section className="audit-panel">
           <header>
             <div>
-              <h2>Importar desde XLSForm (ODK/KoboToolbox)</h2>
-              <p>Sube un archivo .xlsx con hojas "survey" y "choices" para crear una plantilla nueva del constructor (ver docs/81 y docs/93).</p>
+              <h2>Importar formulario (XLSForm, SurveyMonkey o LimeSurvey)</h2>
+              <p>Sube un archivo .xlsx para crear una plantilla nueva del constructor. Detecta automaticamente el formato: XLSForm/ODK/KoboToolbox (hojas "survey"/"choices"), o el formato SurveyMonkey/LimeSurvey de la plantilla de referencia (ver docs/81, docs/93 y docs/94).</p>
             </div>
           </header>
           <div className="ai-analyze-inline">

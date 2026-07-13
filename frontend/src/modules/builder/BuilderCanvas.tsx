@@ -2,7 +2,7 @@ import { useState } from 'react';
 import type { BuilderPreviewSection } from './types';
 
 const optionTypes = new Set(['SELECT', 'MULTISELECT', 'DROPDOWN', 'LIKERT_5', 'LIKERT_7', 'RATING', 'RANKING']);
-const numericTypes = new Set(['NUMBER', 'INTEGER', 'DECIMAL', 'PERCENTAGE', 'CURRENCY', 'NPS', 'YEAR']);
+const numericTypes = new Set(['NUMBER', 'INTEGER', 'DECIMAL', 'PERCENTAGE', 'CURRENCY', 'NPS', 'YEAR', 'RANGE']);
 const textTypes = new Set(['TEXT', 'TEXTAREA', 'DOCUMENT_ID', 'EMAIL', 'PHONE', 'URL']);
 
 type Props = {
@@ -194,6 +194,12 @@ export function BuilderCanvas({
                           <span>Valor maximo</span>
                           <input type="number" value={field.max ?? ''} onChange={(event) => onFieldChange(field.id, { max: event.target.value })} />
                         </label>
+                        {field.type === 'RANGE' ? (
+                          <label>
+                            <span>Paso</span>
+                            <input type="number" value={field.step ?? ''} onChange={(event) => onFieldChange(field.id, { step: event.target.value })} />
+                          </label>
+                        ) : null}
                       </>
                     ) : null}
                     {textTypes.has(field.type) ? (

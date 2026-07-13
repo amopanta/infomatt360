@@ -21,6 +21,7 @@ export type BuilderPreviewField = {
   optionsText?: string;
   min?: string;
   max?: string;
+  step?: string;
   minLength?: string;
   maxLength?: string;
   pattern?: string;

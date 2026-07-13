@@ -41,6 +41,15 @@ FIELD_TYPE_ALIASES = {
     "TIEMPO_ENTREVISTA": "INTERVIEW_DURATION",
     "USUARIO_CAPTURADOR": "CAPTURED_BY",
     "HISTORIAL_CAMBIOS": "CHANGE_HISTORY",
+    # Vocabulario propio de ActivityInfo (no es XLSForm, pero si alguien
+    # escribe estos nombres literalmente en la columna `type` de un XLSForm,
+    # se resuelven igual que su equivalente XLSForm/ODK -- ver docs/93.
+    "MULTILINE_TEXT": "TEXTAREA",
+    "QUANTITY": "NUMBER",
+    "SINGLE_SELECT": "SELECT",
+    "MULTI_SELECT": "MULTISELECT",
+    "ATTACHMENT": "FILE",
+    "CALCULATED": "CALCULATE",
 }
 
 

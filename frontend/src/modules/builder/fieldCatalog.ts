@@ -47,6 +47,7 @@ export const FIELD_CATALOG: BuilderPaletteItem[] = [
   { category: 'Experiencia', type: 'LIKERT_7', label: 'Likert 7 puntos', description: 'Escala de percepcion de 1 a 7' },
   { category: 'Experiencia', type: 'RATING', label: 'Calificacion', description: 'Estrellas o escala visual' },
   { category: 'Experiencia', type: 'RANKING', label: 'Ranking', description: 'Ordenamiento de prioridades' },
+  { category: 'Experiencia', type: 'RANGE', label: 'Deslizador', description: 'Escala numerica interactiva (min, max y paso configurables)' },
   { category: 'Sistema', type: 'UUID', label: 'UUID', description: 'Identificador unico global' },
   { category: 'Sistema', type: 'RESPONSE_ID', label: 'ID de respuesta', description: 'Identificador del registro' },
   { category: 'Auditoria', type: 'INTERVIEW_DURATION', label: 'Tiempo de entrevista', description: 'Duracion de la captura' },

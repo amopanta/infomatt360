@@ -136,3 +136,10 @@ proyecto.
   bytes vía una peticion `multipart/form-data` real contra
   `POST /xlsform/import` — resultado `200` con los 4 campos y
   `warnings: []`.
+
+## Formatos adicionales
+
+`POST /xlsform/import` tambien reconoce automaticamente archivos con el
+formato SurveyMonkey o LimeSurvey (segun la plantilla de referencia del
+usuario), sin necesidad de convertirlos antes a XLSForm — ver
+[docs/94](94_IMPORTADOR_MULTIFORMATO.md).

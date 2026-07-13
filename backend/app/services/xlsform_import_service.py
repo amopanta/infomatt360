@@ -21,7 +21,6 @@ el constructor visual (`hint`, `required`, `relevant`, `constraint`,
 traduccion.
 """
 
-import json
 import re
 from io import BytesIO
 
@@ -30,9 +29,10 @@ from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
 from app.core.field_types import normalize_field_type
-from app.schemas.builder import BuilderComponentCreate, BuilderTemplateCreate
-from app.schemas.builder_layout import BuilderColumnCreate, BuilderPageCreate, BuilderRowCreate, BuilderSectionCreate
+from app.schemas.builder import BuilderTemplateCreate
+from app.schemas.builder_layout import BuilderPageCreate, BuilderSectionCreate
 from app.schemas.xlsform import XlsformImportResult
+from app.services.form_import_common import create_field_component
 from app.services.builder_layout_service import builder_layout_service
 from app.services.builder_service import builder_service
 
@@ -230,7 +230,7 @@ class XlsformImportService:
                     continue
                 repeat = repeat_stack.pop()
                 config = {"fields": repeat["fields"]}
-                self._create_field_component(
+                create_field_component(
                     db, template.id, section.id, sort_order,
                     component_type="REPEAT", name=str(repeat["name"]) or f"repeat_{sort_order}",
                     label=str(repeat["label"]) or "Repetible", config=config,
@@ -264,7 +264,7 @@ class XlsformImportService:
                 repeat_stack[-1]["fields"].append({"name": field_name, "label": field_label, "component_type": mapped_type, "config": config})
                 continue
 
-            self._create_field_component(db, template.id, section.id, sort_order, component_type=mapped_type, name=field_name, label=field_label, config=config)
+            create_field_component(db, template.id, section.id, sort_order, component_type=mapped_type, name=field_name, label=field_label, config=config)
             sort_order += 1
             imported_fields += 1
 
@@ -347,19 +347,6 @@ class XlsformImportService:
         merged = dict(config or {})
         merged.update(updates)
         return merged, warnings
-
-    def _create_field_component(self, db: Session, template_id: str, section_id: str, sort_order: int, *, component_type: str, name: str, label: str, config: dict | None) -> None:
-        row = builder_layout_service.create_row(db, BuilderRowCreate(section_id=section_id, sort_order=sort_order))
-        column = builder_layout_service.create_column(db, BuilderColumnCreate(row_id=row.id, desktop_width=12, tablet_width=12, mobile_width=12, sort_order=0))
-        builder_service.add_component(db, BuilderComponentCreate(
-            template_id=template_id,
-            column_id=column.id,
-            component_type=component_type,
-            name=name,
-            label=label,
-            config_json=json.dumps(config) if config is not None else None,
-            sort_order=sort_order,
-        ))
 
 
 xlsform_import_service = XlsformImportService()

@@ -194,6 +194,7 @@ export function BuilderApp() {
               options: optionsFromText(field.optionsText),
               min: optionalNumber(field.min),
               max: optionalNumber(field.max),
+              step: field.type === 'RANGE' ? optionalNumber(field.step) : undefined,
               min_length: optionalNumber(field.minLength),
               max_length: optionalNumber(field.maxLength),
               pattern: field.type === 'DOCUMENT_ID' ? documentPattern(field.documentAppearance, field.pattern) : field.pattern?.trim() || undefined,

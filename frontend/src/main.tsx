@@ -13,7 +13,9 @@ import { ExcelImportApp } from './modules/admin/ExcelImportApp';
 import { GovernanceApp } from './modules/admin/GovernanceApp';
 import { MailProfilesApp } from './modules/admin/MailProfilesApp';
 import { OperationalMetricsApp } from './modules/admin/OperationalMetricsApp';
+import { PublicLinksApp } from './modules/admin/PublicLinksApp';
 import { StorageApp } from './modules/admin/StorageApp';
+import { XlsformApp } from './modules/admin/XlsformApp';
 import { WhatsAppApp } from './modules/admin/WhatsAppApp';
 import { AuditApp } from './modules/audit/AuditApp';
 import { AuthGate } from './modules/auth/AuthGate';
@@ -94,6 +96,8 @@ function renderRoute(route: AppRoute) {
       case 'excelImport': return <ExcelImportApp />;
       case 'storage': return <StorageApp />;
       case 'mailProfiles': return <MailProfilesApp />;
+      case 'publicLinks': return <PublicLinksApp />;
+      case 'xlsform': return <XlsformApp />;
       case 'adminUsers': return <AdminUserSecurityApp />;
       case 'accountSecurity': return <AccountSecurityApp />;
       case 'records': return <RecordsApp />;

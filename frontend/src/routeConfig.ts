@@ -13,6 +13,8 @@ export type AppRouteKey =
   | 'excelImport'
   | 'storage'
   | 'mailProfiles'
+  | 'publicLinks'
+  | 'xlsform'
   | 'adminUsers'
   | 'accountSecurity'
   | 'records'
@@ -51,6 +53,8 @@ export function resolveAppRoute(pathname: string): AppRoute {
   if (pathname.startsWith('/admin/excel-import')) return { key: 'excelImport', permissions: ['identity.users.manage'] };
   if (pathname.startsWith('/admin/storage')) return { key: 'storage', permissions: ['storage.manage'] };
   if (pathname.startsWith('/admin/mail-profiles')) return { key: 'mailProfiles', permissions: ['messages.write'] };
+  if (pathname.startsWith('/admin/public-links')) return { key: 'publicLinks', permissions: ['builder.write'] };
+  if (pathname.startsWith('/admin/xlsform')) return { key: 'xlsform', permissions: ['builder.write'] };
   if (pathname.startsWith('/admin/users')) return { key: 'adminUsers', permissions: ['identity.users.manage'] };
   if (pathname.startsWith('/account/security')) return { key: 'accountSecurity' };
   if (pathname.startsWith('/records')) return { key: 'records' };

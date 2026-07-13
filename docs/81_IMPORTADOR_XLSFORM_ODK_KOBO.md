@@ -55,3 +55,9 @@ importar.
   despues de importar.
 - Requiere que la hoja `survey` tenga al menos las columnas `type` y
   `name`; si faltan, la importacion completa se rechaza con `422`.
+
+## Pantalla y exportacion
+
+Este importador ahora tiene pantalla propia en `/admin/xlsform`, que
+tambien ofrece la operacion inversa (exportar cualquier plantilla del
+Builder a `.xlsx`) — ver [docs/93](93_EXPORTADOR_XLSFORM.md).

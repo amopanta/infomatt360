@@ -12,6 +12,10 @@ type Props = {
   projectId: string;
   values: RuntimeFormValues;
   onChange: (fieldName: string, value: RuntimeFormValue) => void;
+  /** El enlace publico de captura (ver publicform/) no tiene sesion, y la
+   * subida de archivos exige un JWT (`uploadRuntimeFile`); por eso ahi se
+   * deshabilitan los campos de archivo/firma en vez de intentar subirlos. */
+  uploadsDisabled?: boolean;
 };
 
 function isEmptyValue(value: RuntimeFormValue | undefined) {
@@ -57,7 +61,7 @@ function RuntimeQuestionLabel({ label, config }: { label: string; config: Return
 }
 
 export function RuntimeField(props: Props) {
-  const { component, projectId, values, onChange } = props;
+  const { component, projectId, values, onChange, uploadsDisabled } = props;
   const [uploadStatus, setUploadStatus] = useState('');
   const value = values[component.name] ?? '';
   const type = component.type.toUpperCase();
@@ -89,6 +93,14 @@ export function RuntimeField(props: Props) {
   }
 
   if (type === 'SIGNATURE') {
+    if (uploadsDisabled) {
+      return (
+        <div className="runtime-field-group">
+          <RuntimeQuestionLabel label={component.label} config={config} />
+          <small className="runtime-field-unavailable">Este campo requiere iniciar sesión; no está disponible en el enlace público.</small>
+        </div>
+      );
+    }
     const signature = value && typeof value === 'object' && !Array.isArray(value) ? value as RuntimeFileValue : null;
     return (
       <RuntimeSignature
@@ -105,6 +117,14 @@ export function RuntimeField(props: Props) {
 
   const fileTypes = ['FILE', 'PDF', 'MULTIFILE', 'IMAGE', 'PHOTO', 'AUDIO', 'VIDEO', 'OCR'];
   if (fileTypes.includes(type)) {
+    if (uploadsDisabled) {
+      return (
+        <div className="runtime-field-group">
+          <RuntimeQuestionLabel label={component.label} config={config} />
+          <small className="runtime-field-unavailable">Este campo requiere iniciar sesión; no está disponible en el enlace público.</small>
+        </div>
+      );
+    }
     const multiple = type === 'MULTIFILE';
     const accept = type === 'IMAGE' || type === 'PHOTO' || type === 'OCR' ? 'image/*' : type === 'AUDIO' ? 'audio/*' : type === 'VIDEO' ? 'video/*' : type === 'PDF' ? 'application/pdf' : undefined;
     const uploaded = Array.isArray(value) ? value as RuntimeFileValue[] : value && typeof value === 'object' ? [value as RuntimeFileValue] : [];
@@ -197,6 +217,28 @@ export function RuntimeField(props: Props) {
           value={String(scalarValue ?? '')}
           onChange={(event) => onChange(component.name, event.target.value)}
         />
+      </label>
+    );
+  }
+
+  if (type === 'RANGE') {
+    const min = config.min ?? 0;
+    const max = config.max ?? 100;
+    const step = config.step ?? 1;
+    const rangeValue = isEmptyValue(value) ? min : (scalarValue as number);
+    return (
+      <label className="runtime-field-group" htmlFor={fieldId}>
+        <RuntimeQuestionLabel label={component.label} config={config} />
+        <input
+          {...commonProps}
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={String(rangeValue)}
+          onChange={(event) => onChange(component.name, parseNumberInput(event.target.value))}
+        />
+        <output htmlFor={fieldId}>{String(rangeValue)}</output>
       </label>
     );
   }

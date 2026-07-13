@@ -12,9 +12,17 @@ aqui las particularidades propias del formato de archivo: `select_one <lista>`
 con el nombre de lista embebido, grupos (`begin_group`/`end_group`, que se
 aplanan) y repeticiones (`begin_repeat`/`end_repeat`, que se agrupan en un
 solo componente REPEAT con los campos anidados en `config_json`).
+
+Ademas de `type`/`name`/`label`, se leen las columnas reales del estandar
+XLSForm que ya tienen un equivalente directo en la configuracion que produce
+el constructor visual (`hint`, `required`, `relevant`, `constraint`,
+`constraint_message`, `parameters`) -- ver `_apply_common_columns` y
+`docs/93_EXPORTADOR_XLSFORM.md` para el detalle de que tan fiel es cada
+traduccion.
 """
 
 import json
+import re
 from io import BytesIO
 
 from fastapi import HTTPException, status
@@ -32,10 +40,27 @@ from app.services.builder_service import builder_service
 # visible: se omiten en vez de forzar un mapeo artificial.
 SKIP_TYPES = {
     "note", "start", "end", "today", "deviceid", "subscriberid", "simserial",
-    "username", "audit", "text-audit", "calculate_here",
+    "username", "audit", "text-audit", "calculate_here", "background-audio",
 }
 GROUP_OPEN_TYPES = {"begin_group", "begin group", "begin_repeat", "begin repeat"}
 GROUP_CLOSE_TYPES = {"end_group", "end group", "end_repeat", "end repeat"}
+LIST_TYPES_WITH_EMBEDDED_LIST = {"select_one", "select_multiple", "select_one_from_file", "select_multiple_from_file", "rank"}
+
+TRUE_VALUES = {"yes", "true", "1", "true()"}
+
+_NOT_EMPTY_RE = re.compile(r"^\$\{(\w+)\}\s*!=\s*(''|\"\")$")
+_EMPTY_RE = re.compile(r"^\$\{(\w+)\}\s*=\s*(''|\"\")$")
+_STRING_LENGTH_NOT_EMPTY_RE = re.compile(r"^string-length\(\$\{(\w+)\}\)\s*>\s*0$")
+_EQUALS_RE = re.compile(r"^\$\{(\w+)\}\s*=\s*'([^']*)'$|^\$\{(\w+)\}\s*=\s*\"([^\"]*)\"$")
+_NOT_EQUALS_RE = re.compile(r"^\$\{(\w+)\}\s*!=\s*'([^']*)'$|^\$\{(\w+)\}\s*!=\s*\"([^\"]*)\"$")
+
+_REGEX_CONSTRAINT_RE = re.compile(r"regex\(\.\s*,\s*'([^']*)'\)")
+_STRING_LENGTH_MIN_RE = re.compile(r"string-length\(\.\)\s*>=\s*(\d+)")
+_STRING_LENGTH_MAX_RE = re.compile(r"string-length\(\.\)\s*<=\s*(\d+)")
+_NUMERIC_MIN_RE = re.compile(r"\.\s*>=\s*(-?\d+(?:\.\d+)?)")
+_NUMERIC_MAX_RE = re.compile(r"\.\s*<=\s*(-?\d+(?:\.\d+)?)")
+_NUMERIC_MIN_STRICT_RE = re.compile(r"\.\s*>\s*(-?\d+(?:\.\d+)?)")
+_NUMERIC_MAX_STRICT_RE = re.compile(r"\.\s*<\s*(-?\d+(?:\.\d+)?)")
 
 
 def _normalize_header(value: object) -> str:
@@ -69,6 +94,72 @@ def _cell(row: list[object], index: int | None) -> str:
     return str(row[index]).strip()
 
 
+def _parse_required(value: str) -> bool:
+    return value.strip().lower() in TRUE_VALUES
+
+
+def _parse_relevant_expression(expression: str) -> tuple[dict | None, str | None]:
+    expression = expression.strip()
+    if not expression:
+        return None, None
+
+    match = _NOT_EMPTY_RE.match(expression) or _STRING_LENGTH_NOT_EMPTY_RE.match(expression)
+    if match:
+        return {"field": match.group(1), "operator": "not_empty", "value": ""}, None
+    match = _EMPTY_RE.match(expression)
+    if match:
+        return {"field": match.group(1), "operator": "empty", "value": ""}, None
+    match = _EQUALS_RE.match(expression)
+    if match:
+        field, value = (match.group(1), match.group(2)) if match.group(1) else (match.group(3), match.group(4))
+        return {"field": field, "operator": "equals", "value": value}, None
+    match = _NOT_EQUALS_RE.match(expression)
+    if match:
+        field, value = (match.group(1), match.group(2)) if match.group(1) else (match.group(3), match.group(4))
+        return {"field": field, "operator": "not_equals", "value": value}, None
+
+    return None, f"expresion 'relevant' no reconocida, se preservo el texto pero no se activo como condicion: {expression!r}"
+
+
+def _parse_constraint_expression(expression: str) -> tuple[dict, str | None]:
+    expression = expression.strip()
+    if not expression:
+        return {}, None
+
+    fields: dict[str, object] = {}
+    remaining = expression
+    for pattern, key, caster in (
+        (_REGEX_CONSTRAINT_RE, "pattern", str),
+        (_STRING_LENGTH_MIN_RE, "min_length", int),
+        (_STRING_LENGTH_MAX_RE, "max_length", int),
+        (_NUMERIC_MIN_RE, "min", float),
+        (_NUMERIC_MAX_RE, "max", float),
+        (_NUMERIC_MIN_STRICT_RE, "min", float),
+        (_NUMERIC_MAX_STRICT_RE, "max", float),
+    ):
+        match = pattern.search(remaining)
+        if match and key not in fields:
+            fields[key] = caster(match.group(1))
+            remaining = remaining[: match.start()] + remaining[match.end():]
+
+    leftover = re.sub(r"\s+and\s+|\s+", " ", remaining).strip()
+    warning = None
+    if not fields or leftover:
+        warning = f"expresion 'constraint' no se tradujo por completo a validaciones nativas, se preservo el texto original: {expression!r}"
+    return fields, warning
+
+
+def _parse_parameters(value: str) -> dict[str, str]:
+    parts = re.split(r"[;,\s]+", value.strip())
+    parsed: dict[str, str] = {}
+    for part in parts:
+        if "=" not in part:
+            continue
+        key, _, raw_value = part.partition("=")
+        parsed[key.strip().lower()] = raw_value.strip()
+    return parsed
+
+
 class XlsformImportService:
     def import_xlsform(self, db: Session, project_id: str, filename: str, content: bytes, user_id: str | None) -> XlsformImportResult:
         try:
@@ -86,6 +177,14 @@ class XlsformImportService:
         label_col = _find_column(survey_headers, "label")
         if type_col is None or name_col is None:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La hoja 'survey' debe tener columnas 'type' y 'name'")
+
+        hint_col = _find_column(survey_headers, "hint")
+        required_col = _find_column(survey_headers, "required")
+        relevant_col = _find_column(survey_headers, "relevant")
+        constraint_col = _find_column(survey_headers, "constraint")
+        constraint_message_col = _find_column(survey_headers, "constraint_message")
+        appearance_col = _find_column(survey_headers, "appearance")
+        parameters_col = _find_column(survey_headers, "parameters")
 
         list_col = _find_column(choices_headers, "list_name")
         choice_name_col = _find_column(choices_headers, "name")
@@ -149,6 +248,18 @@ class XlsformImportService:
             if warning:
                 warnings.append(f"Campo '{field_name}': {warning}")
 
+            config, common_warnings = self._apply_common_columns(
+                config, mapped_type,
+                hint=_cell(row, hint_col),
+                required=_cell(row, required_col),
+                relevant=_cell(row, relevant_col),
+                constraint=_cell(row, constraint_col),
+                constraint_message=_cell(row, constraint_message_col),
+                appearance=_cell(row, appearance_col),
+                parameters=_cell(row, parameters_col),
+            )
+            warnings.extend(f"Campo '{field_name}': {message}" for message in common_warnings)
+
             if repeat_stack:
                 repeat_stack[-1]["fields"].append({"name": field_name, "label": field_label, "component_type": mapped_type, "config": config})
                 continue
@@ -163,17 +274,79 @@ class XlsformImportService:
         return XlsformImportResult(template_id=template.id, imported_fields=imported_fields, warnings=warnings)
 
     def _resolve_type(self, base_type: str, parts: list[str], choices_by_list: dict[str, list[dict[str, str]]]) -> tuple[str, dict | None, str | None]:
-        if base_type in ("select_one", "select_multiple", "select_one_from_file"):
+        if base_type in LIST_TYPES_WITH_EMBEDDED_LIST:
             list_name = parts[1] if len(parts) > 1 else ""
             options = choices_by_list.get(list_name, [])
             config = {"options": options}
-            mapped = "MULTISELECT" if base_type == "select_multiple" else "SELECT"
+            if base_type in ("select_multiple", "select_multiple_from_file"):
+                mapped = "MULTISELECT"
+            elif base_type in ("select_one", "select_one_from_file"):
+                mapped = "SELECT"
+            else:
+                mapped = "RANKING"
             warning = None if options or not list_name else f"lista de opciones '{list_name}' no encontrada en la hoja choices"
             return mapped, config, warning
         try:
             return normalize_field_type(base_type), None, None
         except ValueError:
             return "HIDDEN", None, f"tipo '{base_type}' no tiene equivalente directo; se importo como campo oculto"
+
+    def _apply_common_columns(
+        self, config: dict | None, mapped_type: str, *,
+        hint: str, required: str, relevant: str, constraint: str,
+        constraint_message: str, appearance: str, parameters: str,
+    ) -> tuple[dict | None, list[str]]:
+        """Traduce las columnas comunes de XLSForm a las claves de config_json
+        que ya usa/entiende el constructor visual (placeholder, required,
+        relevant, pattern/min/max/min_length/max_length). No asume que
+        `config` ya sea un dict: la mayoria de tipos simples (TEXT, INTEGER,
+        DATE...) llegan aqui con `config=None` desde `_resolve_type`, y estas
+        columnas son justamente las que mas les aplican. Devuelve el config
+        actualizado (o el original si no habia nada que agregar) y
+        advertencias legibles."""
+        warnings: list[str] = []
+        updates: dict[str, object] = {}
+
+        if hint:
+            updates["placeholder"] = hint
+        if required:
+            updates["required"] = _parse_required(required)
+        if appearance:
+            updates["appearance"] = appearance
+
+        if relevant:
+            updates["relevant_expression"] = relevant
+            parsed_relevant, warning = _parse_relevant_expression(relevant)
+            if parsed_relevant:
+                updates["relevant"] = parsed_relevant
+            if warning:
+                warnings.append(warning)
+
+        if constraint:
+            updates["constraint_expression"] = constraint
+            parsed_constraint, warning = _parse_constraint_expression(constraint)
+            updates.update(parsed_constraint)
+            if warning:
+                warnings.append(warning)
+        if constraint_message:
+            updates["constraint_message"] = constraint_message
+
+        if parameters and mapped_type == "RANGE":
+            parsed_parameters = _parse_parameters(parameters)
+            if "start" in parsed_parameters:
+                updates["min"] = float(parsed_parameters["start"])
+            if "end" in parsed_parameters:
+                updates["max"] = float(parsed_parameters["end"])
+            if "step" in parsed_parameters:
+                updates["step"] = float(parsed_parameters["step"])
+        elif parameters:
+            updates["parameters"] = parameters
+
+        if not updates:
+            return config, warnings
+        merged = dict(config or {})
+        merged.update(updates)
+        return merged, warnings
 
     def _create_field_component(self, db: Session, template_id: str, section_id: str, sort_order: int, *, component_type: str, name: str, label: str, config: dict | None) -> None:
         row = builder_layout_service.create_row(db, BuilderRowCreate(section_id=section_id, sort_order=sort_order))

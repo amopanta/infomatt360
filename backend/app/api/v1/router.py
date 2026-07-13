@@ -33,6 +33,7 @@ from app.api.v1.organizations import router as organizations_router
 from app.api.v1.participants import router as participants_router
 from app.api.v1.project_context import router as project_context_router
 from app.api.v1.public import router as public_router
+from app.api.v1.public_forms import router as public_forms_router
 from app.api.v1.records import router as records_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.review import router as review_router
@@ -88,4 +89,5 @@ api_v1_router.include_router(xlsform_router, prefix="/xlsform", tags=["xlsform"]
 api_v1_router.include_router(erp_router, prefix="/erp", tags=["erp"])
 api_v1_router.include_router(whatsapp_router, prefix="/whatsapp", tags=["whatsapp"])
 api_v1_router.include_router(runtime_router, prefix="/runtime", tags=["runtime"])
+api_v1_router.include_router(public_forms_router, prefix="/public-forms", tags=["public-forms"])
 api_v1_router.include_router(compiler_router, prefix="/compiler", tags=["compiler"])

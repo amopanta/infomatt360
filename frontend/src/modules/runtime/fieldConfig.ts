@@ -14,6 +14,7 @@ export type RuntimeFieldConfig = {
   required?: boolean;
   min?: number;
   max?: number;
+  step?: number;
   min_length?: number;
   max_length?: number;
   pattern?: string;

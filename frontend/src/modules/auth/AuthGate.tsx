@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { BrandLogo } from '../../components/BrandLogo';
 import { EnrollScanApp } from '../enrollment/EnrollScanApp';
 import { InstallWizardApp } from '../install/InstallWizardApp';
+import { PublicFormApp } from '../publicform/PublicFormApp';
 import { changePassword, fetchSession, login, logout, refreshAccessToken, requestPasswordReset, resetPassword, verifyMfa } from './api';
 import { clearStoredSession, currentAccessToken, PROJECT_KEY, setAccessToken, storeSelectedProjectPermissions, storeSessionProjects, validSelectedProject } from './session';
 import type { AuthSession } from './types';
@@ -63,6 +64,7 @@ export function AuthGate({ children }: Props) {
   if (window.location.pathname === '/reset-password' && resetToken) return <ResetPasswordPanel token={resetToken} />;
   if (window.location.pathname === '/install') return <InstallWizardApp />;
   if (window.location.pathname === '/enroll') return <EnrollScanApp />;
+  if (window.location.pathname.startsWith('/public-form/')) return <PublicFormApp />;
 
   async function submitLogin(email: string, password: string) {
     setError('');

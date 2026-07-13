@@ -9,6 +9,7 @@ type Props = {
   projectId: string;
   values: RuntimeFormValues;
   onValueChange: (fieldName: string, value: RuntimeFormValue) => void;
+  uploadsDisabled?: boolean;
 };
 
 function widthStyle(column: { desktop_width: number; tablet_width: number; mobile_width: number }) {
@@ -33,7 +34,7 @@ export function themeStyle(themeJson?: string | null) {
   }
 }
 
-export function RuntimeRenderer({ template, projectId, values, onValueChange }: Props) {
+export function RuntimeRenderer({ template, projectId, values, onValueChange, uploadsDisabled }: Props) {
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [activeSectionIndex, setActiveSectionIndex] = useState(0);
   const activePage = template.pages[activePageIndex];
@@ -62,7 +63,7 @@ export function RuntimeRenderer({ template, projectId, values, onValueChange }: 
                 {row.columns.map((column) => (
                   <div key={column.id} className="runtime-column" style={widthStyle(column)}>
                     {column.components.map((component) => (
-                      <RuntimeField key={component.id} component={component} projectId={projectId} values={values} onChange={onValueChange} />
+                      <RuntimeField key={component.id} component={component} projectId={projectId} values={values} onChange={onValueChange} uploadsDisabled={uploadsDisabled} />
                     ))}
                   </div>
                 ))}

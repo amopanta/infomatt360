@@ -16,11 +16,11 @@ from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.identity import Project, Role, User
 
 
-def _build_xlsform(survey_rows: list[list[object]], choices_rows: list[list[object]]) -> bytes:
+def _build_xlsform(survey_rows: list[list[object]], choices_rows: list[list[object]], survey_headers: list[str] | None = None) -> bytes:
     workbook = Workbook()
     survey = workbook.active
     survey.title = "survey"
-    survey.append(["type", "name", "label"])
+    survey.append(survey_headers or ["type", "name", "label"])
     for row in survey_rows:
         survey.append(row)
     choices = workbook.create_sheet("choices")
@@ -153,6 +153,111 @@ def test_xlsform_import_maps_common_types_groups_and_repeats():
 
                 campo_raro = by_name["campo_raro"]
                 assert campo_raro.component_type == "HIDDEN"
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_xlsform_import_reads_hint_required_relevant_constraint_range_and_rank_columns():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            builder_headers = auth(client, "xlsform-builder@example.com", "Builder12345!")
+
+            headers = ["type", "name", "label", "hint", "required", "relevant", "constraint", "constraint_message", "appearance", "parameters"]
+            content = _build_xlsform(
+                survey_headers=headers,
+                survey_rows=[
+                    ["text", "nombre", "Nombre", "Ejemplo: Juan Perez", "yes", "", "", "", "", ""],
+                    ["integer", "edad", "Edad", "", "", "", ". >= 0 and . <= 120", "Debe estar entre 0 y 120", "", ""],
+                    ["text", "comentario", "Comentario", "", "", "${nombre} != ''", "", "", "", ""],
+                    ["range", "satisfaccion", "Satisfaccion", "", "", "", "", "", "", "start=0 end=10 step=1"],
+                    ["rank lista_prioridades", "prioridades", "Prioridades", "", "", "", "", "", "", ""],
+                    ["background-audio", "audio_fondo", "Audio de fondo", "", "", "", "", "", "", ""],
+                ],
+                choices_rows=[
+                    ["lista_prioridades", "salud", "Salud"],
+                    ["lista_prioridades", "educacion", "Educacion"],
+                ],
+            )
+
+            imported = client.post(
+                "/api/v1/xlsform/import",
+                headers=builder_headers,
+                data={"project_id": "xlsform-project"},
+                files={"upload": ("rico.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            )
+            assert imported.status_code == 200, imported.text
+            body = imported.json()
+            assert body["imported_fields"] == 5  # nombre, edad, comentario, satisfaccion, prioridades (audio_fondo se omite)
+            assert body["warnings"] == []
+
+            with sessions() as db:
+                components = db.query(BuilderComponent).filter(BuilderComponent.template_id == body["template_id"]).all()
+                by_name = {component.name: component for component in components}
+
+                assert "audio_fondo" not in by_name
+
+                nombre_config = json.loads(by_name["nombre"].config_json)
+                assert nombre_config["placeholder"] == "Ejemplo: Juan Perez"
+                assert nombre_config["required"] is True
+
+                edad_config = json.loads(by_name["edad"].config_json)
+                assert edad_config["min"] == 0.0
+                assert edad_config["max"] == 120.0
+                assert edad_config["constraint_message"] == "Debe estar entre 0 y 120"
+
+                comentario_config = json.loads(by_name["comentario"].config_json)
+                assert comentario_config["relevant"] == {"field": "nombre", "operator": "not_empty", "value": ""}
+
+                assert by_name["satisfaccion"].component_type == "RANGE"
+                satisfaccion_config = json.loads(by_name["satisfaccion"].config_json)
+                assert satisfaccion_config["min"] == 0.0
+                assert satisfaccion_config["max"] == 10.0
+                assert satisfaccion_config["step"] == 1.0
+
+                assert by_name["prioridades"].component_type == "RANKING"
+                prioridades_config = json.loads(by_name["prioridades"].config_json)
+                assert {option["value"] for option in prioridades_config["options"]} == {"salud", "educacion"}
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_xlsform_import_preserves_unrecognized_relevant_and_constraint_expressions_with_warning():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            builder_headers = auth(client, "xlsform-builder@example.com", "Builder12345!")
+
+            headers = ["type", "name", "label", "hint", "required", "relevant", "constraint"]
+            content = _build_xlsform(
+                survey_headers=headers,
+                survey_rows=[
+                    ["text", "campo_complejo", "Campo", "", "", "${a} > 5 and ${b} < 10", "selected(${lista}, 'x')"],
+                ],
+                choices_rows=[],
+            )
+
+            imported = client.post(
+                "/api/v1/xlsform/import",
+                headers=builder_headers,
+                data={"project_id": "xlsform-project"},
+                files={"upload": ("complejo.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            )
+            assert imported.status_code == 200, imported.text
+            body = imported.json()
+            assert len(body["warnings"]) == 2
+            assert any("relevant" in w for w in body["warnings"])
+            assert any("constraint" in w for w in body["warnings"])
+
+            with sessions() as db:
+                component = db.query(BuilderComponent).filter(BuilderComponent.template_id == body["template_id"]).one()
+                config = json.loads(component.config_json)
+                # El texto original se preserva aunque no se haya podido traducir a una condicion/validacion nativa.
+                assert config["relevant_expression"] == "${a} > 5 and ${b} < 10"
+                assert config["constraint_expression"] == "selected(${lista}, 'x')"
+                assert "relevant" not in config
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

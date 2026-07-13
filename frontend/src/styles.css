@@ -208,6 +208,11 @@ body { margin: 0; }
 .runtime-stepper button, .runtime-section-nav button { flex: 0 0 auto; border: 1px solid #dce7f2; border-radius: 999px; padding: 10px 14px; color: #0a2540; background: #ffffff; font-weight: 700; cursor: pointer; }
 .runtime-stepper button.active, .runtime-section-nav button.active { color: #ffffff; border-color: transparent; background: linear-gradient(135deg, var(--form-primary, #0066cc), var(--form-accent, #00c2ff)); }
 .runtime-page-actions { margin-top: 24px; display: flex; justify-content: space-between; gap: 16px; }
+.runtime-field-unavailable { color: #7a889a; font-style: italic; }
+.public-form-success { text-align: center; }
+.public-form-success h1 { color: #0a5c36; }
+.public-form-actions { justify-content: flex-start; flex-direction: column; align-items: flex-start; }
+.public-form-actions p[role="alert"] { color: #a5352f; font-weight: 700; margin: 0; }
 .runtime-repeat { margin-top: 18px; border: 1px dashed #00c2ff; border-radius: 16px; padding: 16px; background: #f8fcff; }
 .runtime-repeat header { color: #0066cc; font-weight: 900; margin-bottom: 8px; }
 .runtime-repeat small { display: block; margin-bottom: 12px; color: #536878; font-weight: 700; }

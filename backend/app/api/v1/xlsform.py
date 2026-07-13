@@ -14,16 +14,17 @@ from app.services.xlsform_export_service import xlsform_export_service
 router = APIRouter()
 
 
-@router.post("/import", response_model=XlsformImportResult, summary="Importar formulario (XLSForm/ODK/KoboToolbox, SurveyMonkey o LimeSurvey)")
+@router.post("/import", response_model=XlsformImportResult, summary="Importar formulario (XLSForm/ODK/KoboToolbox, SurveyMonkey o LimeSurvey), o reemplazar una plantilla existente en el mismo lugar")
 async def import_xlsform(
     project_id: str = Form(...),
     upload: UploadFile = File(...),
+    replace_template_id: str | None = Form(default=None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> XlsformImportResult:
     require_project_permission(db, current_user.id, project_id, BUILDER_WRITE)
     content = await upload.read()
-    return import_form(db, project_id, upload.filename or "formulario.xlsx", content, current_user.id)
+    return import_form(db, project_id, upload.filename or "formulario.xlsx", content, current_user.id, replace_template_id)
 
 
 @router.get("/export/{template_id}", summary="Exportar plantilla a XLSForm (.xlsx)")

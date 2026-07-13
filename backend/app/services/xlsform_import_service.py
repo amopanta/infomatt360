@@ -29,12 +29,10 @@ from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
 from app.core.field_types import normalize_field_type
-from app.schemas.builder import BuilderTemplateCreate
 from app.schemas.builder_layout import BuilderPageCreate, BuilderSectionCreate
 from app.schemas.xlsform import XlsformImportResult
-from app.services.form_import_common import create_field_component
+from app.services.form_import_common import create_field_component, prepare_target_template
 from app.services.builder_layout_service import builder_layout_service
-from app.services.builder_service import builder_service
 
 # Filas de metadatos propios de ODK/KoboToolbox sin equivalente de campo
 # visible: se omiten en vez de forzar un mapeo artificial.
@@ -161,7 +159,7 @@ def _parse_parameters(value: str) -> dict[str, str]:
 
 
 class XlsformImportService:
-    def import_xlsform(self, db: Session, project_id: str, filename: str, content: bytes, user_id: str | None) -> XlsformImportResult:
+    def import_xlsform(self, db: Session, project_id: str, filename: str, content: bytes, user_id: str | None, replace_template_id: str | None = None) -> XlsformImportResult:
         try:
             workbook = load_workbook(BytesIO(content), read_only=True, data_only=True)
         except Exception as exc:
@@ -199,8 +197,8 @@ class XlsformImportService:
                 "label": _cell(row, choice_label_col) or _cell(row, choice_name_col),
             })
 
-        template = builder_service.create_template(db, BuilderTemplateCreate(project_id=project_id, name=filename.rsplit(".", 1)[0], status="draft"))
-        page = builder_layout_service.create_page(db, BuilderPageCreate(template_id=template.id, title="Importado de XLSForm", sort_order=0))
+        template_id, is_replace = prepare_target_template(db, project_id, filename, replace_template_id)
+        page = builder_layout_service.create_page(db, BuilderPageCreate(template_id=template_id, title="Importado de XLSForm", sort_order=0))
         section = builder_layout_service.create_section(db, BuilderSectionCreate(page_id=page.id, title="Preguntas", sort_order=0))
 
         warnings: list[str] = []
@@ -231,7 +229,7 @@ class XlsformImportService:
                 repeat = repeat_stack.pop()
                 config = {"fields": repeat["fields"]}
                 create_field_component(
-                    db, template.id, section.id, sort_order,
+                    db, template_id, section.id, sort_order,
                     component_type="REPEAT", name=str(repeat["name"]) or f"repeat_{sort_order}",
                     label=str(repeat["label"]) or "Repetible", config=config,
                 )
@@ -264,14 +262,14 @@ class XlsformImportService:
                 repeat_stack[-1]["fields"].append({"name": field_name, "label": field_label, "component_type": mapped_type, "config": config})
                 continue
 
-            create_field_component(db, template.id, section.id, sort_order, component_type=mapped_type, name=field_name, label=field_label, config=config)
+            create_field_component(db, template_id, section.id, sort_order, component_type=mapped_type, name=field_name, label=field_label, config=config)
             sort_order += 1
             imported_fields += 1
 
         if repeat_stack:
             warnings.append("El archivo termino con un 'begin_repeat' sin cerrar; los campos restantes se descartaron")
 
-        return XlsformImportResult(template_id=template.id, imported_fields=imported_fields, warnings=warnings)
+        return XlsformImportResult(template_id=template_id, imported_fields=imported_fields, warnings=warnings, replaced=is_replace)
 
     def _resolve_type(self, base_type: str, parts: list[str], choices_by_list: dict[str, list[dict[str, str]]]) -> tuple[str, dict | None, str | None]:
         if base_type in LIST_TYPES_WITH_EMBEDDED_LIST:

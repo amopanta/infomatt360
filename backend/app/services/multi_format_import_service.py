@@ -27,12 +27,10 @@ from fastapi import HTTPException, status
 from openpyxl import load_workbook
 from sqlalchemy.orm import Session
 
-from app.schemas.builder import BuilderTemplateCreate
 from app.schemas.builder_layout import BuilderPageCreate, BuilderSectionCreate
 from app.schemas.xlsform import XlsformImportResult
 from app.services.builder_layout_service import builder_layout_service
-from app.services.builder_service import builder_service
-from app.services.form_import_common import create_field_component
+from app.services.form_import_common import create_field_component, prepare_target_template
 
 TRUE_VALUES = {"yes", "sí", "si", "true", "1"}
 
@@ -111,9 +109,9 @@ def _read_first_sheet(content: bytes) -> tuple[list[str], list[list[object]]]:
     return headers, rows
 
 
-def _build_template(db: Session, project_id: str, filename: str, source_label: str, parsed_fields: list[dict]) -> XlsformImportResult:
-    template = builder_service.create_template(db, BuilderTemplateCreate(project_id=project_id, name=filename.rsplit(".", 1)[0], status="draft"))
-    page = builder_layout_service.create_page(db, BuilderPageCreate(template_id=template.id, title=f"Importado de {source_label}", sort_order=0))
+def _build_template(db: Session, project_id: str, filename: str, source_label: str, parsed_fields: list[dict], replace_template_id: str | None) -> XlsformImportResult:
+    template_id, is_replace = prepare_target_template(db, project_id, filename, replace_template_id)
+    page = builder_layout_service.create_page(db, BuilderPageCreate(template_id=template_id, title=f"Importado de {source_label}", sort_order=0))
     section = builder_layout_service.create_section(db, BuilderSectionCreate(page_id=page.id, title="Preguntas", sort_order=0))
 
     imported_fields = 0
@@ -150,13 +148,13 @@ def _build_template(db: Session, project_id: str, filename: str, source_label: s
         if item.get("warning"):
             warnings.append(f"Campo '{item['label']}': {item['warning']}")
 
-        create_field_component(db, template.id, section.id, index, component_type=comp_type, name=name, label=item["label"], config=config or None)
+        create_field_component(db, template_id, section.id, index, component_type=comp_type, name=name, label=item["label"], config=config or None)
         imported_fields += 1
 
-    return XlsformImportResult(template_id=template.id, imported_fields=imported_fields, warnings=warnings)
+    return XlsformImportResult(template_id=template_id, imported_fields=imported_fields, warnings=warnings, replaced=is_replace)
 
 
-def import_surveymonkey(db: Session, project_id: str, filename: str, content: bytes, user_id: str | None) -> XlsformImportResult:
+def import_surveymonkey(db: Session, project_id: str, filename: str, content: bytes, user_id: str | None, replace_template_id: str | None = None) -> XlsformImportResult:
     headers, rows = _read_first_sheet(content)
     text_col = _find_column(headers, "texto_pregunta")
     type_col = _find_column(headers, "tipo_pregunta")
@@ -187,10 +185,10 @@ def import_surveymonkey(db: Session, project_id: str, filename: str, content: by
             "warning": warning,
         })
 
-    return _build_template(db, project_id, filename, "SurveyMonkey", parsed)
+    return _build_template(db, project_id, filename, "SurveyMonkey", parsed, replace_template_id)
 
 
-def import_limesurvey(db: Session, project_id: str, filename: str, content: bytes, user_id: str | None) -> XlsformImportResult:
+def import_limesurvey(db: Session, project_id: str, filename: str, content: bytes, user_id: str | None, replace_template_id: str | None = None) -> XlsformImportResult:
     headers, rows = _read_first_sheet(content)
     text_col = _find_column(headers, "questiontext")
     type_col = _find_column(headers, "questiontype")
@@ -219,4 +217,4 @@ def import_limesurvey(db: Session, project_id: str, filename: str, content: byte
             "warning": warning,
         })
 
-    return _build_template(db, project_id, filename, "LimeSurvey", parsed)
+    return _build_template(db, project_id, filename, "LimeSurvey", parsed, replace_template_id)

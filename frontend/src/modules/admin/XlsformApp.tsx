@@ -10,6 +10,7 @@ export function XlsformApp() {
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [exportTemplateId, setExportTemplateId] = useState('');
+  const [replaceTemplateId, setReplaceTemplateId] = useState('');
   const [message, setMessage] = useState('');
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -38,8 +39,12 @@ export function XlsformApp() {
     setImporting(true);
     setWarnings([]);
     try {
-      const result = await importXlsform(projectId, file);
-      setMessage(`Plantilla importada (${result.imported_fields} campo(s)).`);
+      const result = await importXlsform(projectId, file, replaceTemplateId || undefined);
+      setMessage(
+        result.replaced
+          ? `Plantilla reemplazada en el mismo lugar (${result.imported_fields} campo(s)). La estructura anterior quedó respaldada.`
+          : `Plantilla importada (${result.imported_fields} campo(s)).`,
+      );
       setWarnings(result.warnings);
       if (fileInputRef.current) fileInputRef.current.value = '';
       await loadTemplates();
@@ -90,14 +95,23 @@ export function XlsformApp() {
           </header>
           <div className="ai-analyze-inline">
             <input ref={fileInputRef} type="file" accept=".xlsx" />
+            <label>Destino
+              <select value={replaceTemplateId} onChange={(event) => setReplaceTemplateId(event.target.value)}>
+                <option value="">Crear plantilla nueva</option>
+                {templates.map((template) => <option key={template.id} value={template.id}>Reemplazar: {template.name} ({template.status})</option>)}
+              </select>
+            </label>
             <button className="primary" disabled={importing} onClick={() => void submitImport()}>
-              {importing ? 'Importando…' : 'Importar'}
+              {importing ? 'Importando…' : replaceTemplateId ? 'Reemplazar en el mismo lugar' : 'Importar'}
             </button>
             <button disabled={downloadingMaster} onClick={() => void submitDownloadMasterTemplate()}>
               {downloadingMaster ? 'Generando…' : 'Descargar plantilla maestra'}
             </button>
           </div>
           <small>La plantilla maestra trae un campo de ejemplo por cada tipo soportado (texto, numericos, seleccion, medios, GPS, repetibles, condicionales, validaciones, etc.) para usar como base y crear formularios rapidamente en Excel.</small>
+          {replaceTemplateId ? (
+            <small>Al reemplazar, el formulario conserva su mismo enlace y sus registros ya capturados; la estructura anterior queda respaldada automáticamente y se puede volver a ejecutar (como el redeploy de KoboToolbox).</small>
+          ) : null}
           {warnings.length ? (
             <article className="ds-map-card">
               <strong>Advertencias de la importación:</strong>

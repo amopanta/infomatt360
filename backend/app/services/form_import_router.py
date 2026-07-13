@@ -45,14 +45,14 @@ def detect_format(content: bytes) -> str:
     return "unknown"
 
 
-def import_form(db: Session, project_id: str, filename: str, content: bytes, user_id: str | None) -> XlsformImportResult:
+def import_form(db: Session, project_id: str, filename: str, content: bytes, user_id: str | None, replace_template_id: str | None = None) -> XlsformImportResult:
     format_name = detect_format(content)
     if format_name == "xlsform":
-        return xlsform_import_service.import_xlsform(db, project_id, filename, content, user_id)
+        return xlsform_import_service.import_xlsform(db, project_id, filename, content, user_id, replace_template_id)
     if format_name == "surveymonkey":
-        return multi_format_import_service.import_surveymonkey(db, project_id, filename, content, user_id)
+        return multi_format_import_service.import_surveymonkey(db, project_id, filename, content, user_id, replace_template_id)
     if format_name == "limesurvey":
-        return multi_format_import_service.import_limesurvey(db, project_id, filename, content, user_id)
+        return multi_format_import_service.import_limesurvey(db, project_id, filename, content, user_id, replace_template_id)
     raise HTTPException(
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         detail=(

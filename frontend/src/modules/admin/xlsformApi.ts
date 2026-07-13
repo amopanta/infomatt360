@@ -2,6 +2,7 @@ export type XlsformImportResult = {
   template_id: string;
   imported_fields: number;
   warnings: string[];
+  replaced: boolean;
 };
 
 import { authorizationHeader } from '../auth/session';
@@ -16,10 +17,11 @@ async function parseOrThrow<T>(response: Response, fallbackMessage: string): Pro
   return response.json();
 }
 
-export async function importXlsform(projectId: string, file: File): Promise<XlsformImportResult> {
+export async function importXlsform(projectId: string, file: File, replaceTemplateId?: string): Promise<XlsformImportResult> {
   const body = new FormData();
   body.append('project_id', projectId);
   body.append('upload', file);
+  if (replaceTemplateId) body.append('replace_template_id', replaceTemplateId);
   const response = await fetch(`${API_BASE_URL}/xlsform/import`, { method: 'POST', headers: authorizationHeader(), body });
   return parseOrThrow(response, 'No fue posible importar el archivo XLSForm.');
 }

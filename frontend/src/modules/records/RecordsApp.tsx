@@ -4,6 +4,11 @@ import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
 import { applyReviewAction, correctRecordField, downloadTemplateRecords, fetchProjectTemplates, fetchRecord, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
+import { fetchRuntimeRecordChildren, fetchRuntimeTemplate, saveRuntimeChildRecord } from '../runtime/api';
+import type { RuntimeRecordSummary } from '../runtime/api';
+import { RuntimeField } from '../runtime/RuntimeField';
+import { parseFieldConfig } from '../runtime/fieldConfig';
+import type { RuntimeComponent, RuntimeFormValues, RuntimeTemplate } from '../runtime/types';
 
 const REJECTION_STATUSES = new Set(['rejected', 'returned']);
 
@@ -295,6 +300,125 @@ function CorrectableField({
   );
 }
 
+function flattenComponents(template: RuntimeTemplate): RuntimeComponent[] {
+  return template.pages.flatMap((page) => page.sections.flatMap((section) => section.rows.flatMap((row) => row.columns.flatMap((column) => column.components))));
+}
+
+/** Gestion de filas hijas reales de un campo LINKED_SUBFORM (ver docs/97) --
+ * a diferencia de un REPEAT embebido, cada fila es un RuntimeRecord propio
+ * capturado con la plantilla hija, por eso necesita su propia consulta y
+ * su propio formulario de alta en vez de venir ya incluido en `record.values`. */
+function LinkedSubformField({
+  projectId,
+  parentRecordId,
+  field,
+  onMessage,
+}: {
+  projectId: string;
+  parentRecordId: string;
+  field: RuntimeComponent;
+  onMessage: (value: string) => void;
+}) {
+  const config = parseFieldConfig(field.config_json);
+  const childTemplateId = config.child_template_id;
+  const [children, setChildren] = useState<RuntimeRecordSummary[]>([]);
+  const [childTemplate, setChildTemplate] = useState<RuntimeTemplate | null>(null);
+  const [values, setValues] = useState<RuntimeFormValues>({});
+  const [adding, setAdding] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  async function loadChildren() {
+    try {
+      setChildren(await fetchRuntimeRecordChildren(parentRecordId, field.name));
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : 'No fue posible consultar las filas hijas.');
+    }
+  }
+
+  useEffect(() => { void loadChildren(); }, [parentRecordId, field.name]);
+  useEffect(() => {
+    if (!childTemplateId) return;
+    fetchRuntimeTemplate(childTemplateId).then(setChildTemplate).catch(() => setChildTemplate(null));
+  }, [childTemplateId]);
+
+  const childComponents = childTemplate ? flattenComponents(childTemplate) : [];
+
+  async function submitChild() {
+    if (!childTemplateId) return;
+    setSaving(true);
+    try {
+      await saveRuntimeChildRecord({ projectId, templateId: childTemplateId, parentRecordId, parentFieldName: field.name, values });
+      setValues({});
+      setAdding(false);
+      await loadChildren();
+      onMessage('Fila hija guardada.');
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : 'No fue posible guardar la fila hija.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!childTemplateId) {
+    return (
+      <article className="record-linked-subform-card">
+        <strong>{field.label}</strong>
+        <p>Este campo aun no tiene una plantilla hija configurada en el constructor.</p>
+      </article>
+    );
+  }
+
+  return (
+    <article className="record-linked-subform-card">
+      <header>
+        <strong>{field.label}</strong>
+        <button type="button" onClick={() => setAdding((current) => !current)}>{adding ? 'Cancelar' : 'Agregar fila'}</button>
+      </header>
+      {children.length ? (
+        <div className="records-table-wrap">
+          <table className="records-table">
+            <thead><tr>{childComponents.map((component) => <th key={component.id}>{component.label}</th>)}</tr></thead>
+            <tbody>
+              {children.map((child) => (
+                <tr key={child.id}>
+                  {childComponents.map((component) => <td key={component.id}>{formatValue(child.values.find((item) => item.field_name === component.name)?.field_value_json)}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : <p>Sin filas registradas todavia.</p>}
+      {adding && childTemplate ? (
+        <div className="record-linked-subform-form">
+          {childComponents.map((component) => (
+            <RuntimeField key={component.id} component={component} projectId={projectId} values={values} onChange={(name, value) => setValues((current) => ({ ...current, [name]: value }))} />
+          ))}
+          <button type="button" className="primary" disabled={saving} onClick={() => void submitChild()}>{saving ? 'Guardando...' : 'Guardar fila'}</button>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function LinkedSubformSection({ projectId, record, onMessage }: { projectId: string; record: RuntimeRecord; onMessage: (value: string) => void }) {
+  const [linkedFields, setLinkedFields] = useState<RuntimeComponent[]>([]);
+
+  useEffect(() => {
+    fetchRuntimeTemplate(record.template_id)
+      .then((template) => setLinkedFields(flattenComponents(template).filter((component) => component.type.toUpperCase() === 'LINKED_SUBFORM')))
+      .catch(() => setLinkedFields([]));
+  }, [record.template_id]);
+
+  if (!linkedFields.length) return null;
+
+  return (
+    <section className="record-linked-subforms">
+      <h3>Subformularios enlazados</h3>
+      {linkedFields.map((field) => <LinkedSubformField key={field.id} projectId={projectId} parentRecordId={record.id} field={field} onMessage={onMessage} />)}
+    </section>
+  );
+}
+
 function DeepLinkedRecordCard({
   projectId,
   record,
@@ -333,6 +457,7 @@ function DeepLinkedRecordCard({
           </div>
         ))}
       </dl>
+      <LinkedSubformSection projectId={projectId} record={record} onMessage={onMessage} />
       <ReviewPanel projectId={projectId} record={record} onMessage={onMessage} />
     </section>
   );
@@ -454,6 +579,7 @@ function RecordTable({ templateId }: { templateId: string }) {
                             </div>
                           ))}
                         </dl>
+                        <LinkedSubformSection projectId={projectId} record={record} onMessage={setMessage} />
                         <ReviewPanel projectId={projectId} record={record} onMessage={setMessage} />
                       </td>
                     </tr>

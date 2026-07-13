@@ -34,6 +34,13 @@ class RuntimeRecord(Base):
     project_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     template_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     version_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    # Enlace real de subformulario (estilo ActivityInfo): si este registro es
+    # una fila hija capturada dentro de un campo LINKED_SUBFORM de otro
+    # registro, aqui queda el id del registro padre y el nombre del campo
+    # que lo contiene. Es una fila propia en runtime_records, no un grupo
+    # embebido en el JSON del padre (a diferencia de REPEAT).
+    parent_record_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    parent_field_name: Mapped[str | None] = mapped_column(String(180), nullable=True)
     approval_flow_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     approval_flow_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
     approval_flow_snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)

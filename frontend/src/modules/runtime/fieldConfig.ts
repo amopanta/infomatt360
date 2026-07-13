@@ -30,6 +30,11 @@ export type RuntimeFieldConfig = {
     position?: 'before' | 'after';
     size?: 'small' | 'medium' | 'large';
   };
+  /** LINKED_SUBFORM (ver docs/97): plantilla hija cuyas filas se capturan como registros propios. */
+  child_template_id?: string;
+  /** PARENT_CHILD (ver docs/97): plantilla y campo usados para el selector de enlace. */
+  linked_template_id?: string;
+  label_field?: string;
 };
 
 export function parseFieldConfig(configJson?: string | null): RuntimeFieldConfig {

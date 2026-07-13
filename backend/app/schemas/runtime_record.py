@@ -39,6 +39,10 @@ class RuntimeRecordCreate(BaseModel):
     status: Literal["draft", "submitted", "approved", "rejected", "archived"] = "submitted"
     device_id: str | None = None
     ip_address: str | None = None
+    # Enlace real de subformulario (ver docs/97): si se guarda como fila hija
+    # de un campo LINKED_SUBFORM de otro registro ya existente.
+    parent_record_id: str | None = None
+    parent_field_name: str | None = None
     values: list[RuntimeValueCreate] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -159,6 +163,8 @@ class RuntimeRecordRead(BaseModel):
     submitted_by: str | None = None
     device_id: str | None = None
     ip_address: str | None = None
+    parent_record_id: str | None = None
+    parent_field_name: str | None = None
     duplicate_flag: str = "none"
     lock_version: int = 1
     created_at: datetime

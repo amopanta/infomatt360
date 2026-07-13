@@ -9,11 +9,11 @@ FIELD_TYPES = frozenset(
         "PERCENTAGE", "CURRENCY",
         "IMAGE", "FILE", "PDF", "MULTIFILE", "AUDIO", "VIDEO", "SIGNATURE",
         "GPS", "GEOTRACE", "GEOSHAPE",
-        "REPEAT", "MATRIX", "LIKERT_5", "LIKERT_7",
+        "REPEAT", "LINKED_SUBFORM", "MATRIX", "LIKERT_5", "LIKERT_7",
         "CALCULATE", "REFERENCE", "PARENT_CHILD", "LOOKUP", "HIDDEN",
         "UUID", "RESPONSE_ID", "INTERVIEW_DURATION", "CAPTURED_BY", "CHANGE_HISTORY",
         "BARCODE", "QR", "OCR",
-        "NPS", "RATING", "RANKING", "RANGE",
+        "NPS", "RATING", "RANKING", "RANGE", "SERIAL_NUMBER",
     }
 )
 
@@ -33,6 +33,14 @@ FIELD_TYPE_ALIASES = {
     "IDENTIFICACION": "DOCUMENT_ID",
     "SUBFORM": "REPEAT",
     "SUBFORMULARIO": "REPEAT",
+    # Distinto de SUBFORM/REPEAT (grupo embebido, estilo Kobo/ODK): un
+    # LINKED_SUBFORM crea filas hijas como registros propios en runtime_records
+    # (estilo ActivityInfo), enlazadas por parent_record_id -- ver docs/97.
+    "SUBFORMULARIO_ENLAZADO": "LINKED_SUBFORM",
+    "LINKED_REPEAT": "LINKED_SUBFORM",
+    "CONSECUTIVO": "SERIAL_NUMBER",
+    "AUTOINCREMENTO": "SERIAL_NUMBER",
+    "AUTO_INCREMENT": "SERIAL_NUMBER",
     "AGE_CALCULATED": "CALCULATE",
     "EDAD_CALCULADA": "CALCULATE",
     "CAMPOS_CALCULADOS": "CALCULATE",

@@ -57,6 +57,7 @@ EXPORT_TYPE_MAP: dict[str, str] = {
     "BARCODE": "barcode", "QR": "barcode", "OCR": "image",
     "NPS": "integer", "RATING": "text",
     "RANGE": "range",
+    "SERIAL_NUMBER": "calculate", "LINKED_SUBFORM": "text",
 }
 
 YES_NO_LIST = "yes_no"
@@ -128,6 +129,8 @@ MASTER_TEMPLATE_FIELDS: list[tuple[str, str, str, dict]] = [
         {"name": "nombre_integrante_ejemplo", "label": "Nombre", "component_type": "TEXT", "config": {}},
         {"name": "edad_integrante_ejemplo", "label": "Edad", "component_type": "INTEGER", "config": {}},
     ]}),
+    ("SERIAL_NUMBER", "consecutivo_ejemplo", "Numero consecutivo (autoincremental)", {}),
+    ("LINKED_SUBFORM", "subformulario_enlazado_ejemplo", "Subformulario enlazado (filas hijas reales, ver docs/97)", {}),
 ]
 
 

@@ -1,5 +1,5 @@
 export type RecordValue = { id: string; field_name: string; field_value_json: string };
-export type RuntimeRecord = { id: string; status: string; submitted_by?: string | null; approval_flow_id?: string | null; approval_flow_version?: string | null; lock_version: number; created_at: string; updated_at: string; values: RecordValue[] };
+export type RuntimeRecord = { id: string; template_id: string; status: string; submitted_by?: string | null; approval_flow_id?: string | null; approval_flow_version?: string | null; lock_version: number; created_at: string; updated_at: string; values: RecordValue[] };
 export type RuntimeRecordPage = { items: RuntimeRecord[]; total: number; limit: number; offset: number };
 export type TemplateSummary = { id: string; name: string; description?: string | null; status: string };
 export type ReviewAction = { id: string; project_id: string; record_id: string; from_status?: string | null; to_status: string; action: string; notes?: string | null; rejected_field_name?: string | null; user_id: string; approval_flow_id?: string | null; approval_flow_version?: number | null; created_at?: string | null };

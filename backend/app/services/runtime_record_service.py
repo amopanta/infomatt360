@@ -19,10 +19,11 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.time import utc_now
+from app.models.builder import BuilderComponent
 from app.models.files import FileAsset
 from app.models.bulk_import import BulkImportJob
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
-from app.schemas.runtime_record import RuntimeBulkJobDetail, RuntimeBulkJobRead, RuntimeBulkJobSummary, RuntimeBulkSaveItemResult, RuntimeBulkSaveRequest, RuntimeBulkSaveResponse, RuntimeRecordCreate, RuntimeRecordFieldCorrection, RuntimeRecordPage, RuntimeRecordRead, RuntimeValueRead
+from app.schemas.runtime_record import RuntimeBulkJobDetail, RuntimeBulkJobRead, RuntimeBulkJobSummary, RuntimeBulkSaveItemResult, RuntimeBulkSaveRequest, RuntimeBulkSaveResponse, RuntimeRecordCreate, RuntimeRecordFieldCorrection, RuntimeRecordPage, RuntimeRecordRead, RuntimeValueCreate, RuntimeValueRead
 from app.services.ai_audit_service import ai_audit_service
 from app.services.approval_flow_service import approval_flow_service
 from app.services.metrics_service import metrics_service
@@ -55,6 +56,8 @@ def record_to_read(db: Session, row: RuntimeRecord) -> RuntimeRecordRead:
         submitted_by=row.submitted_by,
         device_id=row.device_id,
         ip_address=row.ip_address,
+        parent_record_id=row.parent_record_id,
+        parent_field_name=row.parent_field_name,
         duplicate_flag=row.duplicate_flag,
         lock_version=row.lock_version,
         created_at=row.created_at,
@@ -84,6 +87,17 @@ class RuntimeRecordService:
         Crea primero la cabecera y luego cada valor capturado. El diseno es
         flexible para soportar campos simples y complejos sin migraciones por formulario.
         """
+        if payload.parent_record_id:
+            parent = db.query(RuntimeRecord).filter(RuntimeRecord.id == payload.parent_record_id).first()
+            if parent is None:
+                raise ValueError("El registro padre indicado no existe")
+            if parent.project_id != payload.project_id:
+                raise ValueError("El registro padre pertenece a otro proyecto")
+            if not payload.parent_field_name:
+                raise ValueError("parent_field_name es obligatorio cuando se indica parent_record_id")
+
+        self._assign_serial_numbers(db, payload.template_id, payload.values)
+
         approval_flow_id, approval_flow_version, approval_flow_snapshot_json = approval_flow_service.snapshot_for_record(db, payload.project_id, payload.template_id)
         content_hash = _compute_content_hash(payload.project_id, payload.template_id, payload.values)
         duplicate_window_start = utc_now() - timedelta(days=max(settings.duplicate_check_window_days, 0))
@@ -104,6 +118,8 @@ class RuntimeRecordService:
             submitted_by=user_id,
             device_id=payload.device_id,
             ip_address=payload.ip_address,
+            parent_record_id=payload.parent_record_id,
+            parent_field_name=payload.parent_field_name,
             content_hash=content_hash,
             duplicate_flag="possible" if has_recent_match else "none",
         )
@@ -145,6 +161,62 @@ class RuntimeRecordService:
             logger.warning("La auditoria semantica del registro %s fallo de forma inesperada", record.id, exc_info=True)
 
         return record_to_read(db, record)
+
+    def _assign_serial_numbers(self, db: Session, template_id: str, values: list[RuntimeValueCreate]) -> None:
+        """Asigna un consecutivo entero a cada campo SERIAL_NUMBER vacio.
+
+        No hay bloqueo de fila: dos guardados simultaneos sobre la misma
+        plantilla podrian calcular el mismo siguiente numero (limitacion
+        aceptada, consistente con el resto del proyecto -- SQLite en
+        desarrollo no soporta `SELECT ... FOR UPDATE`).
+        """
+        serial_fields = db.query(BuilderComponent).filter(
+            BuilderComponent.template_id == template_id,
+            BuilderComponent.component_type == "SERIAL_NUMBER",
+        ).all()
+        for field in serial_fields:
+            existing = next((item for item in values if item.field_name == field.name), None)
+            if existing is not None:
+                try:
+                    if json.loads(existing.field_value_json) not in (None, ""):
+                        continue
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            next_number = self._next_serial_number(db, template_id, field.name)
+            if existing is not None:
+                existing.field_value_json = json.dumps(next_number)
+            else:
+                values.append(RuntimeValueCreate(field_name=field.name, field_value_json=json.dumps(next_number)))
+
+    def _next_serial_number(self, db: Session, template_id: str, field_name: str) -> int:
+        rows = db.query(RuntimeRecordValue.field_value_json).join(
+            RuntimeRecord, RuntimeRecord.id == RuntimeRecordValue.record_id
+        ).filter(
+            RuntimeRecord.template_id == template_id,
+            RuntimeRecordValue.field_name == field_name,
+        ).all()
+        max_value = 0
+        for (raw,) in rows:
+            try:
+                parsed = json.loads(raw)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if isinstance(parsed, (int, float)) and not isinstance(parsed, bool):
+                max_value = max(max_value, int(parsed))
+        return max_value + 1
+
+    def list_child_records(self, db: Session, parent_record_id: str, field_name: str) -> list[RuntimeRecordRead]:
+        """Lista las filas hijas reales de un campo LINKED_SUBFORM (ver docs/97).
+
+        A diferencia de REPEAT (grupo embebido en el JSON del padre), cada
+        fila hija es un `RuntimeRecord` propio con su propio id, capturado
+        con la plantilla hija.
+        """
+        rows = db.query(RuntimeRecord).filter(
+            RuntimeRecord.parent_record_id == parent_record_id,
+            RuntimeRecord.parent_field_name == field_name,
+        ).order_by(RuntimeRecord.created_at.asc()).all()
+        return [record_to_read(db, row) for row in rows]
 
     def save_records_bulk(self, db: Session, payload: RuntimeBulkSaveRequest, user_id: str | None) -> RuntimeBulkSaveResponse:
         """Guarda registros por lotes para integraciones de alto volumen.

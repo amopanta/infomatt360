@@ -33,6 +33,11 @@ export type BuilderPreviewField = {
   mediaValue?: string;
   mediaPosition?: 'before' | 'after';
   mediaSize?: 'small' | 'medium' | 'large';
+  /** LINKED_SUBFORM (ver docs/97): plantilla hija cuyas filas se capturan como registros propios. */
+  childTemplateId?: string;
+  /** PARENT_CHILD (ver docs/97): plantilla y campo de esa plantilla que se usan para el selector de enlace. */
+  linkedTemplateId?: string;
+  labelField?: string;
 };
 
 export type BuilderPreviewSection = {

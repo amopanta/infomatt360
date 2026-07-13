@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { RuntimeRepeat } from './RuntimeRepeat';
 import { RuntimeSignature } from './RuntimeSignature';
 import { RuntimeGeoField } from './RuntimeGeoField';
-import { uploadRuntimeFile } from './api';
+import { searchLinkableRecords, uploadRuntimeFile } from './api';
 import { normalizeOptions, parseFieldConfig, parseNumberInput } from './fieldConfig';
 import type { RepeatItem, RuntimeComponent, RuntimeFileValue, RuntimeFormValue, RuntimeFormValues, RuntimeScalarValue } from './types';
 import type { RuntimeGeoValue } from './geoEngine';
@@ -60,6 +60,64 @@ function RuntimeQuestionLabel({ label, config }: { label: string; config: Return
   );
 }
 
+function labelForRecord(record: { id: string; values: { field_name: string; field_value_json: string }[] }, labelField?: string): string {
+  const target = labelField ? record.values.find((item) => item.field_name === labelField) : undefined;
+  if (!target) return record.id;
+  try {
+    const parsed = JSON.parse(target.field_value_json);
+    return parsed === null || parsed === '' ? record.id : String(parsed);
+  } catch {
+    return record.id;
+  }
+}
+
+/** Selector real de PARENT_CHILD (ver docs/97): busca registros existentes
+ * de la plantilla enlazada y guarda el id del registro seleccionado, en vez
+ * de dejar el campo como texto libre sin ninguna logica de enlace. */
+function RuntimeParentChildField({ fieldId, label, config, value, required, onChange }: {
+  fieldId: string;
+  label: string;
+  config: ReturnType<typeof parseFieldConfig>;
+  value: RuntimeScalarValue;
+  required: boolean;
+  onChange: (next: string | null) => void;
+}) {
+  const [search, setSearch] = useState('');
+  const [candidates, setCandidates] = useState<{ id: string; values: { field_name: string; field_value_json: string }[] }[]>([]);
+  const [status, setStatus] = useState('');
+  const linkedTemplateId = config.linked_template_id;
+
+  useEffect(() => {
+    if (!linkedTemplateId) return;
+    let active = true;
+    searchLinkableRecords(linkedTemplateId, search)
+      .then((results) => { if (active) setCandidates(results); })
+      .catch((error: Error) => { if (active) setStatus(error.message); });
+    return () => { active = false; };
+  }, [linkedTemplateId, search]);
+
+  if (!linkedTemplateId) {
+    return (
+      <div className="runtime-field-group">
+        <RuntimeQuestionLabel label={label} config={config} />
+        <small className="runtime-field-unavailable">Este campo aun no tiene una plantilla enlazada configurada en el constructor.</small>
+      </div>
+    );
+  }
+
+  return (
+    <label className="runtime-field-group" htmlFor={fieldId}>
+      <RuntimeQuestionLabel label={label} config={config} />
+      <input type="search" placeholder="Buscar registro..." value={search} onChange={(event) => setSearch(event.target.value)} />
+      <select id={fieldId} className="runtime-field" required={required} value={String(value ?? '')} onChange={(event) => onChange(event.target.value || null)}>
+        <option value="">Seleccione un registro enlazado</option>
+        {candidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{labelForRecord(candidate, config.label_field)}</option>)}
+      </select>
+      {status ? <small role="status">{status}</small> : null}
+    </label>
+  );
+}
+
 export function RuntimeField(props: Props) {
   const { component, projectId, values, onChange, uploadsDisabled } = props;
   const [uploadStatus, setUploadStatus] = useState('');
@@ -86,6 +144,28 @@ export function RuntimeField(props: Props) {
   }
 
   if (type === 'HIDDEN') return null;
+
+  if (type === 'LINKED_SUBFORM') {
+    return (
+      <div className="runtime-field-group">
+        <RuntimeQuestionLabel label={component.label} config={config} />
+        <small className="runtime-field-unavailable">Guarda este registro para poder agregar filas de este subformulario enlazado.</small>
+      </div>
+    );
+  }
+
+  if (type === 'PARENT_CHILD') {
+    return (
+      <RuntimeParentChildField
+        fieldId={fieldId}
+        label={component.label}
+        config={config}
+        value={value as RuntimeScalarValue}
+        required={config.required ?? false}
+        onChange={(next) => onChange(component.name, next)}
+      />
+    );
+  }
 
   if (type === 'GPS' || type === 'GEOTRACE' || type === 'GEOSHAPE') {
     const geometry = value && typeof value === 'object' && !Array.isArray(value) && 'coordinates' in value ? value as RuntimeGeoValue : null;

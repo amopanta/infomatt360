@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
 import { BuilderCanvas } from './BuilderCanvas';
@@ -6,6 +6,8 @@ import { BuilderPalette } from './BuilderPalette';
 import type { BuilderPaletteItem, BuilderPreviewField, BuilderPreviewSection } from './types';
 import { createColumn, createComponent, createPage, createRow, createSection, createTemplate } from './api';
 import { createDefaultCharacterizationTemplate } from './createDefaultTemplate';
+import { fetchProjectTemplates } from '../records/api';
+import type { TemplateSummary } from '../records/api';
 
 function slugify(value: string) {
   const normalized = value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -66,7 +68,13 @@ export function BuilderApp() {
   const [sections, setSections] = useState<BuilderPreviewSection[]>(initialSections);
   const [activeSectionId, setActiveSectionId] = useState(initialSections[0].id);
   const [saving, setSaving] = useState(false);
+  const [projectTemplates, setProjectTemplates] = useState<TemplateSummary[]>([]);
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
+
+  useEffect(() => {
+    if (!projectId) return;
+    fetchProjectTemplates(projectId).then(setProjectTemplates).catch(() => setProjectTemplates([]));
+  }, [projectId]);
 
   function resetTemplate() {
     const sectionId = crypto.randomUUID();
@@ -210,6 +218,9 @@ export function BuilderApp() {
                 position: field.mediaPosition ?? 'before',
                 size: field.mediaSize ?? 'medium',
               } : undefined,
+              child_template_id: field.type === 'LINKED_SUBFORM' ? field.childTemplateId || undefined : undefined,
+              linked_template_id: field.type === 'PARENT_CHILD' ? field.linkedTemplateId || undefined : undefined,
+              label_field: field.type === 'PARENT_CHILD' ? field.labelField?.trim() || undefined : undefined,
             }),
             sortOrder,
           });
@@ -297,6 +308,7 @@ export function BuilderApp() {
           sections={sections}
           theme={theme}
           availableFields={sections.flatMap((section) => section.fields)}
+          projectTemplates={projectTemplates}
           activeSectionId={activeSectionId}
           onActiveSectionChange={setActiveSectionId}
           onSectionTitleChange={updateSection}

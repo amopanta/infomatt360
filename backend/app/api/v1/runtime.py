@@ -53,7 +53,18 @@ def save_runtime_record(payload: RuntimeRecordCreate, db: Session = Depends(get_
     template = require_template_access(db, current_user.id, payload.template_id)
     if template.project_id != payload.project_id:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La plantilla no pertenece al proyecto indicado")
-    return runtime_record_service.save_record(db, payload, current_user.id)
+    try:
+        return runtime_record_service.save_record(db, payload, current_user.id)
+    except ValueError as exc:
+        detail = str(exc)
+        lowered = detail.lower()
+        if "no existe" in lowered:
+            code = status.HTTP_404_NOT_FOUND
+        elif "otro proyecto" in lowered:
+            code = status.HTTP_403_FORBIDDEN
+        else:
+            code = status.HTTP_422_UNPROCESSABLE_CONTENT
+        raise HTTPException(status_code=code, detail=detail) from exc
 
 
 @router.post("/bulk/save", response_model=RuntimeBulkSaveResponse)
@@ -208,6 +219,21 @@ def get_runtime_record(record_id: str, db: Session = Depends(get_db), current_us
     if not assignment_service.user_has_project_access(db, current_user.id, record.project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
     return record
+
+
+@router.get("/record/{record_id}/children/{field_name}", response_model=list[RuntimeRecordRead])
+def list_runtime_record_children(record_id: str, field_name: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[RuntimeRecordRead]:
+    """Lista las filas hijas reales de un campo LINKED_SUBFORM (ver docs/97).
+
+    Distinto de un REPEAT embebido: cada hijo es un `RuntimeRecord` propio,
+    capturado con su propia plantilla hija.
+    """
+    parent = runtime_record_service.get_record(db, record_id)
+    if parent is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado")
+    if not assignment_service.user_has_project_access(db, current_user.id, parent.project_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    return runtime_record_service.list_child_records(db, record_id, field_name)
 
 
 @router.patch("/record/{record_id}/correction", response_model=RuntimeRecordRead)

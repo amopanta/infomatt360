@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { BuilderPreviewSection } from './types';
+import type { TemplateSummary } from '../records/api';
 
 const optionTypes = new Set(['SELECT', 'MULTISELECT', 'DROPDOWN', 'LIKERT_5', 'LIKERT_7', 'RATING', 'RANKING']);
 const numericTypes = new Set(['NUMBER', 'INTEGER', 'DECIMAL', 'PERCENTAGE', 'CURRENCY', 'NPS', 'YEAR', 'RANGE']);
@@ -9,6 +10,7 @@ type Props = {
   sections: BuilderPreviewSection[];
   theme: { primaryColor: string; accentColor: string; backgroundColor: string; radius: string };
   availableFields: BuilderPreviewSection['fields'];
+  projectTemplates: TemplateSummary[];
   activeSectionId: string;
   onActiveSectionChange: (sectionId: string) => void;
   onSectionTitleChange: (sectionId: string, title: string) => void;
@@ -25,6 +27,7 @@ export function BuilderCanvas({
   sections,
   theme,
   availableFields,
+  projectTemplates,
   activeSectionId,
   onActiveSectionChange,
   onSectionTitleChange,
@@ -179,6 +182,40 @@ export function BuilderCanvas({
                       </label>
                     </div>
                     <p>Se guarda como texto controlado para conservar letras, numeros y ceros iniciales.</p>
+                  </details>
+                ) : null}
+                {field.type === 'LINKED_SUBFORM' ? (
+                  <details className="builder-linked-subform-panel">
+                    <summary>Plantilla hija enlazada</summary>
+                    <div className="builder-field-row">
+                      <label>
+                        <span>Formulario hijo</span>
+                        <select value={field.childTemplateId ?? ''} onChange={(event) => onFieldChange(field.id, { childTemplateId: event.target.value })}>
+                          <option value="">Selecciona una plantilla existente</option>
+                          {projectTemplates.map((template) => <option key={template.id} value={template.id}>{template.name} ({template.status})</option>)}
+                        </select>
+                      </label>
+                    </div>
+                    <p>Cada fila que se agregue en Runtime se guarda como un registro propio de esa plantilla, enlazado a este registro (no como un grupo embebido, a diferencia de "Tabla repetida").</p>
+                  </details>
+                ) : null}
+                {field.type === 'PARENT_CHILD' ? (
+                  <details className="builder-parent-child-panel">
+                    <summary>Enlace a otro registro</summary>
+                    <div className="builder-field-row">
+                      <label>
+                        <span>Formulario enlazado</span>
+                        <select value={field.linkedTemplateId ?? ''} onChange={(event) => onFieldChange(field.id, { linkedTemplateId: event.target.value })}>
+                          <option value="">Selecciona una plantilla existente</option>
+                          {projectTemplates.map((template) => <option key={template.id} value={template.id}>{template.name} ({template.status})</option>)}
+                        </select>
+                      </label>
+                      <label>
+                        <span>Campo mostrado como etiqueta</span>
+                        <input value={field.labelField ?? ''} placeholder="Ej: nombre_completo" onChange={(event) => onFieldChange(field.id, { labelField: event.target.value })} />
+                      </label>
+                    </div>
+                    <p>En Runtime se muestra como un selector de registros existentes de esa plantilla, guardando el id del registro enlazado.</p>
                   </details>
                 ) : null}
                 <details className="builder-validation-panel">

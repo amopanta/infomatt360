@@ -311,10 +311,10 @@ body { margin: 0; }
 .builder-field-card button { border-radius: 8px; padding: 6px 8px; font-weight: 800; cursor: pointer; }
 .builder-checkbox { flex-direction: row; align-items: center; gap: 8px; }
 .builder-checkbox input { width: auto; }
-.builder-validation-panel, .builder-condition-panel, .builder-visual-panel, .builder-document-panel { padding: 6px 8px; border: 1px solid #e6f1fa; border-radius: 10px; background: #fbfdff; }
-.builder-validation-panel summary, .builder-condition-panel summary, .builder-visual-panel summary, .builder-document-panel summary { cursor: pointer; color: #0066cc; font-size: 13px; font-weight: 900; }
-.builder-validation-panel .builder-field-row, .builder-condition-panel .builder-field-row, .builder-visual-panel .builder-field-row, .builder-document-panel .builder-field-row { margin-top: 7px; grid-template-columns: repeat(4, minmax(105px, 1fr)); }
-.builder-condition-panel p, .builder-visual-panel p, .builder-document-panel p { margin: 6px 0 0; color: #536878; font-size: 12px; }
+.builder-validation-panel, .builder-condition-panel, .builder-visual-panel, .builder-document-panel, .builder-linked-subform-panel, .builder-parent-child-panel { padding: 6px 8px; border: 1px solid #e6f1fa; border-radius: 10px; background: #fbfdff; }
+.builder-validation-panel summary, .builder-condition-panel summary, .builder-visual-panel summary, .builder-document-panel summary, .builder-linked-subform-panel summary, .builder-parent-child-panel summary { cursor: pointer; color: #0066cc; font-size: 13px; font-weight: 900; }
+.builder-validation-panel .builder-field-row, .builder-condition-panel .builder-field-row, .builder-visual-panel .builder-field-row, .builder-document-panel .builder-field-row, .builder-linked-subform-panel .builder-field-row, .builder-parent-child-panel .builder-field-row { margin-top: 7px; grid-template-columns: repeat(4, minmax(105px, 1fr)); }
+.builder-condition-panel p, .builder-visual-panel p, .builder-document-panel p, .builder-linked-subform-panel p, .builder-parent-child-panel p { margin: 6px 0 0; color: #536878; font-size: 12px; }
 .builder-visual-preview { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 10px; border-radius: 12px; background: #ffffff; }
 .builder-visual-preview span { color: #536878; font-size: 13px; font-weight: 900; }
 .builder-visual-preview strong { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: #f0f9ff; font-size: 28px; }
@@ -535,6 +535,13 @@ body { margin: 0; }
 .review-actions button { border: 0; border-radius: 9px; padding: 9px 12px; color: #ffffff; background: #0066cc; font-weight: 800; cursor: pointer; }
 .review-history { display: grid; gap: 6px; color: #536878; }
 .review-history p { margin: 0; }
+
+.record-linked-subforms { margin-top: 16px; display: grid; gap: 12px; }
+.record-linked-subforms h3 { margin: 0; }
+.record-linked-subform-card { padding: 14px; border: 1px solid #dce7f2; border-radius: 14px; background: #f8fbfd; }
+.record-linked-subform-card header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.record-linked-subform-card header button { border: 0; border-radius: 8px; padding: 8px 12px; color: #ffffff; background: #0066cc; font-weight: 800; cursor: pointer; }
+.record-linked-subform-form { display: grid; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #dce7f2; }
 
 .erp-shell { max-width: 1180px; margin: 28px auto; padding: 0 24px; }
 .erp-tabs { display: flex; gap: 8px; margin-bottom: 16px; }

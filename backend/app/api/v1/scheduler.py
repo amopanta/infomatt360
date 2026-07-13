@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.permissions import require_project_permission
+from app.core.permissions import BACKUPS_MANAGE
 from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.scheduler import ScheduledTaskCreate, ScheduledTaskRead, TaskRunCreate, TaskRunRead
@@ -10,10 +12,19 @@ from app.services.scheduler_service import scheduler_service
 
 router = APIRouter()
 
+# Permiso especifico exigido por task_type, ademas del acceso general al
+# proyecto. Hoy solo "backup" tiene un permiso dedicado (BACKUPS_MANAGE,
+# el mismo que exige el boton manual en backups.py); un task_type nuevo sin
+# entrada aqui sigue protegido solo por pertenencia al proyecto.
+TASK_TYPE_PERMISSIONS = {"backup": BACKUPS_MANAGE}
+
 
 @router.post("/tasks", response_model=ScheduledTaskRead)
 def create_task(payload: ScheduledTaskCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ScheduledTaskRead:
-    if not assignment_service.user_has_project_access(db, current_user.id, payload.project_id):
+    required_permission = TASK_TYPE_PERMISSIONS.get(payload.task_type)
+    if required_permission:
+        require_project_permission(db, current_user.id, payload.project_id, required_permission)
+    elif not assignment_service.user_has_project_access(db, current_user.id, payload.project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
     return scheduler_service.create_task(db, payload)
 

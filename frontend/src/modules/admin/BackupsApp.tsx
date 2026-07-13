@@ -4,6 +4,13 @@ import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
 import { fetchBackups, runBackup } from './backupsApi';
 import type { BackupJob } from './backupsApi';
+import { createScheduledBackupTask, fetchScheduledTasks } from './schedulerApi';
+import type { ScheduledTask } from './schedulerApi';
+
+function frequencyLabel(frequency: string) {
+  const labels: Record<string, string> = { hourly: 'Cada hora', daily: 'Diario', weekly: 'Semanal' };
+  return labels[frequency] ?? frequency;
+}
 
 function statusLabel(status: string) {
   const labels: Record<string, string> = { success: 'Exitoso', failed: 'Fallido', running: 'En progreso' };
@@ -28,6 +35,9 @@ export function BackupsApp() {
   const [backups, setBackups] = useState<BackupJob[]>([]);
   const [message, setMessage] = useState('');
   const [running, setRunning] = useState(false);
+  const [scheduledTask, setScheduledTask] = useState<ScheduledTask | null>(null);
+  const [frequency, setFrequency] = useState('daily');
+  const [scheduling, setScheduling] = useState(false);
 
   async function loadBackups() {
     try {
@@ -37,7 +47,30 @@ export function BackupsApp() {
     }
   }
 
-  useEffect(() => { void loadBackups(); }, [projectId]);
+  async function loadScheduledTask() {
+    if (!projectId) return;
+    try {
+      const tasks = await fetchScheduledTasks(projectId);
+      setScheduledTask(tasks.find((task) => task.task_type === 'backup') ?? null);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No fue posible consultar la programacion de respaldos.');
+    }
+  }
+
+  useEffect(() => { void loadBackups(); void loadScheduledTask(); }, [projectId]);
+
+  async function submitSchedule() {
+    setScheduling(true);
+    try {
+      const task = await createScheduledBackupTask(projectId, frequency);
+      setScheduledTask(task);
+      setMessage('Respaldo automatico programado.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No fue posible programar el respaldo automatico.');
+    } finally {
+      setScheduling(false);
+    }
+  }
 
   async function submitRunBackup() {
     setRunning(true);
@@ -55,6 +88,35 @@ export function BackupsApp() {
   return (
     <AppShell title="Backups programables">
       <main className="audit-shell">
+        <section className="audit-panel">
+          <header>
+            <div>
+              <h2>Respaldo automático</h2>
+              <p>Un worker (<code>python -m app.cli.run_scheduled_tasks --loop</code>) ejecuta este respaldo por su cuenta, sin depender de que alguien entre a la web (ver docs/78).</p>
+            </div>
+          </header>
+          {scheduledTask ? (
+            <div className="ai-analyze-inline">
+              <span>Frecuencia: <strong>{frequencyLabel(scheduledTask.frequency)}</strong></span>
+              <span>Próxima ejecución: {scheduledTask.next_run_at ? new Date(scheduledTask.next_run_at).toLocaleString() : 'pendiente del worker'}</span>
+              <span>Último resultado: {scheduledTask.last_result ?? 'aún no se ha ejecutado'}</span>
+            </div>
+          ) : (
+            <div className="ai-analyze-inline">
+              <label>Frecuencia
+                <select value={frequency} onChange={(event) => setFrequency(event.target.value)}>
+                  <option value="hourly">Cada hora</option>
+                  <option value="daily">Diario</option>
+                  <option value="weekly">Semanal</option>
+                </select>
+              </label>
+              <button className="primary" disabled={scheduling} onClick={() => void submitSchedule()}>
+                {scheduling ? 'Programando…' : 'Programar respaldo automático'}
+              </button>
+            </div>
+          )}
+        </section>
+
         <section className="audit-panel">
           <header>
             <div>

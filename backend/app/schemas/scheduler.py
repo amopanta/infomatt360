@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel
 
 
@@ -14,6 +16,8 @@ class ScheduledTaskCreate(BaseModel):
 class ScheduledTaskRead(ScheduledTaskCreate):
     id: str
     last_result: str | None = None
+    last_run_at: datetime | None = None
+    next_run_at: datetime | None = None
 
 
 class TaskRunCreate(BaseModel):

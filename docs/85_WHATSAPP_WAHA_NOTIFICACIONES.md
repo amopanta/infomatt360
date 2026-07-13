@@ -132,6 +132,52 @@ la URL `/records/{template_id}?recordId={id}&campo=ubicacion` la tarjeta
 destacada aparecio con el campo `ubicacion` resaltado
 (`outline: 3px solid rgb(214, 69, 69)`, confirmado via el DOM real).
 
+### Correccion de paso: el enlace mágico ahora corrige de verdad
+
+**El hallazgo**: hasta este punto, el enlace mágico permitía *ver* el
+campo señalado y marcar el registro como `"corrected"`, pero no existía
+ningún camino de codigo que realmente cambiara el valor de un campo ya
+guardado -- `runtime_record_service.save_record()` siempre crea una fila
+nueva, nunca actualiza una existente, y ningun router (`records.py`,
+`runtime.py`) exponia un `PUT`/`PATCH`. En la práctica, un gestor que
+abría el enlace solo podía leer el error y marcar "corregido" sin haber
+corregido nada.
+
+`PATCH /api/v1/runtime/record/{record_id}/correction`
+(`runtime_record_service.correct_field()`, permiso `records.write`) cierra
+esa brecha:
+
+- Solo se permite mientras el registro esta en estado `"returned"` -- un
+  registro aprobado, rechazado o archivado sigue siendo inmutable, igual
+  que el resto del sistema (ver el ledger inmutable de ERP en
+  [84_ERP_HEADLESS_INVENTARIO_NOMINA.md](84_ERP_HEADLESS_INVENTARIO_NOMINA.md)).
+- Actualiza o crea el `RuntimeRecordValue` del campo indicado (upsert real,
+  el primero en todo el sistema sobre un valor ya existente).
+- **Control de edicion concurrente**: `RuntimeRecord.lock_version`
+  (migracion `0057`) es un bloqueo optimista. El cliente debe enviar
+  `expected_lock_version` con el valor que vio la ultima vez que cargo el
+  registro; si otro usuario ya lo corrigio mientras tanto, el backend
+  responde `409 Conflict` con un mensaje claro en vez de sobrescribir en
+  silencio el cambio ajeno. Cada correccion exitosa incrementa
+  `lock_version` en 1.
+
+En el frontend (`RecordsApp.tsx`), cada campo de la tarjeta destacada
+tiene un boton "Corregir" que lo vuelve editable (solo para valores
+simples -- texto/numero/booleano; campos complejos como fotos o firmas
+muestran una nota indicando que deben recapturarse desde el formulario
+original, no se editan aqui). Al guardar, se llama a
+`correctRecordField()` (`frontend/src/modules/records/api.ts`); si el
+backend responde `409`, el mensaje de error se muestra tal cual para que
+el gestor recargue el registro antes de reintentar.
+
+Verificado en navegador real (con dos "usuarios" simulados: la UI y una
+llamada API directa): se corrigio `telefono_contacto` desde la UI y el
+valor se reflejo de inmediato en la tarjeta; luego, con el `lock_version`
+ya desactualizado en el navegador, un segundo intento de correccion sobre
+otro campo fue rechazado con `409` y el mensaje "El registro fue
+modificado por otro usuario... recarga el registro y vuelve a intentar",
+confirmando que el bloqueo optimista evita la sobrescritura silenciosa.
+
 ## Como levantar una instancia WAHA para activarlo
 
 WAHA es open-source y se levanta con Docker:
@@ -160,3 +206,18 @@ WAHA_SESSION=default
   arquitectura ajustada V3.
 - No hay reintento automatico de envios fallidos; el ledger permite
   identificarlos para un reintento manual futuro.
+- La correccion via enlace magico solo edita valores simples
+  (texto/numero/booleano) desde la tarjeta destacada; fotos, firmas, GPS u
+  otros campos complejos deben recapturarse desde el formulario original.
+- Solo se puede corregir un registro en estado `"returned"` -- no hay
+  edicion general de participantes ni de registros en otros estados
+  (aprobado, rechazado, archivado siguen siendo inmutables).
+
+## Pruebas
+
+`backend/tests/test_runtime_record_correction.py`: corrige un valor
+existente e incrementa `lock_version`, crea un valor para un campo que no
+existia todavia, **rechaza una segunda correccion con `expected_lock_version`
+desactualizado (409, control de edicion concurrente)**, rechaza corregir
+un registro que no esta en `"returned"`, exige el permiso `records.write`,
+y responde `404` para un `record_id` inexistente.

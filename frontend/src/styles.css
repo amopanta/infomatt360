@@ -56,6 +56,13 @@ body { margin: 0; }
 .record-deep-link-card { margin-bottom: 18px; padding: 16px; border: 2px solid #0066cc; border-radius: 14px; background: #eef6ff; }
 .record-deep-link-card header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .record-field-highlighted { outline: 3px solid #d64545; background: #fff2f2 !important; }
+.record-detail dd { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.record-field-edit-button { border: 0; border-radius: 8px; padding: 4px 10px; color: #ffffff; background: #0066cc; font-size: 12px; font-weight: 800; cursor: pointer; }
+.record-field-uneditable { color: #7a889a; font-style: italic; }
+.record-detail dd input { flex: 1 1 160px; min-width: 0; padding: 6px 8px; border: 1px solid #c8d6e5; border-radius: 8px; }
+.record-detail dd button { border: 0; border-radius: 8px; padding: 6px 10px; font-size: 12px; font-weight: 800; cursor: pointer; }
+.record-detail dd button:first-of-type { color: #ffffff; background: #0a5c36; }
+.record-detail dd button:last-of-type { color: #0a2540; background: #e6ecf3; }
 .dashboard-shell { max-width: 1180px; margin: 28px auto; padding: 0 24px; }
 .dashboard-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
 .dashboard-metric { display: flex; flex-direction: column; gap: 7px; padding: 20px; color: #0a2540; text-decoration: none; border: 1px solid #dce7f2; border-radius: 16px; background: #ffffff; box-shadow: 0 10px 26px rgba(10, 37, 64, 0.06); }

@@ -22,7 +22,7 @@ from app.core.time import utc_now
 from app.models.files import FileAsset
 from app.models.bulk_import import BulkImportJob
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
-from app.schemas.runtime_record import RuntimeBulkJobDetail, RuntimeBulkJobRead, RuntimeBulkJobSummary, RuntimeBulkSaveItemResult, RuntimeBulkSaveRequest, RuntimeBulkSaveResponse, RuntimeRecordCreate, RuntimeRecordPage, RuntimeRecordRead, RuntimeValueRead
+from app.schemas.runtime_record import RuntimeBulkJobDetail, RuntimeBulkJobRead, RuntimeBulkJobSummary, RuntimeBulkSaveItemResult, RuntimeBulkSaveRequest, RuntimeBulkSaveResponse, RuntimeRecordCreate, RuntimeRecordFieldCorrection, RuntimeRecordPage, RuntimeRecordRead, RuntimeValueRead
 from app.services.ai_audit_service import ai_audit_service
 from app.services.approval_flow_service import approval_flow_service
 from app.services.metrics_service import metrics_service
@@ -56,6 +56,7 @@ def record_to_read(db: Session, row: RuntimeRecord) -> RuntimeRecordRead:
         device_id=row.device_id,
         ip_address=row.ip_address,
         duplicate_flag=row.duplicate_flag,
+        lock_version=row.lock_version,
         created_at=row.created_at,
         updated_at=row.updated_at,
         values=[value_to_read(item) for item in values],
@@ -586,6 +587,56 @@ class RuntimeRecordService:
         """Consulta una captura por identificador."""
         row = db.query(RuntimeRecord).filter(RuntimeRecord.id == record_id).first()
         return record_to_read(db, row) if row else None
+
+    def correct_field(self, db: Session, record_id: str, payload: RuntimeRecordFieldCorrection, user_id: str | None) -> RuntimeRecordRead:
+        """Corrige el valor de un campo de un registro devuelto ("returned").
+
+        Es el unico camino de escritura sobre un `RuntimeRecordValue` ya
+        existente en todo el sistema -- `save_record` siempre crea filas
+        nuevas. Solo se permite mientras el registro esta en `returned`
+        (la revision humana ya marco que necesita correccion); un registro
+        aprobado, rechazado o archivado es inmutable.
+
+        El bloqueo optimista (`RuntimeRecord.lock_version`) evita que dos
+        gestores corrigiendo el mismo registro al mismo tiempo se
+        sobrescriban en silencio: si `expected_lock_version` no coincide
+        con el valor actual, se rechaza con un mensaje claro para que el
+        cliente recargue el registro antes de reintentar.
+        """
+        record = db.query(RuntimeRecord).filter(RuntimeRecord.id == record_id).first()
+        if record is None:
+            raise ValueError("Registro no encontrado")
+        if record.status != "returned":
+            raise ValueError(f"Solo se puede corregir un registro en estado 'returned' (estado actual: '{record.status}')")
+        if record.lock_version != payload.expected_lock_version:
+            raise ValueError(
+                "El registro fue modificado por otro usuario despues de que se cargo el formulario de correccion; "
+                "recarga el registro y vuelve a intentar."
+            )
+
+        parsed_value = json.loads(payload.field_value_json)
+        for file_id in self._file_asset_ids(parsed_value):
+            asset = db.query(FileAsset).filter(FileAsset.id == file_id, FileAsset.project_id == record.project_id).first()
+            if asset is None:
+                raise ValueError(f"Evidencia inexistente o fuera del proyecto: {file_id}")
+            if asset.record_id and asset.record_id != record.id:
+                raise ValueError(f"La evidencia ya pertenece a otro registro: {file_id}")
+            asset.record_id = record.id
+
+        value_row = db.query(RuntimeRecordValue).filter(
+            RuntimeRecordValue.record_id == record_id,
+            RuntimeRecordValue.field_name == payload.field_name,
+        ).first()
+        if value_row is None:
+            db.add(RuntimeRecordValue(record_id=record_id, field_name=payload.field_name, field_value_json=payload.field_value_json))
+        else:
+            value_row.field_value_json = payload.field_value_json
+
+        record.lock_version += 1
+        record.updated_at = utc_now()
+        db.commit()
+        db.refresh(record)
+        return record_to_read(db, record)
 
     def list_template_records(self, db: Session, template_id: str) -> list[RuntimeRecordRead]:
         """Lista capturas asociadas a una plantilla Runtime."""

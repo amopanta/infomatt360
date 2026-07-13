@@ -9,7 +9,7 @@ Notas: No se crean tablas fisicas por formulario; los valores se guardan en estr
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import DateTime, String, Text
+from sqlalchemy import DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -43,6 +43,10 @@ class RuntimeRecord(Base):
     ip_address: Mapped[str | None] = mapped_column(String(80), nullable=True)
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     duplicate_flag: Mapped[str] = mapped_column(String(20), default="none", nullable=False)
+    # Bloqueo optimista: se incrementa en cada correccion de un valor de
+    # campo (ver runtime_record_service.correct_field). No tiene relacion
+    # con `version_id` (la version de la PLANTILLA usada al capturar).
+    lock_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 

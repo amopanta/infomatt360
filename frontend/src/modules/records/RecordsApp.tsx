@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
-import { applyReviewAction, downloadTemplateRecords, fetchProjectTemplates, fetchRecord, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, searchTemplateRecords } from './api';
+import { applyReviewAction, correctRecordField, downloadTemplateRecords, fetchProjectTemplates, fetchRecord, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
 
 const REJECTION_STATUSES = new Set(['rejected', 'returned']);
@@ -211,15 +211,101 @@ function TemplateList() {
   );
 }
 
+/** Solo se ofrece edicion en linea para valores simples (texto/numero/booleano).
+ * Fotos, firmas, GPS u otros campos complejos se corrigen recapturando desde
+ * el formulario, no con un input de texto generico. */
+function isEditableScalar(raw: string): boolean {
+  try {
+    const value = JSON.parse(raw);
+    return value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean';
+  } catch {
+    return false;
+  }
+}
+
+function CorrectableField({
+  record,
+  value,
+  onCorrected,
+  onMessage,
+}: {
+  record: RuntimeRecord;
+  value: { id: string; field_name: string; field_value_json: string };
+  onCorrected: (record: RuntimeRecord) => void;
+  onMessage: (value: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState('');
+  const [saving, setSaving] = useState(false);
+  const canEditHere = record.status === 'returned';
+
+  function startEditing() {
+    let parsed: unknown = null;
+    try {
+      parsed = JSON.parse(value.field_value_json);
+    } catch {
+      parsed = null;
+    }
+    setDraft(parsed === null || parsed === undefined ? '' : String(parsed));
+    setEditing(true);
+  }
+
+  async function submitCorrection() {
+    setSaving(true);
+    try {
+      const updated = await correctRecordField({
+        recordId: record.id,
+        fieldName: value.field_name,
+        fieldValueJson: JSON.stringify(draft),
+        expectedLockVersion: record.lock_version,
+      });
+      onCorrected(updated);
+      setEditing(false);
+      onMessage('Corrección guardada.');
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : 'No fue posible guardar la corrección.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!canEditHere) {
+    return <dd>{formatValue(value.field_value_json, true)}</dd>;
+  }
+
+  if (!editing) {
+    return (
+      <dd>
+        {formatValue(value.field_value_json, true)}
+        {isEditableScalar(value.field_value_json) ? (
+          <button className="record-field-edit-button" onClick={startEditing}>Corregir</button>
+        ) : (
+          <small className="record-field-uneditable"> (recaptura este campo desde el formulario original)</small>
+        )}
+      </dd>
+    );
+  }
+
+  return (
+    <dd>
+      <input value={draft} onChange={(event) => setDraft(event.target.value)} disabled={saving} />
+      <button disabled={saving} onClick={() => void submitCorrection()}>{saving ? 'Guardando…' : 'Guardar corrección'}</button>
+      <button disabled={saving} onClick={() => setEditing(false)}>Cancelar</button>
+    </dd>
+  );
+}
+
 function DeepLinkedRecordCard({
   projectId,
   record,
   highlightField,
+  onRecordUpdated,
   onMessage,
 }: {
   projectId: string;
   record: RuntimeRecord;
   highlightField: string;
+  onRecordUpdated: (record: RuntimeRecord) => void;
   onMessage: (value: string) => void;
 }) {
   const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -243,7 +329,7 @@ function DeepLinkedRecordCard({
             className={value.field_name === highlightField ? 'record-field-highlighted' : undefined}
           >
             <dt>{value.field_name}</dt>
-            <dd>{formatValue(value.field_value_json, true)}</dd>
+            <CorrectableField record={record} value={value} onCorrected={onRecordUpdated} onMessage={onMessage} />
           </div>
         ))}
       </dl>
@@ -307,7 +393,7 @@ function RecordTable({ templateId }: { templateId: string }) {
     <AppShell title="Registros del formulario">
       <main className="records-shell">
         {deepLinkedRecord ? (
-          <DeepLinkedRecordCard projectId={projectId} record={deepLinkedRecord} highlightField={deepLink.campo} onMessage={setMessage} />
+          <DeepLinkedRecordCard projectId={projectId} record={deepLinkedRecord} highlightField={deepLink.campo} onRecordUpdated={setDeepLinkedRecord} onMessage={setMessage} />
         ) : deepLinkError ? (
           <p role="alert">{deepLinkError}</p>
         ) : null}

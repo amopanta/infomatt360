@@ -123,6 +123,29 @@ class RuntimeValueRead(RuntimeValueCreate):
     record_id: str
 
 
+class RuntimeRecordFieldCorrection(BaseModel):
+    """Corrige el valor de un campo de un registro devuelto (`status="returned"`).
+
+    `expected_lock_version` es el bloqueo optimista: debe ser el
+    `lock_version` que el cliente vio la ultima vez que leyo el registro.
+    Si ya no coincide (otro usuario corrigio el registro mientras tanto),
+    el backend rechaza la escritura en vez de sobrescribirla en silencio.
+    """
+
+    field_name: str = Field(..., min_length=1)
+    field_value_json: str
+    expected_lock_version: int = Field(..., ge=1)
+
+    @field_validator("field_value_json")
+    @classmethod
+    def validate_json_value(cls, value: str) -> str:
+        try:
+            json.loads(value)
+        except (TypeError, json.JSONDecodeError) as exc:
+            raise ValueError("field_value_json debe contener JSON valido") from exc
+        return value
+
+
 class RuntimeRecordRead(BaseModel):
     """Respuesta consolidada de una captura Runtime."""
 
@@ -137,6 +160,7 @@ class RuntimeRecordRead(BaseModel):
     device_id: str | None = None
     ip_address: str | None = None
     duplicate_flag: str = "none"
+    lock_version: int = 1
     created_at: datetime
     updated_at: datetime
     values: list[RuntimeValueRead] = Field(default_factory=list)

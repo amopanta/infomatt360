@@ -1,5 +1,5 @@
 export type RecordValue = { id: string; field_name: string; field_value_json: string };
-export type RuntimeRecord = { id: string; status: string; submitted_by?: string | null; approval_flow_id?: string | null; approval_flow_version?: string | null; created_at: string; updated_at: string; values: RecordValue[] };
+export type RuntimeRecord = { id: string; status: string; submitted_by?: string | null; approval_flow_id?: string | null; approval_flow_version?: string | null; lock_version: number; created_at: string; updated_at: string; values: RecordValue[] };
 export type RuntimeRecordPage = { items: RuntimeRecord[]; total: number; limit: number; offset: number };
 export type TemplateSummary = { id: string; name: string; description?: string | null; status: string };
 export type ReviewAction = { id: string; project_id: string; record_id: string; from_status?: string | null; to_status: string; action: string; notes?: string | null; rejected_field_name?: string | null; user_id: string; approval_flow_id?: string | null; approval_flow_version?: number | null; created_at?: string | null };
@@ -117,6 +117,24 @@ export async function downloadTemplateRecords(templateId: string, filters: { sea
 export async function fetchReviewActions(recordId: string): Promise<ReviewAction[]> {
   const response = await fetch(`${API_BASE_URL}/review/records/${recordId}/actions`, { headers: headers() });
   if (!response.ok) throw new Error('No fue posible consultar el historial de revisión.');
+  return response.json();
+}
+
+/** Corrige el valor de un campo de un registro devuelto ("returned"). Ver docs/92. */
+export async function correctRecordField(payload: { recordId: string; fieldName: string; fieldValueJson: string; expectedLockVersion: number }): Promise<RuntimeRecord> {
+  const response = await fetch(`${API_BASE_URL}/runtime/record/${payload.recordId}/correction`, {
+    method: 'PATCH',
+    headers: jsonHeaders(),
+    body: JSON.stringify({
+      field_name: payload.fieldName,
+      field_value_json: payload.fieldValueJson,
+      expected_lock_version: payload.expectedLockVersion,
+    }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail || 'No fue posible guardar la corrección.');
+  }
   return response.json();
 }
 

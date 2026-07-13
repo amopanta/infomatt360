@@ -11,14 +11,14 @@ from sqlalchemy.orm import Session
 
 from app.api.api_key_auth import require_api_key_permission
 from app.api.deps import get_current_user
-from app.api.permissions import require_any_project_permission
+from app.api.permissions import require_any_project_permission, require_project_permission
 from app.core.permissions import BULK_ADMIN_PERMISSIONS, RECORDS_WRITE
 from app.db.session import get_db
 from app.models.builder import BuilderTemplate
 from app.models.identity import User
 from app.schemas.api_key import ApiKeyAuthContext
 from app.schemas.runtime import RuntimeTemplate
-from app.schemas.runtime_record import RuntimeBulkJobDetail, RuntimeBulkJobRead, RuntimeBulkJobSummary, RuntimeBulkSaveRequest, RuntimeBulkSaveResponse, RuntimeRecordCreate, RuntimeRecordPage, RuntimeRecordRead
+from app.schemas.runtime_record import RuntimeBulkJobDetail, RuntimeBulkJobRead, RuntimeBulkJobSummary, RuntimeBulkSaveRequest, RuntimeBulkSaveResponse, RuntimeRecordCreate, RuntimeRecordFieldCorrection, RuntimeRecordPage, RuntimeRecordRead
 from app.services.runtime_record_service import runtime_record_service
 from app.services.runtime_service import runtime_service
 from app.services.assignment_service import assignment_service
@@ -208,6 +208,33 @@ def get_runtime_record(record_id: str, db: Session = Depends(get_db), current_us
     if not assignment_service.user_has_project_access(db, current_user.id, record.project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
     return record
+
+
+@router.patch("/record/{record_id}/correction", response_model=RuntimeRecordRead)
+def correct_runtime_record_field(record_id: str, payload: RuntimeRecordFieldCorrection, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> RuntimeRecordRead:
+    """Corrige el valor de un campo de un registro devuelto (enlace magico).
+
+    Requiere el mismo permiso que capturar registros (`records.write`): es
+    la accion que hoy falta para que un gestor realmente pueda arreglar el
+    campo senalado por un revisor, en vez de solo poder marcar
+    "corregido" sin cambiar ningun valor.
+    """
+    record = runtime_record_service.get_record(db, record_id)
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado")
+    require_project_permission(db, current_user.id, record.project_id, RECORDS_WRITE)
+    try:
+        return runtime_record_service.correct_field(db, record_id, payload, current_user.id)
+    except ValueError as exc:
+        detail = str(exc)
+        lowered = detail.lower()
+        if "no encontrado" in lowered:
+            code = status.HTTP_404_NOT_FOUND
+        elif "modificado por otro usuario" in lowered:
+            code = status.HTTP_409_CONFLICT
+        else:
+            code = status.HTTP_400_BAD_REQUEST
+        raise HTTPException(status_code=code, detail=detail) from exc
 
 
 @router.get("/template/{template_id}/records", response_model=list[RuntimeRecordRead])

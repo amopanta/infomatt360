@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.models.builder import BuilderTemplate
 from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord
-from app.schemas.participants import ParticipantCreate, ParticipantHistoryItem, ParticipantRead
+from app.schemas.participants import ParticipantCreate, ParticipantHistoryItem, ParticipantPromoteRequest, ParticipantRead
 
 
 def _to_read(row: Participant) -> ParticipantRead:
@@ -75,6 +75,37 @@ class ParticipantService:
             )
             for record in records
         ]
+
+    def promote_record_to_participant(self, db: Session, record: RuntimeRecord, payload: ParticipantPromoteRequest) -> ParticipantRead:
+        """Base abierta -> base cerrada (ver docs/99): convierte explicitamente
+        un registro sin participante enlazado en un participante real, sea
+        enlazandolo a uno existente o creando uno nuevo. Siempre una decision
+        humana -- el auto-enlace en `runtime_record_service` nunca crea
+        participantes por si solo.
+        """
+        if record.participant_id:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este registro ya esta enlazado a un participante")
+
+        if payload.participant_id:
+            participant = db.query(Participant).filter(
+                Participant.id == payload.participant_id,
+                Participant.project_id == record.project_id,
+            ).first()
+            if participant is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="El participante indicado no existe en este proyecto")
+            participant_read = _to_read(participant)
+        else:
+            participant_read = self.create_participant(db, ParticipantCreate(
+                project_id=record.project_id,
+                full_name=payload.full_name,
+                document_id=payload.document_id,
+                external_code=payload.external_code,
+                participant_type=payload.participant_type,
+            ))
+
+        record.participant_id = participant_read.id
+        db.commit()
+        return participant_read
 
 
 participant_service = ParticipantService()

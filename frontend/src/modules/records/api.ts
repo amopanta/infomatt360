@@ -1,5 +1,5 @@
 export type RecordValue = { id: string; field_name: string; field_value_json: string };
-export type RuntimeRecord = { id: string; template_id: string; status: string; submitted_by?: string | null; approval_flow_id?: string | null; approval_flow_version?: string | null; lock_version: number; created_at: string; updated_at: string; values: RecordValue[] };
+export type RuntimeRecord = { id: string; template_id: string; status: string; submitted_by?: string | null; approval_flow_id?: string | null; approval_flow_version?: string | null; participant_id?: string | null; lock_version: number; created_at: string; updated_at: string; values: RecordValue[] };
 export type RuntimeRecordPage = { items: RuntimeRecord[]; total: number; limit: number; offset: number };
 export type TemplateSummary = { id: string; name: string; description?: string | null; status: string };
 export type ReviewAction = { id: string; project_id: string; record_id: string; from_status?: string | null; to_status: string; action: string; notes?: string | null; rejected_field_name?: string | null; user_id: string; approval_flow_id?: string | null; approval_flow_version?: number | null; created_at?: string | null };
@@ -85,14 +85,35 @@ export async function fetchRecord(recordId: string): Promise<RuntimeRecord> {
   return response.json();
 }
 
-export async function searchTemplateRecords(params: { templateId: string; search?: string; status?: string; limit?: number; offset?: number }): Promise<RuntimeRecordPage> {
+export async function searchTemplateRecords(params: { templateId: string; search?: string; status?: string; limit?: number; offset?: number; unlinkedOnly?: boolean }): Promise<RuntimeRecordPage> {
   const query = new URLSearchParams();
   if (params.search) query.set('search', params.search);
   if (params.status) query.set('status', params.status);
+  if (params.unlinkedOnly) query.set('unlinked_only', 'true');
   query.set('limit', String(params.limit ?? 25));
   query.set('offset', String(params.offset ?? 0));
   const response = await fetch(`${API_BASE_URL}/runtime/template/${params.templateId}/records/search?${query.toString()}`, { headers: headers() });
   if (!response.ok) throw new Error('No fue posible consultar los registros.');
+  return response.json();
+}
+
+/** Base abierta -> base cerrada (ver docs/99): enlaza o crea un participante a partir de un registro sin enlace previo. */
+export async function promoteRecordToParticipant(payload: { recordId: string; participantId?: string; fullName?: string; documentId?: string; externalCode?: string }): Promise<{ id: string; full_name: string }> {
+  const response = await fetch(`${API_BASE_URL}/participants/promote`, {
+    method: 'POST',
+    headers: jsonHeaders(),
+    body: JSON.stringify({
+      record_id: payload.recordId,
+      participant_id: payload.participantId || null,
+      full_name: payload.fullName || null,
+      document_id: payload.documentId || null,
+      external_code: payload.externalCode || null,
+    }),
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(body?.detail || 'No fue posible promover el registro a participante.');
+  }
   return response.json();
 }
 

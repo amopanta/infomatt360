@@ -275,14 +275,16 @@ def search_runtime_records(
     template_id: str,
     search: str | None = Query(default=None, max_length=120),
     status_filter: str | None = Query(default=None, alias="status", max_length=30),
+    unlinked_only: bool = Query(default=False),
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> RuntimeRecordPage:
-    """Consulta registros Runtime con busqueda, filtro de estado y paginacion."""
+    """Consulta registros Runtime con busqueda, filtro de estado, paginacion y
+    filtro de "sin participante enlazado" (candidatos a promover, ver docs/99)."""
     require_template_access(db, current_user.id, template_id)
-    return runtime_record_service.search_template_records(db, template_id, search=search, status=status_filter, limit=limit, offset=offset)
+    return runtime_record_service.search_template_records(db, template_id, search=search, status=status_filter, limit=limit, offset=offset, unlinked_only=unlinked_only)
 
 
 @router.get("/template/{template_id}/records/export.csv")

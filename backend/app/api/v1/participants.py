@@ -2,9 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.permissions import require_any_project_permission
+from app.core.permissions import RECORDS_APPROVE, RECORDS_REVIEW
 from app.db.session import get_db
 from app.models.identity import User
-from app.schemas.participants import ParticipantCreate, ParticipantHistoryItem, ParticipantRead
+from app.models.runtime_record import RuntimeRecord
+from app.schemas.participants import ParticipantCreate, ParticipantHistoryItem, ParticipantPromoteRequest, ParticipantRead
 from app.services.assignment_service import assignment_service
 from app.services.participant_service import participant_service
 
@@ -46,3 +49,12 @@ def get_participant(participant_id: str, db: Session = Depends(get_db), current_
 def get_participant_history(participant_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[ParticipantHistoryItem]:
     _require_participant(db, current_user, participant_id)
     return participant_service.get_participant_history(db, participant_id)
+
+
+@router.post("/promote", response_model=ParticipantRead, summary="Base abierta -> base cerrada: enlaza o crea un participante a partir de un registro (ver docs/99)")
+def promote_record_to_participant(payload: ParticipantPromoteRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ParticipantRead:
+    record = db.query(RuntimeRecord).filter(RuntimeRecord.id == payload.record_id).first()
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado")
+    require_any_project_permission(db, current_user.id, record.project_id, {RECORDS_REVIEW, RECORDS_APPROVE})
+    return participant_service.promote_record_to_participant(db, record, payload)

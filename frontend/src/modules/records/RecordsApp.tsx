@@ -2,13 +2,15 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
-import { applyReviewAction, correctRecordField, downloadTemplateRecords, fetchProjectTemplates, fetchRecord, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, searchTemplateRecords } from './api';
+import { applyReviewAction, correctRecordField, downloadTemplateRecords, fetchProjectTemplates, fetchRecord, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, promoteRecordToParticipant, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
 import { fetchRuntimeRecordChildren, fetchRuntimeTemplate, saveRuntimeChildRecord } from '../runtime/api';
 import type { RuntimeRecordSummary } from '../runtime/api';
 import { RuntimeField } from '../runtime/RuntimeField';
 import { parseFieldConfig } from '../runtime/fieldConfig';
 import type { RuntimeComponent, RuntimeFormValues, RuntimeTemplate } from '../runtime/types';
+import { fetchProjectParticipants } from '../participants/api';
+import type { Participant } from '../participants/api';
 
 const REJECTION_STATUSES = new Set(['rejected', 'returned']);
 
@@ -419,6 +421,87 @@ function LinkedSubformSection({ projectId, record, onMessage }: { projectId: str
   );
 }
 
+/** Base abierta -> base cerrada (ver docs/99): un registro sin
+ * `participant_id` viene de captura sin certeza previa de quien es la
+ * persona. Aqui un revisor decide, explicitamente, enlazarlo a un
+ * participante ya existente o crear uno nuevo -- nunca ocurre solo. */
+function PromoteToParticipantPanel({
+  projectId,
+  record,
+  onPromoted,
+  onMessage,
+}: {
+  projectId: string;
+  record: RuntimeRecord;
+  onPromoted: (record: RuntimeRecord) => void;
+  onMessage: (value: string) => void;
+}) {
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [mode, setMode] = useState<'link' | 'create'>('link');
+  const [selectedParticipantId, setSelectedParticipantId] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [documentId, setDocumentId] = useState('');
+  const [externalCode, setExternalCode] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetchProjectParticipants(projectId).then(setParticipants).catch(() => setParticipants([]));
+  }, [projectId]);
+
+  if (record.participant_id) return null;
+
+  async function submit() {
+    setSaving(true);
+    try {
+      await promoteRecordToParticipant({
+        recordId: record.id,
+        participantId: mode === 'link' ? selectedParticipantId : undefined,
+        fullName: mode === 'create' ? fullName.trim() : undefined,
+        documentId: mode === 'create' ? documentId.trim() || undefined : undefined,
+        externalCode: mode === 'create' ? externalCode.trim() || undefined : undefined,
+      });
+      onPromoted(await fetchRecord(record.id));
+      onMessage('Registro promovido a la base cerrada de participantes.');
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : 'No fue posible promover el registro.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const canSubmit = mode === 'link' ? Boolean(selectedParticipantId) : Boolean(fullName.trim());
+
+  return (
+    <section className="participant-promote-panel">
+      <h3>Base abierta: sin participante enlazado</h3>
+      <p>Este registro todavía no está asociado a ningún participante de la base cerrada. Enlázalo a uno existente o crea uno nuevo para consolidar la información.</p>
+      <div className="participant-promote-mode">
+        <label><input type="radio" checked={mode === 'link'} onChange={() => setMode('link')} /> Enlazar participante existente</label>
+        <label><input type="radio" checked={mode === 'create'} onChange={() => setMode('create')} /> Crear participante nuevo</label>
+      </div>
+      {mode === 'link' ? (
+        <label>Participante
+          <select value={selectedParticipantId} onChange={(event) => setSelectedParticipantId(event.target.value)}>
+            <option value="">Selecciona un participante</option>
+            {participants.map((participant) => (
+              <option key={participant.id} value={participant.id}>{participant.full_name}{participant.document_id ? ` (${participant.document_id})` : ''}</option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <div className="participant-promote-fields">
+          <label>Nombre completo<input value={fullName} onChange={(event) => setFullName(event.target.value)} /></label>
+          <label>Documento<input value={documentId} onChange={(event) => setDocumentId(event.target.value)} /></label>
+          <label>Código externo<input value={externalCode} onChange={(event) => setExternalCode(event.target.value)} /></label>
+        </div>
+      )}
+      <button type="button" className="primary" disabled={saving || !canSubmit} onClick={() => void submit()}>
+        {saving ? 'Guardando…' : 'Promover a participante'}
+      </button>
+    </section>
+  );
+}
+
 function DeepLinkedRecordCard({
   projectId,
   record,
@@ -457,6 +540,7 @@ function DeepLinkedRecordCard({
           </div>
         ))}
       </dl>
+      <PromoteToParticipantPanel projectId={projectId} record={record} onPromoted={onRecordUpdated} onMessage={onMessage} />
       <LinkedSubformSection projectId={projectId} record={record} onMessage={onMessage} />
       <ReviewPanel projectId={projectId} record={record} onMessage={onMessage} />
     </section>
@@ -468,6 +552,7 @@ function RecordTable({ templateId }: { templateId: string }) {
   const [records, setRecords] = useState<RuntimeRecord[]>([]);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
+  const [unlinkedOnly, setUnlinkedOnly] = useState(false);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -489,7 +574,7 @@ function RecordTable({ templateId }: { templateId: string }) {
   useEffect(() => {
     let active = true;
     setMessage('Cargando registros...');
-    searchTemplateRecords({ templateId, search: query.trim(), status, limit: PAGE_SIZE, offset })
+    searchTemplateRecords({ templateId, search: query.trim(), status, unlinkedOnly, limit: PAGE_SIZE, offset })
       .then((page) => {
         if (!active) return;
         setRecords(page.items);
@@ -500,7 +585,11 @@ function RecordTable({ templateId }: { templateId: string }) {
     return () => {
       active = false;
     };
-  }, [templateId, query, status, offset]);
+  }, [templateId, query, status, unlinkedOnly, offset]);
+
+  function updateRecordInList(updated: RuntimeRecord) {
+    setRecords((current) => current.map((record) => record.id === updated.id ? updated : record));
+  }
 
   const fields = useMemo(() => Array.from(new Set(records.flatMap((record) => record.values.map((value) => value.field_name)))).slice(0, 5), [records]);
   const pageStart = total ? offset + 1 : 0;
@@ -540,6 +629,10 @@ function RecordTable({ templateId }: { templateId: string }) {
               <option value="cancelled">Cancelado</option>
               <option value="archived">Archivado</option>
             </select>
+            <label className="records-unlinked-filter">
+              <input type="checkbox" checked={unlinkedOnly} onChange={(event) => { setUnlinkedOnly(event.target.checked); setOffset(0); }} />
+              Sin participante enlazado
+            </label>
             <button onClick={() => void exportCsv()}>Exportar CSV</button>
           </div>
         </div>
@@ -579,6 +672,7 @@ function RecordTable({ templateId }: { templateId: string }) {
                             </div>
                           ))}
                         </dl>
+                        <PromoteToParticipantPanel projectId={projectId} record={record} onPromoted={updateRecordInList} onMessage={setMessage} />
                         <LinkedSubformSection projectId={projectId} record={record} onMessage={setMessage} />
                         <ReviewPanel projectId={projectId} record={record} onMessage={setMessage} />
                       </td>

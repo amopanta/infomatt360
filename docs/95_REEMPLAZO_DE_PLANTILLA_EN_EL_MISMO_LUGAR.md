@@ -49,3 +49,14 @@ Cada reemplazo deja una fila `BuilderVersion` con `status="archived"` y el `sche
 ## Pruebas
 
 `backend/tests/test_template_replace.py` (5 pruebas): reemplazo mantiene el `template_id`, respalda la estructura anterior en `BuilderVersion`, un `RuntimeRecord` capturado antes del reemplazo sobrevive intacto, se rechaza un `replace_template_id` de otro proyecto o inexistente (404), y el flujo funciona también para el formato SurveyMonkey (no solo XLSForm).
+
+## Comparación validada contra el comportamiento real de KoboToolbox
+
+A petición del usuario, se revisó la documentación oficial de KoboToolbox y su foro de la comunidad (no el código fuente, que no es de lectura pública fácil) para confirmar que este diseño replica su lógica de redeploy:
+
+- **Mismo activo, no una tabla nueva**: KoboToolbox redespliega actualizando el mismo proyecto/formulario, nunca creando un activo nuevo — igual que aquí (mismo `template_id`).
+- **La identidad del dato es el nombre de columna, no la plantilla completa**: la documentación de Kobo confirma que cambiar la *etiqueta* de una pregunta no rompe el dato ya capturado (los envíos previos simplemente muestran la etiqueta actualizada), pero cambiar el *nombre de columna/valor XML* sí crea una columna nueva. Es exactamente el mismo principio que aquí: los valores se guardan por `field_name` (nombre técnico), no por la plantilla como bloque completo.
+- **Diferencia real, a favor de este diseño**: la documentación de Kobo advierte que quitar una pregunta y luego editar un envío antiguo puede hacer que "se pierdan datos capturados previamente". Aquí eso no ocurre — `RuntimeRecordValue` nunca se borra al reemplazar la plantilla; un campo eliminado deja sus valores históricos huérfanos (sin componente visual asociado) pero **nunca los borra**, y siguen siendo consultables (por ejemplo, en la exportación CSV por `field_name`).
+- **Version history**: Kobo mantiene una lista de versiones desplegadas con fecha/hora, pero su único mecanismo de "restaurar" documentado es clonar manualmente una versión antigua en un formulario nuevo — no hay revertido automático en el mismo activo. Es la misma limitación que se documentó arriba en "Cómo deshacer": aquí también falta un endpoint de un clic, pero el respaldo (`BuilderVersion.schema_json`) ya guarda el árbol completo, lo cual da una base más sólida para construirlo que tener que ubicar manualmente una fecha de despliegue.
+
+Fuentes consultadas: [Deploying forms for data collection — KoboToolbox documentation](https://support.kobotoolbox.org/deploy_form_new_project.html), [Restore previous version if I haven't deployed version 2 — KoboToolbox Community Forum](https://community.kobotoolbox.org/t/restore-previous-version-if-i-havent-deployed-version-2/76130).

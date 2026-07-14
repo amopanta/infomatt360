@@ -765,9 +765,14 @@ class RuntimeRecordService:
         rows = db.query(RuntimeRecord).filter(RuntimeRecord.template_id == template_id).order_by(RuntimeRecord.created_at.desc()).all()
         return [record_to_read(db, row) for row in rows]
 
-    def search_template_records(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, limit: int = 25, offset: int = 0) -> RuntimeRecordPage:
-        """Consulta paginada de registros Runtime con filtros seguros para uso operativo."""
-        query = self._filtered_records_query(db, template_id, search, status)
+    def search_template_records(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, limit: int = 25, offset: int = 0, unlinked_only: bool = False) -> RuntimeRecordPage:
+        """Consulta paginada de registros Runtime con filtros seguros para uso operativo.
+
+        `unlinked_only` filtra a los registros de "base abierta" que todavia
+        no se enlazaron a ningun participante (ver docs/99) -- son los
+        candidatos a promover a la base cerrada.
+        """
+        query = self._filtered_records_query(db, template_id, search, status, unlinked_only)
         total = query.count()
         rows = query.order_by(RuntimeRecord.created_at.desc()).offset(offset).limit(limit).all()
         return RuntimeRecordPage(items=[record_to_read(db, row) for row in rows], total=total, limit=limit, offset=offset)
@@ -812,10 +817,12 @@ class RuntimeRecordService:
     def _safe_csv_cell(self, value: str) -> str:
         return f"'{value}" if value.startswith(("=", "+", "-", "@", "\t", "\r")) else value
 
-    def _filtered_records_query(self, db: Session, template_id: str, search: str | None = None, status: str | None = None):
+    def _filtered_records_query(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, unlinked_only: bool = False):
         query = db.query(RuntimeRecord).filter(RuntimeRecord.template_id == template_id)
         if status:
             query = query.filter(RuntimeRecord.status == status)
+        if unlinked_only:
+            query = query.filter(RuntimeRecord.participant_id.is_(None))
         normalized_search = search.strip() if search else ""
         if normalized_search:
             needle = f"%{normalized_search}%"

@@ -549,6 +549,19 @@ body { margin: 0; }
 .record-linked-subform-card header button { border: 0; border-radius: 8px; padding: 8px 12px; color: #ffffff; background: #0066cc; font-weight: 800; cursor: pointer; }
 .record-linked-subform-form { display: grid; gap: 10px; margin-top: 12px; padding-top: 12px; border-top: 1px solid #dce7f2; }
 
+.records-unlinked-filter { display: flex; align-items: center; gap: 6px; color: #536878; font-weight: 700; white-space: nowrap; }
+.records-unlinked-filter input { width: auto; }
+.participant-promote-panel { margin: 16px 0; padding: 14px; border: 2px dashed #f59e0b; border-radius: 14px; background: #fffbeb; }
+.participant-promote-panel h3 { margin: 0 0 6px; color: #92400e; }
+.participant-promote-panel p { margin: 0 0 12px; color: #536878; }
+.participant-promote-mode { display: flex; gap: 18px; margin-bottom: 12px; font-weight: 700; }
+.participant-promote-mode label { display: flex; align-items: center; gap: 6px; }
+.participant-promote-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.participant-promote-panel label { display: flex; flex-direction: column; gap: 6px; }
+.participant-promote-panel select, .participant-promote-panel input:not([type="radio"]) { padding: 9px; border: 1px solid #cfd8e3; border-radius: 9px; font: inherit; }
+.participant-promote-panel button { border: 0; border-radius: 9px; padding: 10px 16px; color: #ffffff; background: #0066cc; font-weight: 800; cursor: pointer; }
+.participant-promote-panel button:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .erp-shell { max-width: 1180px; margin: 28px auto; padding: 0 24px; }
 .erp-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
 .erp-tabs button { border: 1px solid #dce7f2; border-radius: 10px; padding: 10px 16px; background: #ffffff; font-weight: 800; color: #536878; cursor: pointer; }

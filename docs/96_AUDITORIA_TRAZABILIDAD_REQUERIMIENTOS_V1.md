@@ -37,7 +37,7 @@ El aislamiento fuerte "base independiente por proyecto o schema-per-project" (§
 
 De más a menos crítico si el objetivo es acercarse al "eje central del participante" y al "peaje de calidad" que describe el documento maestro:
 
-1. **#13 (participante como eje central)** — hoy es la brecha más estructural: el motor de captura real ni siquiera enlaza `RuntimeRecord` a un participante.
+1. ~~**#13 (participante como eje central)**~~ — **resuelto**, ver [docs/98](98_PARTICIPANTE_COMO_EJE_CENTRAL.md). `RuntimeRecord` ahora enlaza a `Participant` (explícito o por coincidencia de `DOCUMENT_ID`), con historial unificado entre plantillas/canales expuesto en `/participants`.
 2. **#14 (estados anulado/sincronizado)** — cambio pequeño y de bajo riesgo.
 3. **#12 (jerarquía de roles nacional/proyecto/auditor)** — afecta gobernanza pero es aditivo, no rompe nada existente.
 4. **#1 (Base Espejo real)** — el más grande y más caro de construir bien (soporta múltiples motores externos).

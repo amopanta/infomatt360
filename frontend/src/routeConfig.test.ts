@@ -4,6 +4,8 @@ import { resolveAppRoute } from './routeConfig';
 describe('resolveAppRoute', () => {
   it('mapea rutas funcionales principales', () => {
     expect(resolveAppRoute('/').key).toBe('dashboard');
+    expect(resolveAppRoute('/participants').key).toBe('participants');
+    expect(resolveAppRoute('/participants/participant-1').key).toBe('participants');
     expect(resolveAppRoute('/records').key).toBe('records');
     expect(resolveAppRoute('/records/template-1').key).toBe('records');
     expect(resolveAppRoute('/reports').key).toBe('reports');

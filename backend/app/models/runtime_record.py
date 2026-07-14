@@ -41,6 +41,13 @@ class RuntimeRecord(Base):
     # embebido en el JSON del padre (a diferencia de REPEAT).
     parent_record_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     parent_field_name: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    # Participante como eje central (ver docs/98): permite ver, desde un
+    # unico participante, todos los formularios capturados sobre el sin
+    # importar el canal (web, movil, carga masiva, API). Se completa de
+    # forma explicita (payload) o por coincidencia automatica de un campo
+    # DOCUMENT_ID contra Participant.document_id -- ver
+    # runtime_record_service._match_participant.
+    participant_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     approval_flow_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     approval_flow_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
     approval_flow_snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)

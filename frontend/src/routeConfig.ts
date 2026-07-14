@@ -17,6 +17,7 @@ export type AppRouteKey =
   | 'xlsform'
   | 'adminUsers'
   | 'accountSecurity'
+  | 'participants'
   | 'records'
   | 'reports'
   | 'maps'
@@ -57,6 +58,7 @@ export function resolveAppRoute(pathname: string): AppRoute {
   if (pathname.startsWith('/admin/xlsform')) return { key: 'xlsform', permissions: ['builder.write'] };
   if (pathname.startsWith('/admin/users')) return { key: 'adminUsers', permissions: ['identity.users.manage'] };
   if (pathname.startsWith('/account/security')) return { key: 'accountSecurity' };
+  if (pathname.startsWith('/participants')) return { key: 'participants' };
   if (pathname.startsWith('/records')) return { key: 'records' };
   if (pathname.startsWith('/reports')) return { key: 'reports' };
   if (pathname.startsWith('/maps')) return { key: 'maps' };

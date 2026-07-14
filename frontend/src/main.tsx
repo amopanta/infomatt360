@@ -26,6 +26,7 @@ import { AppShell } from './components/AppShell';
 import { DashboardApp } from './modules/dashboard/DashboardApp';
 import { MapsApp } from './modules/maps/MapsApp';
 import { MessagesApp } from './modules/messages/MessagesApp';
+import { ParticipantsApp } from './modules/participants/ParticipantsApp';
 import { RecordsApp } from './modules/records/RecordsApp';
 import { ReportsApp } from './modules/reports/ReportsApp';
 import { RuntimeApp } from './modules/runtime/RuntimeApp';
@@ -100,6 +101,7 @@ function renderRoute(route: AppRoute) {
       case 'xlsform': return <XlsformApp />;
       case 'adminUsers': return <AdminUserSecurityApp />;
       case 'accountSecurity': return <AccountSecurityApp />;
+      case 'participants': return <ParticipantsApp />;
       case 'records': return <RecordsApp />;
       case 'reports': return <ReportsApp />;
       case 'maps': return <MapsApp />;

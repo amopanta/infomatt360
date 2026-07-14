@@ -22,6 +22,7 @@ from app.core.time import utc_now
 from app.models.builder import BuilderComponent
 from app.models.files import FileAsset
 from app.models.bulk_import import BulkImportJob
+from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
 from app.schemas.runtime_record import RuntimeBulkJobDetail, RuntimeBulkJobRead, RuntimeBulkJobSummary, RuntimeBulkSaveItemResult, RuntimeBulkSaveRequest, RuntimeBulkSaveResponse, RuntimeRecordCreate, RuntimeRecordFieldCorrection, RuntimeRecordPage, RuntimeRecordRead, RuntimeValueCreate, RuntimeValueRead
 from app.services.ai_audit_service import ai_audit_service
@@ -58,6 +59,7 @@ def record_to_read(db: Session, row: RuntimeRecord) -> RuntimeRecordRead:
         ip_address=row.ip_address,
         parent_record_id=row.parent_record_id,
         parent_field_name=row.parent_field_name,
+        participant_id=row.participant_id,
         duplicate_flag=row.duplicate_flag,
         lock_version=row.lock_version,
         created_at=row.created_at,
@@ -97,6 +99,7 @@ class RuntimeRecordService:
                 raise ValueError("parent_field_name es obligatorio cuando se indica parent_record_id")
 
         self._assign_serial_numbers(db, payload.template_id, payload.values)
+        participant_id = self._resolve_participant(db, payload)
 
         approval_flow_id, approval_flow_version, approval_flow_snapshot_json = approval_flow_service.snapshot_for_record(db, payload.project_id, payload.template_id)
         content_hash = _compute_content_hash(payload.project_id, payload.template_id, payload.values)
@@ -120,6 +123,7 @@ class RuntimeRecordService:
             ip_address=payload.ip_address,
             parent_record_id=payload.parent_record_id,
             parent_field_name=payload.parent_field_name,
+            participant_id=participant_id,
             content_hash=content_hash,
             duplicate_flag="possible" if has_recent_match else "none",
         )
@@ -161,6 +165,52 @@ class RuntimeRecordService:
             logger.warning("La auditoria semantica del registro %s fallo de forma inesperada", record.id, exc_info=True)
 
         return record_to_read(db, record)
+
+    def _resolve_participant(self, db: Session, payload: RuntimeRecordCreate) -> str | None:
+        """Enlaza el registro a un `Participant` -- el eje central del sistema (ver docs/98).
+
+        Si el cliente ya indico `participant_id`, solo se valida que exista y
+        pertenezca al mismo proyecto. Si no, se intenta un enlace automatico:
+        se busca en la plantilla un componente DOCUMENT_ID, se toma el valor
+        capturado para ese campo, y se busca un `Participant` existente con
+        el mismo `document_id` en el proyecto. Nunca se crea un participante
+        nuevo aqui -- solo se enlaza a uno que ya exista, para no generar
+        participantes fantasma por errores de digitacion.
+        """
+        if payload.participant_id:
+            participant = db.query(Participant).filter(Participant.id == payload.participant_id).first()
+            if participant is None:
+                raise ValueError("El participante indicado no existe")
+            if participant.project_id != payload.project_id:
+                raise ValueError("El participante pertenece a otro proyecto")
+            return participant.id
+
+        document_fields = {
+            component.name
+            for component in db.query(BuilderComponent).filter(
+                BuilderComponent.template_id == payload.template_id,
+                BuilderComponent.component_type == "DOCUMENT_ID",
+            ).all()
+        }
+        if not document_fields:
+            return None
+
+        for item in payload.values:
+            if item.field_name not in document_fields:
+                continue
+            try:
+                document_value = json.loads(item.field_value_json)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if not isinstance(document_value, str) or not document_value.strip():
+                continue
+            participant = db.query(Participant).filter(
+                Participant.project_id == payload.project_id,
+                Participant.document_id == document_value.strip(),
+            ).first()
+            if participant is not None:
+                return participant.id
+        return None
 
     def _assign_serial_numbers(self, db: Session, template_id: str, values: list[RuntimeValueCreate]) -> None:
         """Asigna un consecutivo entero a cada campo SERIAL_NUMBER vacio.

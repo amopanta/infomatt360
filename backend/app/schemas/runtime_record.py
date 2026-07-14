@@ -43,6 +43,10 @@ class RuntimeRecordCreate(BaseModel):
     # de un campo LINKED_SUBFORM de otro registro ya existente.
     parent_record_id: str | None = None
     parent_field_name: str | None = None
+    # Participante como eje central (ver docs/98). Si no se envia, el
+    # backend intenta enlazar automaticamente por coincidencia de un campo
+    # DOCUMENT_ID contra un Participant existente del mismo proyecto.
+    participant_id: str | None = None
     values: list[RuntimeValueCreate] = Field(default_factory=list)
 
     @model_validator(mode="after")
@@ -165,6 +169,7 @@ class RuntimeRecordRead(BaseModel):
     ip_address: str | None = None
     parent_record_id: str | None = None
     parent_field_name: str | None = None
+    participant_id: str | None = None
     duplicate_flag: str = "none"
     lock_version: int = 1
     created_at: datetime

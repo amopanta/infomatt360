@@ -1,8 +1,10 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.models.builder import BuilderTemplate
 from app.models.participants import Participant
-from app.schemas.participants import ParticipantCreate, ParticipantRead
+from app.models.runtime_record import RuntimeRecord
+from app.schemas.participants import ParticipantCreate, ParticipantHistoryItem, ParticipantRead
 
 
 def _to_read(row: Participant) -> ParticipantRead:
@@ -41,9 +43,38 @@ class ParticipantService:
         rows = db.query(Participant).filter(Participant.project_id == project_id).order_by(Participant.created_at.desc()).all()
         return [_to_read(row) for row in rows]
 
-    def get_participant(self, db: Session, participant_id: str) -> ParticipantRead | None:
-        row = db.query(Participant).filter(Participant.id == participant_id).first()
+    def get_participant(self, db: Session, participant_id: str, project_id: str | None = None) -> ParticipantRead | None:
+        query = db.query(Participant).filter(Participant.id == participant_id)
+        if project_id:
+            query = query.filter(Participant.project_id == project_id)
+        row = query.first()
         return _to_read(row) if row else None
+
+    def get_participant_history(self, db: Session, participant_id: str) -> list[ParticipantHistoryItem]:
+        """Historial unificado del participante: el eje central de InfoMatt360 (ver docs/98).
+
+        Recorre `RuntimeRecord.participant_id` (enlazado explicitamente o por
+        coincidencia de documento en `runtime_record_service.save_record`) sin
+        importar de que plantilla o canal vino cada captura.
+        """
+        records = db.query(RuntimeRecord).filter(RuntimeRecord.participant_id == participant_id).order_by(RuntimeRecord.created_at.desc()).all()
+        template_ids = {record.template_id for record in records}
+        template_names = {
+            template.id: template.name
+            for template in db.query(BuilderTemplate).filter(BuilderTemplate.id.in_(template_ids)).all()
+        } if template_ids else {}
+        return [
+            ParticipantHistoryItem(
+                record_id=record.id,
+                template_id=record.template_id,
+                template_name=template_names.get(record.template_id, "Formulario eliminado"),
+                status=record.status,
+                created_at=record.created_at,
+                updated_at=record.updated_at,
+                submitted_by=record.submitted_by,
+            )
+            for record in records
+        ]
 
 
 participant_service = ParticipantService()

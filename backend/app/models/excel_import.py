@@ -4,7 +4,8 @@ Flujo: upload_and_preview (status=uploaded) -> confirm_mapping (status=mapped)
 -> approve_and_import (status=completed/failed). Distinto del bulk sync de
 `bulk_import.py`, que es para sincronizar registros de formulario ya
 estructurados via API/dispositivo; este modulo importa filas crudas de un
-archivo .xlsx para participantes o usuarios.
+archivo .xlsx para participantes, usuarios, asignaciones o registros
+historicos de un formulario (ver docs/104).
 """
 
 from datetime import datetime
@@ -27,6 +28,9 @@ class ExcelImportJob(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
     project_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     entity_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    # Solo se usa cuando entity_type="records": la plantilla cuyos campos
+    # definen el mapeo dinamico de columnas (ver docs/104).
+    template_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     source_filename: Mapped[str] = mapped_column(String(250), nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="uploaded", nullable=False)
     column_mapping_json: Mapped[str | None] = mapped_column(Text, nullable=True)

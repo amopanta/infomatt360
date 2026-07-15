@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
+import { fetchProjectTemplates } from '../records/api';
+import type { TemplateSummary } from '../records/api';
 import { approveExcelImport, confirmExcelImportMapping, fetchExcelImportJobs, uploadExcelImport } from './excelImportApi';
-import type { ExcelImportJob } from './excelImportApi';
+import type { ExcelImportJob, ExcelImportTargetField } from './excelImportApi';
 
 const TARGET_FIELDS: Record<string, string[]> = {
   participants: ['document_id', 'full_name', 'external_code', 'participant_type'],
@@ -25,6 +27,8 @@ function statusClass(status: string) {
 export function ExcelImportApp() {
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [entityType, setEntityType] = useState('participants');
+  const [templates, setTemplates] = useState<TemplateSummary[]>([]);
+  const [templateId, setTemplateId] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [currentJob, setCurrentJob] = useState<ExcelImportJob | null>(null);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
@@ -42,11 +46,22 @@ export function ExcelImportApp() {
 
   useEffect(() => { void loadJobs(); }, [projectId]);
 
+  useEffect(() => {
+    if (entityType !== 'records' || !projectId) return;
+    fetchProjectTemplates(projectId)
+      .then(setTemplates)
+      .catch((error: Error) => setMessage(error.message));
+  }, [entityType, projectId]);
+
   async function submitUpload() {
     if (!file) return;
+    if (entityType === 'records' && !templateId) {
+      setMessage('Selecciona la plantilla del formulario antes de subir el archivo.');
+      return;
+    }
     setBusy(true);
     try {
-      const job = await uploadExcelImport({ projectId, entityType, file });
+      const job = await uploadExcelImport({ projectId, entityType, templateId: entityType === 'records' ? templateId : undefined, file });
       setCurrentJob(job);
       setColumnMapping(job.column_mapping ?? {});
       setMessage(`Archivo subido: ${job.total_rows} fila(s) detectada(s).`);
@@ -89,7 +104,8 @@ export function ExcelImportApp() {
     }
   }
 
-  const targetFields = TARGET_FIELDS[entityType] ?? [];
+  const dynamicTargetFields: ExcelImportTargetField[] | null = currentJob?.target_fields ?? null;
+  const targetFieldOptions: ExcelImportTargetField[] = dynamicTargetFields ?? (TARGET_FIELDS[entityType] ?? []).map((name) => ({ name, label: name }));
 
   return (
     <AppShell title="Carga masiva desde Excel">
@@ -100,18 +116,28 @@ export function ExcelImportApp() {
           <header>
             <div>
               <h2>1. Subir archivo</h2>
-              <p>Excel con columnas a mapear hacia participantes, usuarios o asignaciones usuario-proyecto-rol (ver docs/76, docs/103).</p>
+              <p>Excel con columnas a mapear hacia participantes, usuarios, asignaciones usuario-proyecto-rol o registros historicos de un formulario (ver docs/76, docs/103, docs/104).</p>
             </div>
           </header>
           <div className="ai-analyze-inline">
             <label>
               Tipo de entidad
-              <select value={entityType} onChange={(event) => setEntityType(event.target.value)}>
+              <select value={entityType} onChange={(event) => { setEntityType(event.target.value); setTemplateId(''); }}>
                 <option value="participants">Participantes</option>
                 <option value="users">Usuarios</option>
                 <option value="assignments">Asignaciones (usuario-proyecto-rol)</option>
+                <option value="records">Registros historicos de un formulario</option>
               </select>
             </label>
+            {entityType === 'records' ? (
+              <label>
+                Plantilla del formulario
+                <select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
+                  <option value="">Selecciona una plantilla</option>
+                  {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+                </select>
+              </label>
+            ) : null}
             <label>
               Archivo (.xlsx)
               <input type="file" accept=".xlsx" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
@@ -147,7 +173,7 @@ export function ExcelImportApp() {
                           onChange={(event) => setColumnMapping((previous) => ({ ...previous, [header]: event.target.value }))}
                         >
                           <option value="">(ignorar)</option>
-                          {targetFields.map((field) => <option key={field} value={field}>{field}</option>)}
+                          {targetFieldOptions.map((field) => <option key={field.name} value={field.name}>{field.label}</option>)}
                         </select>
                       </td>
                       {currentJob.preview!.sample_rows.slice(0, 2).map((row, index) => (

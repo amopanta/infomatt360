@@ -3,14 +3,24 @@ export type ExcelImportPreview = {
   sample_rows: Record<string, unknown>[];
 };
 
+export type ExcelImportTargetField = {
+  name: string;
+  label: string;
+};
+
 export type ExcelImportJob = {
   id: string;
   project_id: string;
   entity_type: string;
+  template_id?: string | null;
   source_filename: string;
   status: string;
   column_mapping?: Record<string, string> | null;
   preview?: ExcelImportPreview | null;
+  // Solo viene poblado para entity_type="records" -- los campos de la
+  // plantilla elegida (ya filtrados a tipos escalares simples) mas los dos
+  // campos reservados de metadatos (ver docs/104).
+  target_fields?: ExcelImportTargetField[] | null;
   total_rows: number;
   imported_rows: number;
   failed_rows: number;
@@ -39,10 +49,11 @@ async function parseOrThrow<T>(response: Response, fallbackMessage: string): Pro
   return response.json();
 }
 
-export async function uploadExcelImport(payload: { projectId: string; entityType: string; file: File }): Promise<ExcelImportJob> {
+export async function uploadExcelImport(payload: { projectId: string; entityType: string; templateId?: string; file: File }): Promise<ExcelImportJob> {
   const formData = new FormData();
   formData.append('project_id', payload.projectId);
   formData.append('entity_type', payload.entityType);
+  if (payload.templateId) formData.append('template_id', payload.templateId);
   formData.append('upload', payload.file);
   const response = await fetch(`${API_BASE_URL}/excel-import/upload`, { method: 'POST', headers: authHeaders(), body: formData });
   return parseOrThrow(response, 'No fue posible subir el archivo.');

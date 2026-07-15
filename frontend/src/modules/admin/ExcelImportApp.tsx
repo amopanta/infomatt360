@@ -8,6 +8,7 @@ import type { ExcelImportJob } from './excelImportApi';
 const TARGET_FIELDS: Record<string, string[]> = {
   participants: ['document_id', 'full_name', 'external_code', 'participant_type'],
   users: ['document_id', 'full_name', 'email', 'phone'],
+  assignments: ['email', 'role_name', 'status'],
 };
 
 function statusLabel(status: string) {
@@ -99,7 +100,7 @@ export function ExcelImportApp() {
           <header>
             <div>
               <h2>1. Subir archivo</h2>
-              <p>Excel con columnas a mapear hacia participantes o usuarios (ver docs/76).</p>
+              <p>Excel con columnas a mapear hacia participantes, usuarios o asignaciones usuario-proyecto-rol (ver docs/76, docs/103).</p>
             </div>
           </header>
           <div className="ai-analyze-inline">
@@ -108,6 +109,7 @@ export function ExcelImportApp() {
               <select value={entityType} onChange={(event) => setEntityType(event.target.value)}>
                 <option value="participants">Participantes</option>
                 <option value="users">Usuarios</option>
+                <option value="assignments">Asignaciones (usuario-proyecto-rol)</option>
               </select>
             </label>
             <label>

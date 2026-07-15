@@ -2,8 +2,9 @@
 
 No reutiliza el worker de `bulk_import.py` (ese es para sincronizar
 respuestas de formulario ya estructuradas via API/dispositivo). Este motor
-importa filas crudas de un archivo .xlsx hacia participantes o usuarios,
-validando y dejando reporte de errores antes de decidir importar.
+importa filas crudas de un archivo .xlsx hacia participantes, usuarios o
+asignaciones usuario-proyecto-rol (ver docs/103), validando y dejando
+reporte de errores antes de decidir importar.
 """
 
 import json
@@ -11,13 +12,17 @@ from io import BytesIO
 
 from fastapi import HTTPException, status
 from openpyxl import load_workbook
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.time import utc_now
 from app.models.excel_import import ExcelImportJob
+from app.models.identity import Role
+from app.schemas.assignment import AssignmentCreate
 from app.schemas.excel_import import ExcelImportJobRead
 from app.schemas.identity import UserCreate
 from app.schemas.participants import ParticipantCreate
+from app.services.assignment_service import assignment_service
 from app.services.identity_service import identity_service
 from app.services.participant_service import participant_service
 
@@ -45,14 +50,27 @@ ENTITY_ALIASES: dict[str, dict[str, str]] = {
         "telefono": "phone",
         "celular": "phone",
     },
+    "assignments": {
+        "correo": "email",
+        "email": "email",
+        "correo electronico": "email",
+        "usuario": "email",
+        "rol": "role_name",
+        "nombre del rol": "role_name",
+        "role": "role_name",
+        "estado": "status",
+        "status": "status",
+    },
 }
 
 PARTICIPANT_TARGET_FIELDS = {"document_id", "full_name", "external_code", "participant_type"}
 USER_TARGET_FIELDS = {"document_id", "full_name", "email", "phone"}
+ASSIGNMENT_TARGET_FIELDS = {"email", "role_name", "status"}
 
 REQUIRED_FIELDS = {
     "participants": {"full_name"},
     "users": {"full_name", "document_id", "email"},
+    "assignments": {"email", "role_name"},
 }
 
 
@@ -129,7 +147,12 @@ class ExcelImportService:
         mapping = json.loads(row.column_mapping_json) if row.column_mapping_json else {}
         data_rows = json.loads(row.rows_json) if row.rows_json else []
         required = REQUIRED_FIELDS.get(row.entity_type, set())
-        target_fields = PARTICIPANT_TARGET_FIELDS if row.entity_type == "participants" else USER_TARGET_FIELDS
+        if row.entity_type == "participants":
+            target_fields = PARTICIPANT_TARGET_FIELDS
+        elif row.entity_type == "assignments":
+            target_fields = ASSIGNMENT_TARGET_FIELDS
+        else:
+            target_fields = USER_TARGET_FIELDS
 
         errors: list[dict[str, object]] = []
         imported = 0
@@ -143,6 +166,8 @@ class ExcelImportService:
             try:
                 if row.entity_type == "participants":
                     participant_service.create_participant(db, ParticipantCreate(project_id=row.project_id, **mapped))
+                elif row.entity_type == "assignments":
+                    self._import_assignment_row(db, row.project_id, mapped)
                 else:
                     identity_service.create_user(db, UserCreate(**mapped))
                 imported += 1
@@ -163,6 +188,33 @@ class ExcelImportService:
         db.commit()
         db.refresh(row)
         return _to_read(row)
+
+    def _import_assignment_row(self, db: Session, project_id: str, mapped: dict[str, str | None]) -> None:
+        """Asigna un usuario ya existente a `project_id` con el rol indicado.
+
+        A diferencia de entity_type="users" (que crea usuarios nuevos), esto
+        asume que el usuario y el rol ya existen -- carga masiva de
+        asignaciones, no de identidades (ver docs/103). No hay deduplicacion:
+        si la fila se importa dos veces, o el usuario ya tenia una asignacion
+        activa en el proyecto, queda una fila UserProjectAssignment mas --
+        mismo comportamiento que crear una asignacion individual hoy.
+        """
+        email = mapped["email"]
+        user = identity_service.get_user_by_email(db, email)
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No existe un usuario con el correo '{email}'")
+
+        role_name = mapped["role_name"]
+        role = db.query(Role).filter(func.lower(Role.name) == role_name.strip().lower()).first()
+        if role is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No existe un rol llamado '{role_name}'")
+
+        assignment_service.create_assignment(db, AssignmentCreate(
+            user_id=user.id,
+            project_id=project_id,
+            role_id=role.id,
+            status=mapped.get("status") or "active",
+        ))
 
     def get_job(self, db: Session, job_id: str) -> ExcelImportJobRead | None:
         row = db.query(ExcelImportJob).filter(ExcelImportJob.id == job_id).first()

@@ -36,12 +36,14 @@ def setup_client():
         basic_role = Role(id="excel-basic-role", name="Basico", permissions="records.read")
         admin = User(id="excel-admin", full_name="Admin", document_id="excel-admin-doc", email="excel-admin@example.com", password_hash=hash_password("Admin12345!"))
         basic = User(id="excel-basic", full_name="Basic", document_id="excel-basic-doc", email="excel-basic@example.com", password_hash=hash_password("Basic12345!"))
+        newmember = User(id="excel-newmember", full_name="Nuevo Miembro", document_id="excel-newmember-doc", email="excel-newmember@example.com", password_hash=hash_password("Newmember12345!"))
         db.add_all([
             project,
             admin_role,
             basic_role,
             admin,
             basic,
+            newmember,
             UserProjectAssignment(user_id=admin.id, project_id=project.id, role_id=admin_role.id, status="active"),
             UserProjectAssignment(user_id=basic.id, project_id=project.id, role_id=basic_role.id, status="active"),
         ])
@@ -121,6 +123,57 @@ def test_excel_import_full_flow_with_auto_mapping_and_duplicate_report():
 
             second_approve = client.post(f"/api/v1/excel-import/{job_id}/approve", headers=admin_headers)
             assert second_approve.status_code == 409
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_excel_import_assignments_creates_project_role_assignment_and_reports_lookup_failures():
+    """Carga masiva de asignaciones usuario-proyecto-rol (ver docs/103) --
+    cierra el hallazgo #2 de la auditoria de trazabilidad (docs/96)."""
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            admin_headers = auth(client, "excel-admin@example.com", "Admin12345!")
+
+            content = _build_xlsx(
+                ["Correo", "Rol"],
+                [
+                    ["excel-newmember@example.com", "Basico"],
+                    ["no-existe@example.com", "Basico"],
+                    ["excel-basic@example.com", "Rol Fantasma"],
+                ],
+            )
+
+            uploaded = client.post(
+                "/api/v1/excel-import/upload",
+                headers=admin_headers,
+                data={"project_id": "excel-project", "entity_type": "assignments"},
+                files={"upload": ("asignaciones.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+            )
+            assert uploaded.status_code == 200
+            job = uploaded.json()
+            assert job["column_mapping"] == {"Correo": "email", "Rol": "role_name"}
+            job_id = job["id"]
+
+            client.patch(f"/api/v1/excel-import/{job_id}/mapping", headers=admin_headers, json={"column_mapping": job["column_mapping"]})
+            approved = client.post(f"/api/v1/excel-import/{job_id}/approve", headers=admin_headers)
+            assert approved.status_code == 200
+            result = approved.json()
+            assert result["imported_rows"] == 1
+            assert result["failed_rows"] == 2
+            errors = " ".join(item["error"].lower() for item in result["error_report"])
+            assert "no existe un usuario" in errors
+            assert "no existe un rol" in errors
+
+            with sessions() as db:
+                new_assignment = db.query(UserProjectAssignment).filter(
+                    UserProjectAssignment.user_id == "excel-newmember",
+                    UserProjectAssignment.project_id == "excel-project",
+                ).first()
+                assert new_assignment is not None
+                assert new_assignment.role_id == "excel-basic-role"
+                assert new_assignment.status == "active"
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

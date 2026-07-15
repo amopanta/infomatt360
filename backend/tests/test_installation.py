@@ -8,6 +8,7 @@ from app.core.config import settings
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
+from app.models.identity import Role
 
 
 def setup_client():
@@ -96,6 +97,15 @@ def test_bootstrap_creates_admin_stack_and_is_idempotent_when_enforced():
 
             status_after = client.get("/api/v1/install/status")
             assert status_after.json() == {"installed": True, "installer_enforced": True}
+
+            # El rol predefinido de solo lectura (ver docs/101) debe existir
+            # desde el arranque de toda organizacion nueva, junto al
+            # "Administrador" con todos los permisos.
+            with sessions() as db:
+                auditor_role = db.query(Role).filter(Role.name == "Auditor/Consulta").first()
+                assert auditor_role is not None
+                auditor_permissions = {item.strip() for item in auditor_role.permissions.split(",") if item.strip()}
+                assert auditor_permissions == {"projects.read", "records.read", "gis.read", "messages.read", "reports.export"}
 
             duplicate = client.post("/api/v1/install/bootstrap", json=BOOTSTRAP_PAYLOAD)
             assert duplicate.status_code == 409

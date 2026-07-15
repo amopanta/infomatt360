@@ -29,6 +29,7 @@ from app.api.v1.install import router as install_router
 from app.api.v1.integrations import router as integrations_router
 from app.api.v1.messages import router as messages_router
 from app.api.v1.mirror import router as mirror_router
+from app.api.v1.organization_assignments import router as organization_assignments_router
 from app.api.v1.organizations import router as organizations_router
 from app.api.v1.participants import router as participants_router
 from app.api.v1.project_context import router as project_context_router
@@ -58,6 +59,7 @@ api_v1_router.include_router(identity_router, prefix="/identity", tags=["identit
 api_v1_router.include_router(organizations_router, prefix="/organizations", tags=["organizations"])
 api_v1_router.include_router(backups_router, prefix="/backups", tags=["backups"])
 api_v1_router.include_router(assignments_router, prefix="/assignments", tags=["assignments"])
+api_v1_router.include_router(organization_assignments_router, prefix="/organization-assignments", tags=["organization-assignments"])
 api_v1_router.include_router(enrollment_router, prefix="/enrollment", tags=["enrollment"])
 api_v1_router.include_router(emergency_access_router, prefix="/emergency-access", tags=["emergency-access"])
 api_v1_router.include_router(support_router, prefix="/support", tags=["support"])

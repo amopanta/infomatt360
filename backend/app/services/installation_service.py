@@ -5,7 +5,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.permissions import ALL_PERMISSIONS
+from app.core.permissions import ALL_PERMISSIONS, GIS_READ, MESSAGES_READ, PROJECT_READ, RECORDS_READ, REPORTS_EXPORT
 from app.core.security import hash_password
 from app.core.time import utc_now
 from app.models.assignment import UserProjectAssignment
@@ -107,6 +107,14 @@ class InstallationService:
 
         admin_role = Role(name="Administrador", description="Rol inicial con todos los permisos del catalogo", permissions=",".join(sorted(ALL_PERMISSIONS)))
         db.add(admin_role)
+
+        # Rol predefinido de solo lectura (ver docs/101 -- jerarquia de
+        # roles §21 del Documento Maestro de Requerimientos): disponible
+        # desde el arranque de toda organizacion nueva, sin que un admin
+        # tenga que ensamblar la lista de permisos a mano.
+        auditor_permissions = {PROJECT_READ, RECORDS_READ, GIS_READ, MESSAGES_READ, REPORTS_EXPORT}
+        auditor_role = Role(name="Auditor/Consulta", description="Rol de solo lectura: ver proyectos, registros, mapas y mensajes, y exportar reportes.", permissions=",".join(sorted(auditor_permissions)))
+        db.add(auditor_role)
         db.flush()
 
         admin_user = User(

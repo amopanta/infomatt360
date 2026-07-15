@@ -49,8 +49,15 @@ def get_template_runtime(template_id: str, db: Session = Depends(get_db), curren
 
 @router.post("/save", response_model=RuntimeRecordRead)
 def save_runtime_record(payload: RuntimeRecordCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> RuntimeRecordRead:
-    """Guarda una respuesta capturada desde el formulario Runtime."""
+    """Guarda una respuesta capturada desde el formulario Runtime.
+
+    Exige records.write explicito (ver auditoria tecnica de julio 2026,
+    hallazgo S-001): antes solo se validaba acceso al proyecto
+    (user_has_project_access), asi que un usuario con un rol de solo
+    lectura tambien podia guardar registros.
+    """
     template = require_template_access(db, current_user.id, payload.template_id)
+    require_project_permission(db, current_user.id, payload.project_id, RECORDS_WRITE)
     if template.project_id != payload.project_id:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La plantilla no pertenece al proyecto indicado")
     try:

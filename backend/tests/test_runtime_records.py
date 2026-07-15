@@ -14,7 +14,7 @@ from app.db.session import get_db
 from app.main import app
 from app.models.assignment import UserProjectAssignment
 from app.models.builder import BuilderTemplate
-from app.models.identity import User
+from app.models.identity import Role, User
 from app.models.runtime_record import RuntimeRecord
 from app.schemas.runtime_record import RuntimeRecordCreate, RuntimeValueCreate
 from app.services.runtime_record_service import runtime_record_service
@@ -32,7 +32,8 @@ def runtime_context():
 
     with testing_session() as db:
         db.add(BuilderTemplate(id="template-runtime", project_id="project-runtime", name="Runtime Test"))
-        db.add(UserProjectAssignment(user_id="runtime-user", project_id="project-runtime", status="active"))
+        db.add(Role(id="runtime-role", name="Capturista", permissions="records.write,records.read"))
+        db.add(UserProjectAssignment(user_id="runtime-user", project_id="project-runtime", role_id="runtime-role", status="active"))
         db.commit()
 
     def override_get_db():

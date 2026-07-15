@@ -19,6 +19,7 @@ export function ApiKeysApp() {
   const [name, setName] = useState('');
   const [permissions, setPermissions] = useState('records.read');
   const [rateLimitProfile, setRateLimitProfile] = useState('standard');
+  const [expiresInDays, setExpiresInDays] = useState('');
   const [newKey, setNewKey] = useState('');
   const [message, setMessage] = useState('Cargando API keys...');
 
@@ -31,10 +32,13 @@ export function ApiKeysApp() {
   async function submit() {
     try {
       const selected = permissions.split(',').map((item) => item.trim()).filter(Boolean);
-      const created = await createApiKey({ projectId, name, permissions: selected, rateLimitProfile });
+      const days = Number(expiresInDays);
+      const expiresAt = expiresInDays.trim() && days > 0 ? new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString() : undefined;
+      const created = await createApiKey({ projectId, name, permissions: selected, rateLimitProfile, expiresAt });
       setItems((current) => [created, ...current]);
       setNewKey(created.api_key);
       setName('');
+      setExpiresInDays('');
       setMessage('API key creada. Copia el secreto ahora; no se volverá a mostrar.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No fue posible crear la API key.');
@@ -71,6 +75,10 @@ export function ApiKeysApp() {
               <option value="trusted_sync">Trusted sync - sincronización confiable sin límite estricto</option>
             </select>
           </label>
+          <label>
+            Expira en (días, opcional)
+            <input type="number" min="1" value={expiresInDays} onChange={(event) => setExpiresInDays(event.target.value)} placeholder="Sin expiración" />
+          </label>
           <div className="api-key-chips">
             {DEFAULT_PERMISSIONS.map((permission) => <button key={permission} onClick={() => setPermissions((current) => current.includes(permission) ? current : `${current ? `${current},` : ''}${permission}`)}>{permission}</button>)}
           </div>
@@ -87,7 +95,7 @@ export function ApiKeysApp() {
                 {item.status === 'active' ? <button onClick={() => void revoke(item.key_id)}>Revocar</button> : null}
               </header>
               <p>{item.permissions.join(', ') || 'Sin permisos asignados'}</p>
-              <small>Creada: {item.created_at ? new Date(item.created_at).toLocaleString() : '—'} · Último uso: {item.last_used_at ? new Date(item.last_used_at).toLocaleString() : 'Nunca'}</small>
+              <small>Creada: {item.created_at ? new Date(item.created_at).toLocaleString() : '—'} · Último uso: {item.last_used_at ? new Date(item.last_used_at).toLocaleString() : 'Nunca'} · Expira: {item.expires_at ? new Date(item.expires_at).toLocaleString() : 'Nunca'}</small>
             </article>
           )) : <p>No hay API keys creadas.</p>}
         </section>

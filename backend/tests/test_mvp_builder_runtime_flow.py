@@ -11,7 +11,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.assignment import UserProjectAssignment
-from app.models.identity import User
+from app.models.identity import Role, User
 
 
 @pytest.fixture(scope="module")
@@ -26,7 +26,8 @@ def mvp_context():
     active_user = User(id="mvp-user", full_name="MVP User", document_id="3000", email="mvp@example.com")
 
     with testing_session() as db:
-        db.add(UserProjectAssignment(user_id=active_user.id, project_id="project-mvp", status="active"))
+        db.add(Role(id="mvp-role", name="Capturista", permissions="records.write,records.read,builder.write"))
+        db.add(UserProjectAssignment(user_id=active_user.id, project_id="project-mvp", role_id="mvp-role", status="active"))
         db.commit()
 
     def override_get_db():

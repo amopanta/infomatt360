@@ -1,9 +1,12 @@
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 from starlette.testclient import TestClient
 
 from app.core.security import hash_password
+from app.core.time import utc_now
 from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
@@ -95,6 +98,61 @@ def test_api_key_lifecycle_and_x_api_key_authentication():
 
             rejected = client.get("/api/v1/api-keys/auth/check", headers={"X-API-Key": created_data["api_key"]})
             assert rejected.status_code == 401
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_api_key_expiration():
+    """Auditoria tecnica de julio 2026, hallazgo S-004: expiracion de API keys.
+
+    Los timestamps se envian conscientes de zona (con offset), igual que
+    `Date.toISOString()` en el frontend real (siempre termina en "Z") --
+    una version anterior de esta prueba uso `utc_now().isoformat()` (sin
+    zona) y por eso no detecto un TypeError real al comparar naive vs.
+    aware que solo aparecio probando en el navegador."""
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            admin_headers = auth(client, "api-admin@example.com", "Admin12345!")
+            now_aware = datetime.now(timezone.utc)
+
+            rejected_past = client.post(
+                "/api/v1/api-keys/", headers=admin_headers,
+                json={"project_id": "api-project", "name": "Fecha invalida", "permissions": ["records.read"], "expires_at": (now_aware - timedelta(days=1)).isoformat()},
+            )
+            assert rejected_past.status_code == 422
+
+            created = client.post(
+                "/api/v1/api-keys/", headers=admin_headers,
+                json={"project_id": "api-project", "name": "Con expiracion", "permissions": ["records.read"], "expires_at": (now_aware + timedelta(days=30)).isoformat()},
+            )
+            assert created.status_code == 200
+            created_data = created.json()
+            assert created_data["expires_at"] is not None
+            assert created_data["status"] == "active"
+
+            still_valid = client.get("/api/v1/api-keys/auth/check", headers={"X-API-Key": created_data["api_key"]})
+            assert still_valid.status_code == 200
+
+            # Simula que la clave ya vencio (sin necesidad de esperar 30 dias).
+            with sessions() as db:
+                row = db.query(ProjectApiKey).filter(ProjectApiKey.key_id == created_data["key_id"]).one()
+                row.expires_at = utc_now() - timedelta(minutes=1)
+                db.add(row)
+                db.commit()
+
+            expired_check = client.get("/api/v1/api-keys/auth/check", headers={"X-API-Key": created_data["api_key"]})
+            assert expired_check.status_code == 401
+
+            listed = client.get("/api/v1/api-keys/api-project", headers=admin_headers)
+            expired_item = next(item for item in listed.json() if item["key_id"] == created_data["key_id"])
+            # status en la base sigue "active" (nunca se reescribio), pero el
+            # status efectivo que ve el administrador es "expired".
+            assert expired_item["status"] == "expired"
+            with sessions() as db:
+                row = db.query(ProjectApiKey).filter(ProjectApiKey.key_id == created_data["key_id"]).one()
+                assert row.status == "active"
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

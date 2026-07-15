@@ -27,3 +27,7 @@ class ProjectApiKey(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Ver auditoria tecnica de julio 2026, hallazgo S-004: opcional -- una
+    # clave sin expiracion (None) se comporta igual que antes de este
+    # cambio, para no romper integraciones ya emitidas.
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

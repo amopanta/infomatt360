@@ -12,7 +12,7 @@ from app.db.session import get_db
 from app.main import app
 from app.models.assignment import UserProjectAssignment
 from app.models.builder import BuilderComponent, BuilderTemplate
-from app.models.identity import User
+from app.models.identity import Role, User
 
 
 @pytest.fixture(scope="module")
@@ -34,8 +34,9 @@ def linked_context():
             template_id="linked-parent-template", component_type="SERIAL_NUMBER",
             name="consecutivo", label="Consecutivo",
         ))
-        db.add(UserProjectAssignment(user_id="linked-user", project_id="linked-project", status="active"))
-        db.add(UserProjectAssignment(user_id="linked-user", project_id="other-project", status="active"))
+        db.add(Role(id="linked-role", name="Capturista", permissions="records.write,records.read"))
+        db.add(UserProjectAssignment(user_id="linked-user", project_id="linked-project", role_id="linked-role", status="active"))
+        db.add(UserProjectAssignment(user_id="linked-user", project_id="other-project", role_id="linked-role", status="active"))
         db.commit()
 
     def override_get_db():

@@ -1,6 +1,8 @@
 import secrets
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
+from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -10,10 +12,29 @@ from app.models.api_key import ProjectApiKey
 from app.schemas.api_key import ApiKeyCreate, ApiKeyCreateResponse, ApiKeyRead
 
 
+def _to_naive_utc(value: datetime | None) -> datetime | None:
+    """Normaliza a UTC sin zona, igual que utc_now() (columnas SQLAlchemy
+    DateTime existentes). El frontend envia expires_at con sufijo "Z"
+    (datetime consciente de zona); compararlo directo contra utc_now() sin
+    normalizar lanza TypeError (naive vs. aware)."""
+    if value is None or value.tzinfo is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+
 @dataclass(frozen=True)
 class ParsedApiKey:
     key_id: str
     secret: str
+
+
+# Ver auditoria tecnica de julio 2026, hallazgo S-003: antes de esto,
+# authenticate() escribia y confirmaba (commit) en cada solicitud exitosa,
+# sin excepcion. Bajo alto volumen (integraciones bulk, dispositivos de
+# campo) eso presiona I/O sin necesidad real -- last_used_at es solo
+# informativo, no interviene en la revocacion (que usa status/revoked_at),
+# asi que una precision de un minuto es mas que suficiente.
+LAST_USED_AT_WRITE_INTERVAL_SECONDS = 60
 
 
 def _permissions_to_text(permissions: list[str]) -> str:
@@ -25,6 +46,12 @@ def _permissions_from_text(value: str) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _effective_status(row: ProjectApiKey) -> str:
+    if row.status == "active" and row.expires_at is not None and row.expires_at <= utc_now():
+        return "expired"
+    return row.status
+
+
 def to_read(row: ProjectApiKey) -> ApiKeyRead:
     return ApiKeyRead(
         id=row.id,
@@ -33,11 +60,12 @@ def to_read(row: ProjectApiKey) -> ApiKeyRead:
         key_id=row.key_id,
         permissions=_permissions_from_text(row.permissions),
         rate_limit_profile=row.rate_limit_profile,
-        status=row.status,
+        status=_effective_status(row),
         created_by=row.created_by,
         created_at=row.created_at,
         last_used_at=row.last_used_at,
         revoked_at=row.revoked_at,
+        expires_at=row.expires_at,
     )
 
 
@@ -45,6 +73,9 @@ class ApiKeyService:
     prefix = "im360"
 
     def create_key(self, db: Session, payload: ApiKeyCreate, created_by: str) -> ApiKeyCreateResponse:
+        expires_at = _to_naive_utc(payload.expires_at)
+        if expires_at is not None and expires_at <= utc_now():
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="expires_at debe ser una fecha futura")
         key_id = secrets.token_urlsafe(12).replace("-", "").replace("_", "")[:16]
         secret = secrets.token_urlsafe(32)
         api_key = f"{self.prefix}_{key_id}_{secret}"
@@ -55,6 +86,7 @@ class ApiKeyService:
             secret_hash=hash_api_key_secret(secret),
             permissions=_permissions_to_text(payload.permissions),
             rate_limit_profile=payload.rate_limit_profile,
+            expires_at=expires_at,
             created_by=created_by,
             status="active",
         )
@@ -92,13 +124,17 @@ class ApiKeyService:
         row = db.query(ProjectApiKey).filter(ProjectApiKey.key_id == parsed.key_id, ProjectApiKey.status == "active").first()
         if not row or not verify_api_key_secret(parsed.secret, row.secret_hash):
             return None
+        now = utc_now()
+        if row.expires_at is not None and row.expires_at <= now:
+            return None
         permissions = set(_permissions_from_text(row.permissions))
         if required_permission and required_permission not in permissions:
             return None
-        row.last_used_at = utc_now()
-        db.add(row)
-        db.commit()
-        db.refresh(row)
+        if row.last_used_at is None or (now - row.last_used_at).total_seconds() >= LAST_USED_AT_WRITE_INTERVAL_SECONDS:
+            row.last_used_at = now
+            db.add(row)
+            db.commit()
+            db.refresh(row)
         return row
 
     def rate_limit_profile_for_key(self, db: Session, raw_key: str) -> str | None:

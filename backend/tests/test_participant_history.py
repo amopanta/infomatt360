@@ -16,7 +16,7 @@ from app.db.session import get_db
 from app.main import app
 from app.models.assignment import UserProjectAssignment
 from app.models.builder import BuilderComponent, BuilderTemplate
-from app.models.identity import Project, User
+from app.models.identity import Project, Role, User
 from app.models.participants import Participant
 
 
@@ -35,9 +35,10 @@ def setup_client():
         participant = Participant(id="history-participant", project_id=project.id, document_id="CC-777", full_name="Carlos Perez")
         other_participant = Participant(id="history-other-participant", project_id=other_project.id, document_id="CC-999", full_name="Otro proyecto")
 
+        role = Role(id="history-role", name="Gestor", permissions="records.write,records.read")
         db.add_all([
-            project, other_project, user, template_a, template_b, participant, other_participant,
-            UserProjectAssignment(user_id=user.id, project_id=project.id, status="active"),
+            project, other_project, user, template_a, template_b, participant, other_participant, role,
+            UserProjectAssignment(user_id=user.id, project_id=project.id, role_id=role.id, status="active"),
             BuilderComponent(template_id=template_a.id, component_type="DOCUMENT_ID", name="documento", label="Documento", sort_order=0),
         ])
         db.commit()

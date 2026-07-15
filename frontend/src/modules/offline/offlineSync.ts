@@ -31,12 +31,37 @@ export async function getPendingCount(): Promise<number> {
   return indexedDbQueue.countPending();
 }
 
+function groupByTemplate(records: indexedDbQueue.QueuedRecord[]): Map<string, indexedDbQueue.QueuedRecord[]> {
+  const groups = new Map<string, indexedDbQueue.QueuedRecord[]>();
+  for (const record of records) {
+    const key = `${record.projectId}::${record.templateId}`;
+    const group = groups.get(key);
+    if (group) group.push(record);
+    else groups.set(key, [record]);
+  }
+  return groups;
+}
+
+/** Clave de idempotencia del lote: hash estable del conjunto de ids locales
+ * que lo componen. Si la respuesta se pierde en la red despues de que el
+ * servidor ya creo los registros, reintentar con el mismo conjunto de ids
+ * reutiliza la respuesta cacheada (BulkImportJob) en vez de duplicar. */
+async function hashIds(ids: string[]): Promise<string> {
+  const sorted = [...ids].sort();
+  const data = new TextEncoder().encode(sorted.join(','));
+  const digest = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+type BulkSaveResult = { index: number; id?: string; status: string; error?: string };
+type BulkSaveResponse = { results: BulkSaveResult[] };
+
 /**
- * Igual que `desktop/src/offlineQueue.js:syncPending`: usa
- * `POST /runtime/save` (sesion normal de usuario), no
- * `POST /runtime/bulk/save` (ese exige API key para integraciones externas
- * y devuelve 401 con una sesion de usuario normal -- ya se probo con el
- * backend real en la verificacion de escritorio).
+ * Sincroniza la cola pendiente agrupada por (proyecto, plantilla) contra
+ * `POST /runtime/session/bulk-save` -- un lote por grupo en vez de una
+ * solicitud HTTP por registro (ver auditoria tecnica de julio 2026,
+ * hallazgo SYNC-001, y docs/106). Distinto de `POST /runtime/bulk/save`
+ * (ese exige API key para integraciones externas, no sesion de usuario).
  */
 export async function syncNow(credentials: { apiBaseUrl: string; accessToken: string }): Promise<OfflineSyncResult> {
   if (isDesktopApp()) {
@@ -48,28 +73,47 @@ export async function syncNow(credentials: { apiBaseUrl: string; accessToken: st
   const pending = await indexedDbQueue.listPending();
   const result: OfflineSyncResult = { attempted: pending.length, synced: 0, failed: 0 };
 
-  for (const record of pending) {
+  for (const group of groupByTemplate(pending).values()) {
+    const [{ projectId, templateId }] = group;
+    const idempotencyKey = await hashIds(group.map((record) => record.id));
     try {
-      const response = await fetch(`${credentials.apiBaseUrl}/runtime/save`, {
+      const response = await fetch(`${credentials.apiBaseUrl}/runtime/session/bulk-save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${credentials.accessToken}` },
         body: JSON.stringify({
-          project_id: record.projectId,
-          template_id: record.templateId,
-          status: 'submitted',
-          values: record.values,
+          project_id: projectId,
+          template_id: templateId,
+          idempotency_key: idempotencyKey,
+          records: group.map((record) => ({
+            project_id: record.projectId,
+            template_id: record.templateId,
+            status: 'submitted',
+            values: record.values,
+          })),
         }),
       });
       if (!response.ok) {
-        await indexedDbQueue.markFailed(record.id, `HTTP ${response.status}: ${await response.text()}`);
-        result.failed += 1;
+        const detail = await response.text();
+        for (const record of group) await indexedDbQueue.markFailed(record.id, `HTTP ${response.status}: ${detail}`);
+        result.failed += group.length;
         continue;
       }
-      await indexedDbQueue.markSynced(record.id);
-      result.synced += 1;
+      const data = (await response.json()) as BulkSaveResponse;
+      for (const item of data.results) {
+        const record = group[item.index];
+        if (!record) continue;
+        if (item.status === 'created') {
+          await indexedDbQueue.markSynced(record.id);
+          result.synced += 1;
+        } else {
+          await indexedDbQueue.markFailed(record.id, item.error ?? 'Error desconocido al sincronizar');
+          result.failed += 1;
+        }
+      }
     } catch (error) {
-      await indexedDbQueue.markFailed(record.id, error instanceof Error ? error.message : String(error));
-      result.failed += 1;
+      const message = error instanceof Error ? error.message : String(error);
+      for (const record of group) await indexedDbQueue.markFailed(record.id, message);
+      result.failed += group.length;
     }
   }
   notifyQueueChanged();

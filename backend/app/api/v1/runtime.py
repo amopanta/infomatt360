@@ -74,6 +74,33 @@ def save_runtime_record(payload: RuntimeRecordCreate, db: Session = Depends(get_
         raise HTTPException(status_code=code, detail=detail) from exc
 
 
+@router.post("/session/bulk-save", response_model=RuntimeBulkSaveResponse)
+def save_runtime_records_bulk_session(
+    payload: RuntimeBulkSaveRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> RuntimeBulkSaveResponse:
+    """Guarda registros por lotes con sesion de usuario normal.
+
+    Distinto de /bulk/save (API key, integraciones externas): este es para
+    el cliente offline (PWA/escritorio) sincronizando su cola local (ver
+    auditoria tecnica de julio 2026, hallazgo SYNC-001 -- antes sincronizaba
+    un registro por solicitud HTTP, secuencial). Reutiliza el mismo motor
+    save_records_bulk (idempotencia, hasta 10000 registros por lote, mismo
+    peaje de validacion por item que /save) en vez de reimplementarlo.
+    """
+    template = db.query(BuilderTemplate).filter(BuilderTemplate.id == payload.template_id).first()
+    if template is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plantilla no encontrada")
+    require_project_permission(db, current_user.id, payload.project_id, RECORDS_WRITE)
+    if template.project_id != payload.project_id:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La plantilla no pertenece al proyecto indicado")
+    try:
+        return runtime_record_service.save_records_bulk(db, payload, current_user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
 @router.post("/bulk/save", response_model=RuntimeBulkSaveResponse)
 def save_runtime_records_bulk(
     payload: RuntimeBulkSaveRequest,

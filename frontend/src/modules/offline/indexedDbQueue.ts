@@ -8,7 +8,12 @@
 
 const DB_NAME = 'infomatt360-offline-queue';
 const STORE_NAME = 'queued_records';
-const DB_VERSION = 1;
+// v2 agrega indices por status/createdAt (ver auditoria tecnica de julio
+// 2026, hallazgo SYNC-004): listPending() antes hacia getAll() + filtraba
+// en JS, un full scan a partir de cierto volumen de cola.
+const DB_VERSION = 2;
+const STATUS_INDEX = 'status';
+const CREATED_AT_INDEX = 'createdAt';
 
 export type QueuedValue = { field_name: string; field_value_json: string };
 
@@ -28,9 +33,11 @@ function openDb(): Promise<IDBDatabase> {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME, { keyPath: 'id' });
-      }
+      const store = db.objectStoreNames.contains(STORE_NAME)
+        ? request.transaction!.objectStore(STORE_NAME)
+        : db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      if (!store.indexNames.contains(STATUS_INDEX)) store.createIndex(STATUS_INDEX, 'status');
+      if (!store.indexNames.contains(CREATED_AT_INDEX)) store.createIndex(CREATED_AT_INDEX, 'createdAt');
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error);
@@ -70,8 +77,7 @@ export async function enqueue(record: { projectId: string; templateId: string; v
 }
 
 export async function listPending(): Promise<QueuedRecord[]> {
-  const all = await withStore<QueuedRecord[]>('readonly', (store) => store.getAll());
-  return all.filter((row) => row.status === 'pending');
+  return withStore<QueuedRecord[]>('readonly', (store) => store.index(STATUS_INDEX).getAll('pending'));
 }
 
 export async function countPending(): Promise<number> {

@@ -16,26 +16,79 @@ test("enqueue guarda un registro pendiente y countPending lo refleja", async () 
   assert.equal(listPending(queue)[0].id, id);
 });
 
-test("syncPending marca como sincronizado cuando el backend responde exitoso", async () => {
+test("syncPending agrupa la cola en un solo lote a /runtime/session/bulk-save", async () => {
   const queue = await initQueue(":memory:");
   enqueue(queue, { projectId: "p1", templateId: "t1", values: sampleValues("Ana") });
+  enqueue(queue, { projectId: "p1", templateId: "t1", values: sampleValues("Beatriz") });
 
   const calls = [];
   const fetchImpl = async (url, options) => {
     calls.push({ url, body: JSON.parse(options.body) });
-    return { ok: true, json: async () => ({ id: "srv-1", status: "submitted" }) };
+    return {
+      ok: true,
+      json: async () => ({
+        results: [
+          { index: 0, id: "srv-1", status: "created" },
+          { index: 1, id: "srv-2", status: "created" },
+        ],
+      }),
+    };
   };
 
   const result = await syncPending(queue, { apiBaseUrl: "http://api.test/api/v1", accessToken: "tok-123", fetchImpl });
 
-  assert.deepEqual(result, { attempted: 1, synced: 1, failed: 0 });
+  assert.deepEqual(result, { attempted: 2, synced: 2, failed: 0 });
   assert.equal(countPending(queue), 0);
-  assert.equal(calls[0].url, "http://api.test/api/v1/runtime/save");
-  assert.equal(calls[0].body.status, "submitted");
-  assert.equal(calls[0].body.values[0].field_name, "nombre");
+  assert.equal(calls.length, 1); // un solo request, no dos
+  assert.equal(calls[0].url, "http://api.test/api/v1/runtime/session/bulk-save");
+  assert.equal(calls[0].body.project_id, "p1");
+  assert.equal(calls[0].body.template_id, "t1");
+  assert.equal(calls[0].body.records.length, 2);
+  assert.match(calls[0].body.idempotency_key, /^[0-9a-f]{64}$/);
+  assert.equal(calls[0].body.records[0].values[0].field_name, "nombre");
 });
 
-test("syncPending deja el registro pendiente y guarda el error si el backend falla", async () => {
+test("syncPending agrupa por plantilla: dos plantillas distintas generan dos lotes separados", async () => {
+  const queue = await initQueue(":memory:");
+  enqueue(queue, { projectId: "p1", templateId: "t1", values: sampleValues("Ana") });
+  enqueue(queue, { projectId: "p1", templateId: "t2", values: sampleValues("Beatriz") });
+
+  const calls = [];
+  const fetchImpl = async (_url, options) => {
+    calls.push({ body: JSON.parse(options.body) });
+    return { ok: true, json: async () => ({ results: [{ index: 0, status: "created" }] }) };
+  };
+
+  const result = await syncPending(queue, { apiBaseUrl: "http://api.test/api/v1", accessToken: "tok-123", fetchImpl });
+
+  assert.deepEqual(result, { attempted: 2, synced: 2, failed: 0 });
+  assert.equal(calls.length, 2);
+  assert.deepEqual(new Set(calls.map((call) => call.body.template_id)), new Set(["t1", "t2"]));
+});
+
+test("syncPending deja pendiente solo el registro que el servidor reporta como fallido dentro del lote", async () => {
+  const queue = await initQueue(":memory:");
+  enqueue(queue, { projectId: "p1", templateId: "t1", values: sampleValues("Ana") });
+  enqueue(queue, { projectId: "p1", templateId: "t1", values: sampleValues("Beatriz") });
+
+  const fetchImpl = async () => ({
+    ok: true,
+    json: async () => ({
+      results: [
+        { index: 0, id: "srv-1", status: "created" },
+        { index: 1, status: "failed", error: "contenido invalido" },
+      ],
+    }),
+  });
+
+  const result = await syncPending(queue, { apiBaseUrl: "http://api.test/api/v1", accessToken: "tok-123", fetchImpl });
+
+  assert.deepEqual(result, { attempted: 2, synced: 1, failed: 1 });
+  assert.equal(countPending(queue), 1);
+  assert.match(listPending(queue)[0].error, /contenido invalido/);
+});
+
+test("syncPending deja todo el lote pendiente y guarda el error si el backend falla", async () => {
   const queue = await initQueue(":memory:");
   const id = enqueue(queue, { projectId: "p1", templateId: "t1", values: sampleValues("Ana") });
 
@@ -56,7 +109,7 @@ test("syncPending no reintenta registros ya sincronizados (idempotencia local)",
   let callCount = 0;
   const fetchImpl = async () => {
     callCount += 1;
-    return { ok: true, json: async () => ({ id: "srv-1", status: "submitted" }) };
+    return { ok: true, json: async () => ({ results: [{ index: 0, status: "created" }] }) };
   };
 
   await syncPending(queue, { apiBaseUrl: "http://api.test/api/v1", accessToken: "tok-123", fetchImpl });

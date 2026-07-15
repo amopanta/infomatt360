@@ -111,3 +111,26 @@ export async function markFailed(id: string, error: string): Promise<void> {
     record.error = error.slice(0, 2000);
   });
 }
+
+/** Borra los registros ya sincronizados hace mas de `retentionDays` (ver
+ * auditoria tecnica de julio 2026, hallazgo SYNC-005) -- sin esto la cola
+ * local crece indefinidamente. Nunca toca los `pending`. */
+export async function purgeOldSynced(retentionDays: number): Promise<number> {
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+  const db = await openDb();
+  try {
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    const synced = await requestToPromise<QueuedRecord[]>(store.index(STATUS_INDEX).getAll('synced'));
+    let purged = 0;
+    for (const record of synced) {
+      if (record.syncedAt && record.syncedAt < cutoff) {
+        await requestToPromise(store.delete(record.id));
+        purged += 1;
+      }
+    }
+    return purged;
+  } finally {
+    db.close();
+  }
+}

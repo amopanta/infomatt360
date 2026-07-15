@@ -2,7 +2,7 @@
 
 const path = require("node:path");
 const { app, BrowserWindow, ipcMain } = require("electron");
-const { initQueue, close, enqueue, countPending, syncPending } = require("./offlineQueue");
+const { initQueue, close, enqueue, countPending, syncPending, purgeOldSynced } = require("./offlineQueue");
 const { startStaticServer } = require("./staticServer");
 
 let queueDb = null;
@@ -49,6 +49,10 @@ function registerIpcHandlers() {
 
   ipcMain.handle("desktop:sync-now", async (_event, { apiBaseUrl, accessToken }) => {
     return syncPending(queueDb, { apiBaseUrl, accessToken });
+  });
+
+  ipcMain.handle("desktop:purge-old-synced", (_event, retentionDays) => {
+    return purgeOldSynced(queueDb, retentionDays);
   });
 }
 

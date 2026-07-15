@@ -12,6 +12,12 @@ import * as indexedDbQueue from './indexedDbQueue';
 
 export type OfflineSyncResult = { attempted: number; synced: number; failed: number };
 
+/** Ver auditoria tecnica de julio 2026, hallazgo SYNC-005: ventana de
+ * retencion de registros ya sincronizados en la cola local, acordada con
+ * el usuario (coincide con el minimo que ya recomienda docs/63 para
+ * backups, como referencia de una semana razonable). */
+export const DEFAULT_RETENTION_DAYS = 7;
+
 /** Se dispara cada vez que se encola o sincroniza un registro, para que
  * `OfflineSyncStatus` actualice el contador sin esperar su poll periodico. */
 export const OFFLINE_QUEUE_CHANGED_EVENT = 'infomatt360:offline-queue-changed';
@@ -29,6 +35,15 @@ export async function enqueueRecord(record: { projectId: string; templateId: str
 export async function getPendingCount(): Promise<number> {
   if (isDesktopApp()) return window.desktopBridge!.getPendingCount();
   return indexedDbQueue.countPending();
+}
+
+/** Borra los registros ya sincronizados hace mas de `retentionDays` de la
+ * cola local. Se llama automaticamente al final de `syncNow`, y tambien
+ * queda expuesta para un boton manual (ver docs/107). */
+export async function purgeOldSynced(retentionDays: number = DEFAULT_RETENTION_DAYS): Promise<number> {
+  const purged = isDesktopApp() ? await window.desktopBridge!.purgeOldSynced(retentionDays) : await indexedDbQueue.purgeOldSynced(retentionDays);
+  if (purged > 0) notifyQueueChanged();
+  return purged;
 }
 
 function groupByTemplate(records: indexedDbQueue.QueuedRecord[]): Map<string, indexedDbQueue.QueuedRecord[]> {
@@ -66,6 +81,7 @@ type BulkSaveResponse = { results: BulkSaveResult[] };
 export async function syncNow(credentials: { apiBaseUrl: string; accessToken: string }): Promise<OfflineSyncResult> {
   if (isDesktopApp()) {
     const result = await window.desktopBridge!.syncNow(credentials);
+    await purgeOldSynced();
     notifyQueueChanged();
     return result;
   }
@@ -116,6 +132,7 @@ export async function syncNow(credentials: { apiBaseUrl: string; accessToken: st
       result.failed += group.length;
     }
   }
+  await purgeOldSynced();
   notifyQueueChanged();
   return result;
 }

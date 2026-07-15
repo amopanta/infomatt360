@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { initQueue, enqueue, listPending, countPending, syncPending } = require("./offlineQueue");
+const { initQueue, enqueue, listPending, countPending, markSynced, purgeOldSynced, syncPending } = require("./offlineQueue");
 
 function sampleValues(text) {
   return [{ field_name: "nombre", field_value_json: JSON.stringify(text) }];
@@ -130,6 +130,33 @@ test("syncPending maneja un error de red (fetch rechaza) sin lanzar", async () =
 
   assert.deepEqual(result, { attempted: 1, synced: 0, failed: 1 });
   assert.match(listPending(queue)[0].error, /ECONNREFUSED/);
+});
+
+test("purgeOldSynced borra los sincronizados vencidos y conserva los recientes y los pendientes", async () => {
+  const queue = await initQueue(":memory:");
+  const oldId = enqueue(queue, { projectId: "p1", templateId: "t1", values: sampleValues("Antiguo") });
+  const recentId = enqueue(queue, { projectId: "p1", templateId: "t1", values: sampleValues("Reciente") });
+  const pendingId = enqueue(queue, { projectId: "p1", templateId: "t1", values: sampleValues("Pendiente") });
+
+  markSynced(queue, oldId);
+  markSynced(queue, recentId);
+  const tenDaysAgo = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+  const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+  queue.db.run("UPDATE queued_records SET synced_at = ? WHERE id = ?", [tenDaysAgo, oldId]);
+  queue.db.run("UPDATE queued_records SET synced_at = ? WHERE id = ?", [twoDaysAgo, recentId]);
+
+  const purged = purgeOldSynced(queue, 7);
+
+  assert.equal(purged, 1);
+  assert.equal(countPending(queue), 1);
+  assert.equal(listPending(queue)[0].id, pendingId);
+});
+
+test("purgeOldSynced no borra nada si ningun sincronizado supera la retencion", async () => {
+  const queue = await initQueue(":memory:");
+  const id = enqueue(queue, { projectId: "p1", templateId: "t1", values: sampleValues("Ana") });
+  markSynced(queue, id);
+  assert.equal(purgeOldSynced(queue, 7), 0);
 });
 
 test("initQueue persiste en disco y recupera los datos al reabrir", async () => {

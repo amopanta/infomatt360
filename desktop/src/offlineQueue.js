@@ -110,6 +110,17 @@ function markFailed(queue, id, error) {
   persist(queue);
 }
 
+/** Borra los registros ya sincronizados hace mas de `retentionDays` (ver
+ * auditoria tecnica de julio 2026, hallazgo SYNC-005) -- sin esto la cola
+ * local crece indefinidamente. Nunca toca los `pending`. */
+function purgeOldSynced(queue, retentionDays) {
+  const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+  queue.db.run("DELETE FROM queued_records WHERE status = 'synced' AND synced_at < ?", [cutoff]);
+  const purged = queue.db.getRowsModified();
+  persist(queue);
+  return purged;
+}
+
 function groupByTemplate(rows) {
   const groups = new Map();
   for (const row of rows) {
@@ -195,4 +206,4 @@ async function syncPending(queue, { apiBaseUrl, accessToken, fetchImpl = fetch }
   return result;
 }
 
-module.exports = { initQueue, close, enqueue, listPending, countPending, markSynced, markFailed, syncPending };
+module.exports = { initQueue, close, enqueue, listPending, countPending, markSynced, markFailed, purgeOldSynced, syncPending };

@@ -12,6 +12,7 @@ export type DesktopBridge = {
   enqueueRecord: (record: { projectId: string; templateId: string; values: DesktopRecordValue[] }) => Promise<string>;
   getPendingCount: () => Promise<number>;
   syncNow: (credentials: { apiBaseUrl: string; accessToken: string }) => Promise<DesktopSyncResult>;
+  purgeOldSynced: (retentionDays: number) => Promise<number>;
 };
 
 declare global {

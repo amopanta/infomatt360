@@ -41,6 +41,7 @@ o permisos escritos de forma diferente.
 | `organizations.tenant_clean` | Ejecutar la purga controlada de datos de prueba de una organizacion (accion critica, requiere 2FA y confirmacion explicita del slug). |
 | `support.tickets.manage` | Revisar y resolver manualmente tickets de la mesa de ayuda que no se resolvieron por el motor de reglas automatico. |
 | `storage.manage` | Conectar el destino de almacenamiento de multimedia del proyecto (boveda S3/MinIO, cuenta de Google Drive). Antes de este permiso, cualquier miembro del proyecto podia hacerlo (ver `docs/89_ALMACENAMIENTO_S3_BOVEDA_MULTIMEDIA.md`). |
+| `mirror.manage` | Conectar una base de datos externa como espejo del proyecto (destino, credenciales, planes y ejecucion de sincronizacion) -- ver `docs/102_BASE_ESPEJO_REAL.md`. |
 
 ## Grupos operativos actuales
 

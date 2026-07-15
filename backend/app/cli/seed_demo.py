@@ -36,7 +36,7 @@ def seed(db: Session) -> dict[str, str]:
         DEMO_ROLE_ID,
         name="Administrador demo",
         description="Rol demo con permisos amplios para validar el MVP.",
-        permissions="projects.read,users.admin,identity.users.manage,records.read,records.write,records.review,records.coordinate,records.approve,records.void,reports.export,gis.read,builder.write,messages.write,messages.read,integrations.api_keys.manage,organizations.manage,organizations.branding.manage,organizations.tenant_clean,backups.manage,erp.manage,integrations.donor_sync.manage,ai.audit.manage,support.tickets.manage,storage.manage",
+        permissions="projects.read,users.admin,identity.users.manage,records.read,records.write,records.review,records.coordinate,records.approve,records.void,reports.export,gis.read,builder.write,messages.write,messages.read,integrations.api_keys.manage,organizations.manage,organizations.branding.manage,organizations.tenant_clean,backups.manage,erp.manage,integrations.donor_sync.manage,ai.audit.manage,support.tickets.manage,storage.manage,mirror.manage",
     )
     project = upsert(
         db,

@@ -21,6 +21,8 @@ function templateIdFromPath(): string {
   return parts[0] === 'records' ? parts[1] ?? '' : '';
 }
 
+const VOID_ACTION = { label: 'Anular', toStatus: 'voided', action: 'void' };
+
 const REVIEW_ACTIONS: Record<string, Array<{ label: string; toStatus: string; action: string }>> = {
   draft: [
     { label: 'Enviar', toStatus: 'submitted', action: 'submit' },
@@ -31,28 +33,50 @@ const REVIEW_ACTIONS: Record<string, Array<{ label: string; toStatus: string; ac
     { label: 'Aprobar', toStatus: 'approved', action: 'approve' },
     { label: 'Devolver', toStatus: 'returned', action: 'return' },
     { label: 'Rechazar', toStatus: 'rejected', action: 'reject' },
+    VOID_ACTION,
   ],
   under_review: [
     { label: 'Aprobación técnica', toStatus: 'tech_approved', action: 'technical_approve' },
     { label: 'Aprobar', toStatus: 'approved', action: 'approve' },
     { label: 'Devolver', toStatus: 'returned', action: 'return' },
     { label: 'Rechazar', toStatus: 'rejected', action: 'reject' },
+    VOID_ACTION,
   ],
   tech_approved: [
     { label: 'Aprobación coordinador', toStatus: 'coordinator_approved', action: 'coordinator_approve' },
     { label: 'Aprobar final', toStatus: 'approved', action: 'approve' },
     { label: 'Devolver', toStatus: 'returned', action: 'return' },
     { label: 'Rechazar', toStatus: 'rejected', action: 'reject' },
+    VOID_ACTION,
   ],
   coordinator_approved: [
     { label: 'Aprobar final', toStatus: 'approved', action: 'final_approve' },
     { label: 'Devolver', toStatus: 'returned', action: 'return' },
     { label: 'Rechazar', toStatus: 'rejected', action: 'reject' },
+    VOID_ACTION,
   ],
-  returned: [{ label: 'Marcar corregido', toStatus: 'corrected', action: 'mark_corrected' }],
-  corrected: [{ label: 'Reenviar a revisión', toStatus: 'under_review', action: 'resubmit_review' }],
-  approved: [{ label: 'Archivar', toStatus: 'archived', action: 'archive' }],
-  rejected: [{ label: 'Archivar', toStatus: 'archived', action: 'archive' }],
+  returned: [
+    { label: 'Marcar corregido', toStatus: 'corrected', action: 'mark_corrected' },
+    VOID_ACTION,
+  ],
+  corrected: [
+    { label: 'Reenviar a revisión', toStatus: 'under_review', action: 'resubmit_review' },
+    VOID_ACTION,
+  ],
+  approved: [
+    { label: 'Archivar', toStatus: 'archived', action: 'archive' },
+    { label: 'Marcar sincronizado', toStatus: 'synced', action: 'mark_synced' },
+    VOID_ACTION,
+  ],
+  rejected: [
+    { label: 'Archivar', toStatus: 'archived', action: 'archive' },
+    VOID_ACTION,
+  ],
+  archived: [VOID_ACTION],
+  synced: [
+    { label: 'Archivar', toStatus: 'archived', action: 'archive' },
+    VOID_ACTION,
+  ],
 };
 
 function FlowSnapshotSummary({ title, snapshot }: { title: string; snapshot?: ReviewFlowSnapshot | null }) {
@@ -628,6 +652,8 @@ function RecordTable({ templateId }: { templateId: string }) {
               <option value="rejected">Rechazado</option>
               <option value="cancelled">Cancelado</option>
               <option value="archived">Archivado</option>
+              <option value="synced">Sincronizado</option>
+              <option value="voided">Anulado</option>
             </select>
             <label className="records-unlinked-filter">
               <input type="checkbox" checked={unlinkedOnly} onChange={(event) => { setUnlinkedOnly(event.target.checked); setOffset(0); }} />

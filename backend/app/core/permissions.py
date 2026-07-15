@@ -20,6 +20,7 @@ RECORDS_WRITE = "records.write"
 RECORDS_REVIEW = "records.review"
 RECORDS_COORDINATE = "records.coordinate"
 RECORDS_APPROVE = "records.approve"
+RECORDS_VOID = "records.void"
 
 REPORTS_EXPORT = "reports.export"
 GIS_READ = "gis.read"
@@ -56,6 +57,7 @@ ALL_PERMISSIONS = {
     RECORDS_REVIEW,
     RECORDS_COORDINATE,
     RECORDS_APPROVE,
+    RECORDS_VOID,
     REPORTS_EXPORT,
     GIS_READ,
     BUILDER_WRITE,

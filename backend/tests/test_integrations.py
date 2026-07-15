@@ -158,6 +158,11 @@ def test_approving_record_pushes_mapped_payload_to_donor_source():
                 assert job.status == "sent"
                 assert job.map_id == map_id
                 assert job.source_id == source_id
+
+                # "Sincronizado" (ver docs/100): un envio exitoso al donante
+                # avanza automaticamente el registro mas alla de "approved".
+                record = db.get(RuntimeRecord, "ds-record-1")
+                assert record.status == "synced"
     finally:
         integration_service_module.httpx.post = original_post
         app.dependency_overrides.clear()

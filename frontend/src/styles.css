@@ -72,6 +72,8 @@ body { margin: 0; }
 .records-table th { color: #0a2540; background: #f5f8fb; white-space: nowrap; }
 .records-table button { border: 0; border-radius: 8px; padding: 8px 11px; color: #ffffff; background: #0066cc; font-weight: 800; cursor: pointer; }
 .record-status { display: inline-block; padding: 4px 8px; border-radius: 999px; color: #0a5c36; background: #dcfae6; font-size: 12px; font-weight: 800; }
+.record-status.synced { color: #075985; background: #e0f2fe; }
+.record-status.voided { color: #9f1239; background: #ffe4e6; }
 .record-detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 4px 0; }
 .record-detail div { min-width: 0; padding: 10px; border-radius: 10px; background: #f8fbfd; }
 .record-detail dt { color: #536878; font-size: 12px; font-weight: 800; }

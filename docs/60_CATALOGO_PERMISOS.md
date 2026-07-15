@@ -25,6 +25,7 @@ o permisos escritos de forma diferente.
 | `records.review` | Revisar registros dentro de un flujo operativo. |
 | `records.coordinate` | Coordinar registros o etapas intermedias del flujo. |
 | `records.approve` | Aprobar registros o etapas finales del flujo. |
+| `records.void` | Anular formalmente un registro (invalidacion administrativa que preserva el historial completo, distinta de rechazar o archivar) -- ver `docs/100_ESTADOS_ANULADO_Y_SINCRONIZADO.md`. |
 | `reports.export` | Exportar reportes. |
 | `gis.read` | Consultar vistas de mapas/GIS. |
 | `builder.write` | Crear o editar formularios y estructuras del Builder. |

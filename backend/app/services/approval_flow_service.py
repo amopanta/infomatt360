@@ -56,6 +56,18 @@ def step_to_read(row: ApprovalFlowStep) -> ApprovalFlowStepRead:
     )
 
 
+# "Anular" (ver docs/100) se ofrece en todo estado no terminal, igual que en
+# el REVIEW_ACTIONS del frontend (RecordsApp.tsx) -- debe declararse aqui
+# tambien porque next_actions() devuelve DEFAULT_ACTIONS cuando el proyecto
+# no tiene un flujo de aprobacion configurado (el caso comun/por defecto), y
+# esa lista reemplaza por completo al fallback del frontend en cuanto no
+# viene vacia (ver RecordsApp.tsx: `actions = nextActions.length ? ... :
+# fallbackActions`). Omitir "voided" aqui lo dejaba inalcanzable desde la UI
+# para cualquier registro sin flujo configurado -- solo se detecto probando
+# en el navegador real, no con las pruebas unitarias que llaman la API
+# directo con to_status="voided".
+VOID_ACTION = ReviewNextAction(label="Anular", to_status="voided", action="void", required_permission="records.void")
+
 DEFAULT_ACTIONS: dict[str, list[ReviewNextAction]] = {
     "draft": [
         ReviewNextAction(label="Enviar", to_status="submitted", action="submit"),
@@ -66,28 +78,50 @@ DEFAULT_ACTIONS: dict[str, list[ReviewNextAction]] = {
         ReviewNextAction(label="Aprobar", to_status="approved", action="approve", required_permission="records.approve"),
         ReviewNextAction(label="Devolver", to_status="returned", action="return", required_permission="records.review"),
         ReviewNextAction(label="Rechazar", to_status="rejected", action="reject", required_permission="records.approve"),
+        VOID_ACTION,
     ],
     "under_review": [
         ReviewNextAction(label="Aprobación técnica", to_status="tech_approved", action="technical_approve", required_permission="records.review"),
         ReviewNextAction(label="Aprobar", to_status="approved", action="approve", required_permission="records.approve"),
         ReviewNextAction(label="Devolver", to_status="returned", action="return", required_permission="records.review"),
         ReviewNextAction(label="Rechazar", to_status="rejected", action="reject", required_permission="records.approve"),
+        VOID_ACTION,
     ],
     "tech_approved": [
         ReviewNextAction(label="Aprobación coordinador", to_status="coordinator_approved", action="coordinator_approve", required_permission="records.coordinate"),
         ReviewNextAction(label="Aprobar final", to_status="approved", action="approve", required_permission="records.approve"),
         ReviewNextAction(label="Devolver", to_status="returned", action="return", required_permission="records.review"),
         ReviewNextAction(label="Rechazar", to_status="rejected", action="reject", required_permission="records.approve"),
+        VOID_ACTION,
     ],
     "coordinator_approved": [
         ReviewNextAction(label="Aprobar final", to_status="approved", action="final_approve", required_permission="records.approve"),
         ReviewNextAction(label="Devolver", to_status="returned", action="return", required_permission="records.review"),
         ReviewNextAction(label="Rechazar", to_status="rejected", action="reject", required_permission="records.approve"),
+        VOID_ACTION,
     ],
-    "returned": [ReviewNextAction(label="Marcar corregido", to_status="corrected", action="mark_corrected")],
-    "corrected": [ReviewNextAction(label="Reenviar a revisión", to_status="under_review", action="resubmit_review", required_permission="records.review")],
-    "approved": [ReviewNextAction(label="Archivar", to_status="archived", action="archive", required_permission="records.approve")],
-    "rejected": [ReviewNextAction(label="Archivar", to_status="archived", action="archive", required_permission="records.approve")],
+    "returned": [
+        ReviewNextAction(label="Marcar corregido", to_status="corrected", action="mark_corrected"),
+        VOID_ACTION,
+    ],
+    "corrected": [
+        ReviewNextAction(label="Reenviar a revisión", to_status="under_review", action="resubmit_review", required_permission="records.review"),
+        VOID_ACTION,
+    ],
+    "approved": [
+        ReviewNextAction(label="Archivar", to_status="archived", action="archive", required_permission="records.approve"),
+        ReviewNextAction(label="Marcar sincronizado", to_status="synced", action="mark_synced", required_permission="records.approve"),
+        VOID_ACTION,
+    ],
+    "rejected": [
+        ReviewNextAction(label="Archivar", to_status="archived", action="archive", required_permission="records.approve"),
+        VOID_ACTION,
+    ],
+    "archived": [VOID_ACTION],
+    "synced": [
+        ReviewNextAction(label="Archivar", to_status="archived", action="archive", required_permission="records.approve"),
+        VOID_ACTION,
+    ],
 }
 
 
@@ -222,13 +256,21 @@ class ApprovalFlowService:
         next_step = self._next_configured_step(current_status, steps)
         if not next_step:
             return DEFAULT_ACTIONS.get(current_status, [])
-        return [ReviewNextAction(
+        configured_action = ReviewNextAction(
             label=next_step.action_label,
             to_status=next_step.status_after,
             action=next_step.action,
             required_permission=next_step.required_permission,
             source="configured",
-        )]
+        )
+        # "Anular" (ver docs/100) es una invalidacion administrativa, no un
+        # paso mas del flujo de aprobacion -- debe seguir disponible aunque
+        # el flujo configurado por el proyecto no la incluya explicitamente,
+        # igual que en el camino sin flujo (DEFAULT_ACTIONS). No aplica a los
+        # estados ya terminales.
+        if current_status not in ("draft", "cancelled", "voided"):
+            return [configured_action, VOID_ACTION]
+        return [configured_action]
 
     def approval_progress(self, db: Session, project_id: str, template_id: str | None, current_status: str, record_id: str, snapshot_json: str | None = None) -> list[ReviewApprovalProgress]:
         steps = self._steps_from_snapshot(snapshot_json)

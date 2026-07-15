@@ -21,6 +21,8 @@ REVIEW_STATUS_PERMISSIONS: dict[str, set[str]] = {
     "approved": {"records.approve"},
     "rejected": {"records.approve"},
     "archived": {"records.approve"},
+    "synced": {"records.approve"},
+    "voided": {"records.void"},
 }
 
 

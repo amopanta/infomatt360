@@ -155,12 +155,21 @@ def test_configurable_approval_flow_drives_next_actions_and_permissions():
 
             next_actions = client.get("/api/v1/review/records/flow-record/next-actions", headers=reviewer_headers)
             assert next_actions.status_code == 200
+            # "Anular" (ver docs/100) siempre acompana al paso configurado del
+            # flujo -- es una invalidacion administrativa aparte, no otro
+            # paso mas del flujo de aprobacion en si.
             assert next_actions.json() == [{
                 "label": "Aprobar jurídico",
                 "to_status": "legal_approved",
                 "action": "legal_approve",
                 "required_permission": "records.legal",
                 "source": "configured",
+            }, {
+                "label": "Anular",
+                "to_status": "voided",
+                "action": "void",
+                "required_permission": "records.void",
+                "source": "default",
             }]
 
             initial_progress = client.get("/api/v1/review/records/flow-record/approval-progress", headers=reviewer_headers)

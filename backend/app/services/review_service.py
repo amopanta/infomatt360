@@ -20,16 +20,26 @@ from app.services.whatsapp_service import whatsapp_service
 
 ALLOWED_TRANSITIONS: dict[str, set[str]] = {
     "draft": {"submitted", "cancelled"},
-    "submitted": {"under_review", "approved", "rejected", "returned", "archived"},
-    "under_review": {"tech_approved", "approved", "rejected", "returned", "archived"},
-    "tech_approved": {"coordinator_approved", "approved", "rejected", "returned", "archived"},
-    "coordinator_approved": {"approved", "rejected", "returned", "archived"},
-    "returned": {"corrected", "cancelled", "archived"},
-    "corrected": {"submitted", "under_review", "archived"},
-    "approved": {"archived"},
-    "rejected": {"archived"},
+    "submitted": {"under_review", "approved", "rejected", "returned", "archived", "voided"},
+    "under_review": {"tech_approved", "approved", "rejected", "returned", "archived", "voided"},
+    "tech_approved": {"coordinator_approved", "approved", "rejected", "returned", "archived", "voided"},
+    "coordinator_approved": {"approved", "rejected", "returned", "archived", "voided"},
+    "returned": {"corrected", "cancelled", "archived", "voided"},
+    "corrected": {"submitted", "under_review", "archived", "voided"},
+    "approved": {"archived", "synced", "voided"},
+    "rejected": {"archived", "voided"},
     "cancelled": set(),
-    "archived": set(),
+    "archived": {"voided"},
+    # "sincronizado": confirma que el registro aprobado llego a un sistema
+    # externo (donante/ActivityInfo, ver docs/86). Se puede marcar manualmente
+    # o queda asignado automaticamente por review_service.apply_action cuando
+    # integration_service.push_approved_record() tiene exito.
+    "synced": {"archived", "voided"},
+    # "anulado": invalidacion formal de un registro, distinta de "cancelled"
+    # (abandonar un borrador antes de enviarlo) y de "rejected" (no paso
+    # control de calidad). Nunca borra el registro ni su historial -- solo
+    # marca que ya no es valido, preservando la trazabilidad completa.
+    "voided": set(),
 }
 
 
@@ -78,7 +88,23 @@ class ReviewService:
                 # Interoperabilidad con plataformas de donantes (ActivityInfo/
                 # TolaData u otras via conector generico): fire-and-forget, no
                 # bloquea la aprobacion si el envio externo falla.
-                integration_service.push_approved_record(db, record)
+                integration_job = integration_service.push_approved_record(db, record)
+                # "Sincronizado" (ver docs/100): solo se avanza automaticamente
+                # si el envio realmente tuvo exito (job.status == "sent"). Si
+                # no hay integracion configurada (job es None) o el envio
+                # fallo, el registro se queda en "approved" -- la aprobacion en
+                # si nunca se revierte ni se bloquea por esto.
+                if integration_job is not None and integration_job.status == "sent":
+                    record.status = "synced"
+                    db.add(ReviewAction(
+                        project_id=payload.project_id,
+                        record_id=payload.record_id,
+                        from_status="approved",
+                        to_status="synced",
+                        action="auto_synced",
+                        notes="Sincronizado automaticamente tras el envio exitoso a la integracion de donante.",
+                        user_id=user_id,
+                    ))
 
         row = ReviewAction(
             project_id=payload.project_id,

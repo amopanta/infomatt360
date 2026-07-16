@@ -68,6 +68,9 @@ class Settings(BaseSettings):
     auth_throttle_backend: str = "db"
     auth_throttle_redis_prefix: str = "infomatt360:auth-throttle"
     api_key_profile_cache_ttl_seconds: int = 30
+    permissions_cache_backend: str = "memory"
+    permissions_cache_redis_prefix: str = "infomatt360:permissions"
+    permissions_cache_ttl_seconds: int = 60
     request_logging_enabled: bool = True
     request_id_header: str = "X-Request-ID"
     metrics_enabled: bool = True

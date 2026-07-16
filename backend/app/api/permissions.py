@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.models.assignment import UserOrganizationAssignment, UserProjectAssignment
 from app.models.identity import Project, Role
+from app.services.permission_cache_service import CachedProjectAssignment, get_permission_cache
 
 
 def get_organization_permissions(db: Session, user_id: str, organization_id: str) -> set[str]:
@@ -24,7 +25,21 @@ def get_organization_permissions(db: Session, user_id: str, organization_id: str
     return {item.strip() for item in row[1].permissions.split(",") if item.strip()} if row else set()
 
 
-def get_project_permissions(db: Session, user_id: str, project_id: str) -> tuple[UserProjectAssignment | None, set[str]]:
+def get_project_permissions(db: Session, user_id: str, project_id: str) -> tuple[UserProjectAssignment | CachedProjectAssignment | None, set[str]]:
+    # Cache de permisos efectivos (ver E-004, docs/108): esta funcion se
+    # llama en casi cada endpoint de escritura y hacia hasta 3 queries por
+    # chequeo sin ningun cache. `approval_flow_service.user_can_execute_step`
+    # es el unico llamador que usa el `assignment` devuelto (solo lee
+    # `.role_id`), asi que en un hit de cache se reconstruye un sustituto
+    # liviano con ese campo en vez de devolver la fila ORM real (que no
+    # sobrevive fuera de la sesion que la cargo).
+    cache = get_permission_cache()
+    cached = cache.get(user_id, project_id)
+    if cached is not None:
+        cached_role_id, cached_permissions = cached
+        cached_assignment = CachedProjectAssignment(role_id=cached_role_id) if cached_role_id is not None else None
+        return (cached_assignment, set(cached_permissions))
+
     row = (
         db.query(UserProjectAssignment, Role)
         .join(Role, Role.id == UserProjectAssignment.role_id)
@@ -45,6 +60,7 @@ def get_project_permissions(db: Session, user_id: str, project_id: str) -> tuple
     if project and project.organization_id:
         permissions |= get_organization_permissions(db, user_id, project.organization_id)
 
+    cache.set(user_id, project_id, assignment.role_id if assignment else None, frozenset(permissions))
     return (assignment, permissions)
 
 

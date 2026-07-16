@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.models.assignment import UserOrganizationAssignment, UserProjectAssignment
 from app.models.identity import Project
 from app.schemas.assignment import AssignmentCreate, AssignmentRead, OrganizationAssignmentCreate, OrganizationAssignmentRead
+from app.services.permission_cache_service import invalidate_permissions_for_user
 
 
 def _to_read(row: UserProjectAssignment) -> AssignmentRead:
@@ -31,6 +32,10 @@ class AssignmentService:
         db.add(row)
         db.commit()
         db.refresh(row)
+        # Sin esto, un chequeo de permiso anterior a la asignacion (cacheado
+        # como "sin permisos") seguiria vigente hasta que expire el TTL (ver
+        # E-004, docs/108).
+        invalidate_permissions_for_user(row.user_id)
         return _to_read(row)
 
     def list_assignments(self, db: Session, project_id: str | None = None) -> list[AssignmentRead]:
@@ -44,6 +49,10 @@ class AssignmentService:
         db.add(row)
         db.commit()
         db.refresh(row)
+        # Una asignacion a nivel organizacion ("Administrador nacional", ver
+        # docs/101) puede otorgar permisos sobre cualquier proyecto de esa
+        # organizacion, no solo uno -- invalida todo lo cacheado del usuario.
+        invalidate_permissions_for_user(row.user_id)
         return _org_to_read(row)
 
     def list_organization_assignments(self, db: Session, organization_id: str | None = None) -> list[OrganizationAssignmentRead]:

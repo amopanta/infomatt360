@@ -4,6 +4,7 @@ from uuid import uuid4
 from sqlalchemy import DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.time import utc_now
 from app.db.base import Base
 
 
@@ -35,3 +36,20 @@ class ReportLink(Base):
     expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(String(40), default="active", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class ReportBoard(Base):
+    """Tablero de reportes personalizable, uno por proyecto (docs/96 item #6,
+    docs/111). No confundir con `Report`/`ReportLink` (una lista de reportes
+    nombrados, sin usar hoy por ninguna UI) ni con el dashboard posterior al
+    login (`app.services.dashboard_service`) -- este es el tablero de la
+    pantalla de Reportes, editable in-situ, siempre una sola fila por
+    proyecto (`UNIQUE(project_id)`)."""
+
+    __tablename__ = "report_boards"
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
+    project_id: Mapped[str] = mapped_column(String(36), nullable=False, unique=True, index=True)
+    widgets_json: Mapped[str] = mapped_column(Text, nullable=False, default="[]")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

@@ -1,15 +1,53 @@
+import json
 from io import BytesIO
 from zipfile import ZIP_DEFLATED, ZipFile
 from xml.sax.saxutils import escape
 
+from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.time import utc_now
-from app.models.builder import BuilderTemplate
-from app.models.reports import Report, ReportLink
-from app.models.runtime_record import RuntimeRecord
+from app.models.builder import BuilderComponent, BuilderTemplate
+from app.models.reports import Report, ReportBoard, ReportLink
+from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
+from app.schemas.report_board import (
+    ChartPoint,
+    ChartWidget,
+    CustomMetricByStatusChartSource,
+    CustomMetricSource,
+    KpiWidget,
+    RecordsTotalSource,
+    ReportBoardLayout,
+    ReportBoardRead,
+    ReportBoardUpdate,
+    ReportWidget,
+    ResolvedChart,
+    ResolvedKpi,
+    ResolvedTable,
+    ResolvedWidget,
+    StatusBreakdownChartSource,
+    StatusCountSource,
+    TableWidget,
+    TemplateCountSource,
+    TemplateTotalsChartSource,
+)
 from app.schemas.reports import ReportCreate, ReportLinkCreate, ReportLinkRead, ReportProjectSummary, ReportRead, ReportTemplateMetric
+
+# Mismo catalogo que frontend/src/modules/builder/fieldCatalog.ts (categoria
+# "Numericos" + "Experiencia") -- duplicado igual que ya se duplica el
+# catalogo de tipos de campo entre frontend y backend.
+NUMERIC_AGGREGATABLE_TYPES = {"NUMBER", "INTEGER", "DECIMAL", "PERCENTAGE", "CURRENCY", "RANGE", "NPS", "RATING", "LIKERT_5", "LIKERT_7"}
+
+# Tablero por defecto para un proyecto sin configuracion guardada (docs/111).
+# No es un port pixel a pixel de las 3 tarjetas viejas de ReportsApp.tsx --
+# "Formularios con datos" no tiene una fuente equivalente limpia sin
+# inventar una 5ta fuente de datos, asi que se simplifica honestamente.
+DEFAULT_WIDGETS: list[ReportWidget] = [
+    KpiWidget(title="Registros totales", source=RecordsTotalSource()),
+    TableWidget(title="Resumen por formulario"),
+    ChartWidget(title="Registros por estado", chart_kind="pie", source=StatusBreakdownChartSource()),
+]
 
 
 def report_to_read(row: Report) -> ReportRead:
@@ -82,6 +120,140 @@ class ReportService:
         ]
         metrics.sort(key=lambda item: (-item.records_total, item.template_name.lower()))
         return ReportProjectSummary(project_id=project_id, records_total=records_total, records_by_status=records_by_status, templates=metrics, generated_at=utc_now())
+
+    # --- Constructor visual de tableros (docs/96 item #6, docs/111) ---
+
+    def get_board_row(self, db: Session, project_id: str) -> ReportBoard | None:
+        """Sin efecto secundario: si no hay fila guardada, no se inserta una
+        -- el default vive en memoria (DEFAULT_WIDGETS), no en la base."""
+        return db.query(ReportBoard).filter(ReportBoard.project_id == project_id).first()
+
+    def update_board(self, db: Session, payload: ReportBoardUpdate) -> ReportBoard:
+        for widget in payload.widgets:
+            self._validate_widget(db, payload.project_id, widget)
+
+        row = self.get_board_row(db, payload.project_id)
+        widgets_json = ReportBoardLayout(widgets=payload.widgets).model_dump_json()
+        if row is None:
+            row = ReportBoard(project_id=payload.project_id, widgets_json=widgets_json)
+            db.add(row)
+        else:
+            row.widgets_json = widgets_json
+            row.updated_at = utc_now()
+        db.commit()
+        db.refresh(row)
+        return row
+
+    def _validate_widget(self, db: Session, project_id: str, widget: ReportWidget) -> None:
+        sources = []
+        if isinstance(widget, KpiWidget):
+            sources.append(widget.source)
+        elif isinstance(widget, ChartWidget):
+            sources.append(widget.source)
+        for source in sources:
+            if isinstance(source, (CustomMetricSource, CustomMetricByStatusChartSource)):
+                self._validate_custom_metric_source(db, project_id, source)
+
+    def _validate_custom_metric_source(self, db: Session, project_id: str, source: CustomMetricSource | CustomMetricByStatusChartSource) -> None:
+        template = db.query(BuilderTemplate).filter(BuilderTemplate.id == source.template_id, BuilderTemplate.project_id == project_id).first()
+        if template is None:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La plantilla seleccionada no pertenece a este proyecto.")
+        component = db.query(BuilderComponent).filter(BuilderComponent.template_id == source.template_id, BuilderComponent.name == source.field_name).first()
+        if component is None:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El campo seleccionado no existe en el formulario.")
+        if source.aggregation != "count" and component.component_type not in NUMERIC_AGGREGATABLE_TYPES:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Este campo no admite la agregación seleccionada.")
+
+    def resolve_board(self, db: Session, project_id: str, widgets: list[ReportWidget]) -> ReportBoardRead:
+        summary = self.project_summary(db, project_id)
+        resolved: list[ResolvedWidget] = [self._resolve_widget(db, summary, widget) for widget in widgets]
+        return ReportBoardRead(project_id=project_id, widgets=widgets, summary=summary, resolved=resolved, generated_at=utc_now())
+
+    def _resolve_widget(self, db: Session, summary: ReportProjectSummary, widget: ReportWidget) -> ResolvedWidget:
+        if isinstance(widget, TableWidget):
+            return ResolvedTable()
+        if isinstance(widget, KpiWidget):
+            value = self._resolve_kpi_value(db, summary, widget.source)
+            display = f"{value:.2f}".rstrip("0").rstrip(".") if isinstance(value, float) and not value.is_integer() else str(int(value))
+            return ResolvedKpi(value=value, display=display)
+        points = self._resolve_chart_points(db, summary, widget.source)
+        return ResolvedChart(points=points)
+
+    def _resolve_kpi_value(self, db: Session, summary: ReportProjectSummary, source) -> float:
+        if isinstance(source, RecordsTotalSource):
+            return float(summary.records_total)
+        if isinstance(source, StatusCountSource):
+            return float(summary.records_by_status.get(source.status, 0))
+        if isinstance(source, TemplateCountSource):
+            return next((float(item.records_total) for item in summary.templates if item.template_id == source.template_id), 0.0)
+        if isinstance(source, CustomMetricSource):
+            return self._aggregate_custom_metric(db, source.template_id, source.field_name, source.aggregation)
+        return 0.0
+
+    def _resolve_chart_points(self, db: Session, summary: ReportProjectSummary, source) -> list[ChartPoint]:
+        if isinstance(source, StatusBreakdownChartSource):
+            return [ChartPoint(label=status_name, value=float(count)) for status_name, count in sorted(summary.records_by_status.items())]
+        if isinstance(source, TemplateTotalsChartSource):
+            return [ChartPoint(label=item.template_name, value=float(item.records_total)) for item in summary.templates]
+        if isinstance(source, CustomMetricByStatusChartSource):
+            by_status = self._aggregate_custom_metric_by_status(db, source.template_id, source.field_name, source.aggregation)
+            return [ChartPoint(label=status_name, value=value) for status_name, value in sorted(by_status.items())]
+        return []
+
+    def _aggregate_custom_metric(self, db: Session, template_id: str, field_name: str, aggregation: str) -> float:
+        values = self._numeric_values_for_field(db, template_id, field_name, aggregation)
+        return self._apply_aggregation(values, aggregation)
+
+    def _aggregate_custom_metric_by_status(self, db: Session, template_id: str, field_name: str, aggregation: str) -> dict[str, float]:
+        rows = (
+            db.query(RuntimeRecordValue.field_value_json, RuntimeRecord.status)
+            .join(RuntimeRecord, RuntimeRecord.id == RuntimeRecordValue.record_id)
+            .filter(RuntimeRecord.template_id == template_id, RuntimeRecordValue.field_name == field_name)
+            .all()
+        )
+        buckets: dict[str, list[float]] = {}
+        for raw_value, record_status in rows:
+            decoded = self._decode_numeric_or_countable(raw_value, aggregation)
+            if decoded is None:
+                continue
+            buckets.setdefault(record_status, []).append(decoded)
+        return {status_name: self._apply_aggregation(values, aggregation) for status_name, values in buckets.items()}
+
+    def _numeric_values_for_field(self, db: Session, template_id: str, field_name: str, aggregation: str) -> list[float]:
+        rows = (
+            db.query(RuntimeRecordValue.field_value_json)
+            .join(RuntimeRecord, RuntimeRecord.id == RuntimeRecordValue.record_id)
+            .filter(RuntimeRecord.template_id == template_id, RuntimeRecordValue.field_name == field_name)
+            .all()
+        )
+        values = [self._decode_numeric_or_countable(row[0], aggregation) for row in rows]
+        return [value for value in values if value is not None]
+
+    def _decode_numeric_or_countable(self, raw_value: str, aggregation: str) -> float | None:
+        try:
+            parsed = json.loads(raw_value)
+        except json.JSONDecodeError:
+            parsed = raw_value
+        if aggregation == "count":
+            return 1.0 if parsed not in (None, "") else None
+        if isinstance(parsed, (int, float)) and not isinstance(parsed, bool):
+            return float(parsed)
+        return None
+
+    def _apply_aggregation(self, values: list[float], aggregation: str) -> float:
+        if not values:
+            return 0.0
+        if aggregation == "count":
+            return float(len(values))
+        if aggregation == "sum":
+            return sum(values)
+        if aggregation == "average":
+            return sum(values) / len(values)
+        if aggregation == "min":
+            return min(values)
+        if aggregation == "max":
+            return max(values)
+        return 0.0
 
     def export_project_summary_xlsx(self, db: Session, project_id: str) -> bytes:
         summary = self.project_summary(db, project_id)

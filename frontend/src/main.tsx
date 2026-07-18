@@ -30,6 +30,7 @@ import { MessagesApp } from './modules/messages/MessagesApp';
 import { ParticipantsApp } from './modules/participants/ParticipantsApp';
 import { RecordsApp } from './modules/records/RecordsApp';
 import { ReportsApp } from './modules/reports/ReportsApp';
+import { EvidenceApp } from './modules/evidence/EvidenceApp';
 import { RuntimeApp } from './modules/runtime/RuntimeApp';
 import { APP_NAVIGATION_EVENT, navigateTo, resolveAppRoute } from './routeConfig';
 import type { AppRoute } from './routeConfig';
@@ -106,6 +107,7 @@ function renderRoute(route: AppRoute) {
       case 'participants': return <ParticipantsApp />;
       case 'records': return <RecordsApp />;
       case 'reports': return <ReportsApp />;
+      case 'evidence': return <EvidenceApp />;
       case 'maps': return <MapsApp />;
       case 'messages': return <MessagesApp />;
       case 'audit': return <AuditApp />;

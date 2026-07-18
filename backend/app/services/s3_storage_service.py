@@ -107,5 +107,16 @@ class S3StorageService:
             "checksum": checksum,
         }
 
+    def get_object(self, profile: StorageProfile, storage_path: str) -> bytes:
+        if not self.is_configured(profile):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El perfil de almacenamiento S3 no tiene credenciales configuradas")
+        bucket, key = storage_path.removeprefix("s3://").split("/", 1)
+        client = self._client(profile)
+        try:
+            response = client.get_object(Bucket=bucket, Key=key)
+            return response["Body"].read()
+        except Exception as exc:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="No fue posible descargar el archivo desde la boveda S3") from exc
+
 
 s3_storage_service = S3StorageService()

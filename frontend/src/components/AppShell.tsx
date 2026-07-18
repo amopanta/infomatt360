@@ -10,6 +10,7 @@ const menu = [
   { label: 'Actas', href: '/acta', permissions: ['builder.write'] },
   { label: 'Participantes', href: '/participants' },
   { label: 'Registros', href: '/records' },
+  { label: 'Evidencias', href: '/evidence' },
   { label: 'Reportes', href: '/reports' },
   { label: 'Mapas', href: '/maps' },
   { label: 'Mensajes', href: '/messages' },

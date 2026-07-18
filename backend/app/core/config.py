@@ -81,6 +81,8 @@ class Settings(BaseSettings):
     duplicate_check_window_days: int = 3
     backup_directory: str = "./backups"
     acta_batch_max_records: int = 200
+    evidence_batch_max_records: int = 100
+    evidence_batch_max_total_size_mb: int = 300
 
     # Conector opcional de Google Drive para evidencias/backups. Vacio por
     # defecto: sin credenciales configuradas, el conector queda inactivo.

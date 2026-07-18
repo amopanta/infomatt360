@@ -21,6 +21,7 @@ export type AppRouteKey =
   | 'participants'
   | 'records'
   | 'reports'
+  | 'evidence'
   | 'maps'
   | 'messages'
   | 'audit'
@@ -63,6 +64,7 @@ export function resolveAppRoute(pathname: string): AppRoute {
   if (pathname.startsWith('/participants')) return { key: 'participants' };
   if (pathname.startsWith('/records')) return { key: 'records' };
   if (pathname.startsWith('/reports')) return { key: 'reports' };
+  if (pathname.startsWith('/evidence')) return { key: 'evidence' };
   if (pathname.startsWith('/maps')) return { key: 'maps' };
   if (pathname.startsWith('/messages')) return { key: 'messages' };
   if (pathname.startsWith('/audit')) return { key: 'audit' };

@@ -122,6 +122,48 @@ def test_runtime_csv_export_is_excel_compatible_and_formula_safe(runtime_context
     assert any(row[malicious_column] == "'=2+2" for row in rows[1:])
 
 
+def test_list_filtered_record_ids_resolves_all_matching_records_without_pagination(runtime_context):
+    """Usado por la generacion masiva de actas (docs/96 item #5, docs/110)
+    para resolver 'todos los registros que coinciden con el filtro' del lado
+    del servidor, sin el limite de 100 que si aplica a search_template_records."""
+    client, testing_session, _ = runtime_context
+    with testing_session() as db:
+        db.add(BuilderTemplate(id="template-runtime-batch", project_id="project-runtime", name="Runtime Batch"))
+        db.commit()
+
+    submitted_ids = []
+    for index in range(3):
+        response = client.post(
+            "/api/v1/runtime/save",
+            json={
+                "project_id": "project-runtime",
+                "template_id": "template-runtime-batch",
+                "status": "submitted",
+                "values": [{"field_name": "nombre", "field_value_json": json.dumps(f"Registro {index}")}],
+            },
+        )
+        assert response.status_code == 200
+        submitted_ids.append(response.json()["id"])
+
+    for _ in range(2):
+        response = client.post(
+            "/api/v1/runtime/save",
+            json={
+                "project_id": "project-runtime",
+                "template_id": "template-runtime-batch",
+                "status": "draft",
+                "values": [{"field_name": "nombre", "field_value_json": json.dumps("Borrador")}],
+            },
+        )
+        assert response.status_code == 200
+
+    with testing_session() as db:
+        resolved_ids = runtime_record_service.list_filtered_record_ids(db, "template-runtime-batch", status="submitted")
+
+    assert set(resolved_ids) == set(submitted_ids)
+    assert len(resolved_ids) == 3
+
+
 def test_runtime_records_search_paginates_and_filters(runtime_context):
     client, testing_session, _ = runtime_context
     with testing_session() as db:

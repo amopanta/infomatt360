@@ -77,3 +77,16 @@ class ActaLayoutTemplateCreate(BaseModel):
 
 class ActaRenderFromRecordRequest(BaseModel):
     record_id: str
+
+
+class ActaRenderBatchRequest(BaseModel):
+    """Selecciona el conjunto de registros para generar en lote (docs/96 #5):
+    o bien una lista explicita de ids (seleccion manual), o los mismos
+    filtros del buscador de Registros, resueltos sin paginacion contra el
+    servidor. record_ids, si no esta vacio, tiene prioridad -- nunca se
+    combinan ambos caminos para evitar ambiguedad silenciosa."""
+
+    record_ids: list[str] | None = None
+    search: str | None = None
+    status: str | None = None
+    unlinked_only: bool = False

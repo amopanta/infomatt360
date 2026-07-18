@@ -66,6 +66,12 @@ body { margin: 0; }
 .records-pagination { display: flex; justify-content: flex-end; align-items: center; gap: 10px; margin: -6px 0 14px; color: #536878; font-weight: 700; }
 .records-pagination button { border: 1px solid #cfd8e3; border-radius: 9px; padding: 8px 12px; color: #0066cc; background: #ffffff; font-weight: 800; cursor: pointer; }
 .records-pagination button:disabled { color: #8aa0b2; cursor: not-allowed; opacity: 0.65; }
+.records-select-col { width: 36px; text-align: center; }
+.records-bulk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; padding: 12px 16px; border: 1px solid #9bd8ff; border-radius: 12px; background: #f0f9ff; }
+.records-bulk-bar span { font-weight: 800; color: #0a2540; }
+.records-bulk-bar select { border: 1px solid #cfd8e3; border-radius: 8px; padding: 6px 8px; font: inherit; min-width: 220px; }
+.records-bulk-bar button { border: 0; border-radius: 9px; padding: 8px 12px; color: #ffffff; background: #0066cc; font-weight: 800; cursor: pointer; }
+.records-bulk-bar button.secondary { color: #0066cc; background: #ffffff; border: 1px solid #0066cc; }
 .records-table-wrap { overflow-x: auto; border: 1px solid #dce7f2; border-radius: 14px; background: #ffffff; }
 .records-table { width: 100%; border-collapse: collapse; }
 .records-table th, .records-table td { padding: 12px 14px; text-align: left; vertical-align: top; border-bottom: 1px solid #e6f1fa; }
@@ -377,7 +383,7 @@ body { margin: 0; }
 @media (max-width: 1100px) { .runtime-column { grid-column: span var(--tablet-span, 12); } }
 @media (max-width: 1200px) { .builder-layout { grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); } .builder-palette { position: static; grid-column: 1 / -1; max-height: none; } .acta-builder-body { grid-template-columns: minmax(220px, 260px) minmax(0, 1fr); } }
 @media (max-width: 900px) { .app-shell { grid-template-columns: 1fr; } .app-sidebar { min-height: auto; } .builder-layout { grid-template-columns: 1fr; } .builder-sidebar-stack { position: static; max-height: none; } .dashboard-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .reports-cards, .maps-layout { grid-template-columns: 1fr; } .acta-builder-body { grid-template-columns: 1fr; } }
-@media (max-width: 640px) { .runtime-column { grid-column: span var(--mobile-span, 12); } .builder-field-card { grid-column: span 12; } .dashboard-cards { grid-template-columns: 1fr; } .records-toolbar, .records-toolbar-actions, .records-pagination, .reports-panel header, .reports-actions, .maps-canvas-card header, .audit-panel header, .acta-list-header, .acta-builder-header { align-items: stretch; flex-direction: column; } }
+@media (max-width: 640px) { .runtime-column { grid-column: span var(--mobile-span, 12); } .builder-field-card { grid-column: span 12; } .dashboard-cards { grid-template-columns: 1fr; } .records-toolbar, .records-toolbar-actions, .records-pagination, .records-bulk-bar, .reports-panel header, .reports-actions, .maps-canvas-card header, .audit-panel header, .acta-list-header, .acta-builder-header { align-items: stretch; flex-direction: column; } }
 
 .messages-shell { max-width: 1180px; margin: 28px auto; padding: 0 24px; }
 .messages-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }

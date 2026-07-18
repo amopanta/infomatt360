@@ -4,7 +4,7 @@ import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
 import { applyReviewAction, correctRecordField, downloadTemplateRecords, fetchProjectTemplates, fetchRecord, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, promoteRecordToParticipant, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
-import { fetchActaTemplates, renderActaFromRecord } from '../acta/api';
+import { fetchActaTemplates, renderActaBatch, renderActaFromRecord } from '../acta/api';
 import type { ActaTemplateSummary } from '../acta/types';
 import { fetchRuntimeRecordChildren, fetchRuntimeTemplate, saveRuntimeChildRecord } from '../runtime/api';
 import type { RuntimeRecordSummary } from '../runtime/api';
@@ -13,6 +13,7 @@ import { parseFieldConfig } from '../runtime/fieldConfig';
 import type { RuntimeComponent, RuntimeFormValues, RuntimeTemplate } from '../runtime/types';
 import { fetchProjectParticipants } from '../participants/api';
 import type { Participant } from '../participants/api';
+import { deselectPage, isPageFullySelected, selectPage, toggleSelection } from './selection';
 
 const REJECTION_STATUSES = new Set(['rejected', 'returned']);
 
@@ -146,6 +147,69 @@ function GenerateActaPanel({
       <button type="button" className="secondary" onClick={() => void generate()} disabled={!selectedTemplateId || generating}>
         {generating ? 'Generando...' : 'Generar acta'}
       </button>
+    </div>
+  );
+}
+
+/** Barra de generación masiva de actas (docs/96 item #5, docs/110): aparece
+ * en Registros cuando hay una seleccion manual o "todos los que coinciden
+ * con el filtro" activa. Reusa la misma consulta de plantillas que
+ * GenerateActaPanel, filtradas al formulario actual. */
+function BulkActaBar({
+  projectId,
+  templateId,
+  selectedCount,
+  selectAllMatchingFilter,
+  selection,
+  total,
+  onMessage,
+  onClear,
+}: {
+  projectId: string;
+  templateId: string;
+  selectedCount: number;
+  selectAllMatchingFilter: boolean;
+  selection: { recordIds?: string[]; search?: string; status?: string; unlinkedOnly?: boolean };
+  total: number;
+  onMessage: (value: string) => void;
+  onClear: () => void;
+}) {
+  const [templates, setTemplates] = useState<ActaTemplateSummary[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    fetchActaTemplates(projectId)
+      .then((rows) => setTemplates(rows.filter((template) => template.template_id === templateId)))
+      .catch(() => setTemplates([]));
+  }, [projectId, templateId]);
+
+  async function generateBatch() {
+    if (!selectedTemplateId) return;
+    setGenerating(true);
+    try {
+      await renderActaBatch(selectedTemplateId, selection, 'actas-lote');
+      onMessage('Lote de actas generado.');
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : 'No fue posible generar el lote de actas.');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <div className="records-bulk-bar">
+      <span>{selectAllMatchingFilter ? `Todos los que coinciden con el filtro (${total})` : `${selectedCount} registro(s) seleccionado(s)`}</span>
+      <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
+        <option value="">Selecciona una plantilla de acta</option>
+        {templates.map((template) => (
+          <option key={template.id} value={template.id}>{template.name}</option>
+        ))}
+      </select>
+      <button type="button" onClick={() => void generateBatch()} disabled={!selectedTemplateId || generating}>
+        {generating ? 'Generando...' : 'Generar actas en lote'}
+      </button>
+      <button type="button" className="secondary" onClick={onClear}>Limpiar selección</button>
     </div>
   );
 }
@@ -648,6 +712,12 @@ function RecordTable({ templateId }: { templateId: string }) {
   });
   const [deepLinkedRecord, setDeepLinkedRecord] = useState<RuntimeRecord | null>(null);
   const [deepLinkError, setDeepLinkError] = useState('');
+  // Seleccion para generacion masiva de actas (docs/96 item #5, docs/110):
+  // selectedIds persiste a proposito entre paginas/filtros -- solo "Limpiar
+  // seleccion" la reinicia. selectAllMatchingFilter es mutuamente excluyente
+  // con selectedIds (activar uno apaga el otro).
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectAllMatchingFilter, setSelectAllMatchingFilter] = useState(false);
 
   useEffect(() => {
     if (!deepLink.recordId) return;
@@ -679,6 +749,8 @@ function RecordTable({ templateId }: { templateId: string }) {
   const fields = useMemo(() => Array.from(new Set(records.flatMap((record) => record.values.map((value) => value.field_name)))).slice(0, 5), [records]);
   const pageStart = total ? offset + 1 : 0;
   const pageEnd = Math.min(offset + records.length, total);
+  const pageIds = useMemo(() => records.map((record) => record.id), [records]);
+  const pageFullySelected = isPageFullySelected(selectedIds, pageIds);
 
   async function exportCsv() {
     try {
@@ -686,6 +758,26 @@ function RecordTable({ templateId }: { templateId: string }) {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No fue posible exportar.');
     }
+  }
+
+  function toggleRecordSelection(recordId: string) {
+    setSelectAllMatchingFilter(false);
+    setSelectedIds((current) => toggleSelection(current, recordId));
+  }
+
+  function togglePageSelection() {
+    setSelectAllMatchingFilter(false);
+    setSelectedIds((current) => (pageFullySelected ? deselectPage(current, pageIds) : selectPage(current, pageIds)));
+  }
+
+  function activateSelectAllMatchingFilter() {
+    setSelectedIds(new Set());
+    setSelectAllMatchingFilter(true);
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set());
+    setSelectAllMatchingFilter(false);
   }
 
   return (
@@ -725,14 +817,32 @@ function RecordTable({ templateId }: { templateId: string }) {
         </div>
         <div className="records-pagination" aria-live="polite">
           <span>{pageStart}-{pageEnd} de {total} registros</span>
+          <button className="secondary" disabled={total === 0 || selectAllMatchingFilter} onClick={activateSelectAllMatchingFilter}>
+            Seleccionar todos los que coinciden con el filtro ({total})
+          </button>
           <button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>Anterior</button>
           <button disabled={offset + PAGE_SIZE >= total} onClick={() => setOffset(offset + PAGE_SIZE)}>Siguiente</button>
         </div>
         {message ? <p role="status">{message}</p> : null}
+        {selectedIds.size > 0 || selectAllMatchingFilter ? (
+          <BulkActaBar
+            projectId={projectId}
+            templateId={templateId}
+            selectedCount={selectedIds.size}
+            selectAllMatchingFilter={selectAllMatchingFilter}
+            selection={selectAllMatchingFilter ? { search: query.trim(), status, unlinkedOnly } : { recordIds: Array.from(selectedIds) }}
+            total={total}
+            onMessage={setMessage}
+            onClear={clearSelection}
+          />
+        ) : null}
         <div className="records-table-wrap">
           <table className="records-table">
             <thead>
               <tr>
+                <th className="records-select-col">
+                  <input type="checkbox" aria-label="Seleccionar todos los de esta página" checked={pageFullySelected} onChange={togglePageSelection} disabled={pageIds.length === 0} />
+                </th>
                 <th>Fecha</th>
                 <th>Estado</th>
                 {fields.map((field) => <th key={field}>{field}</th>)}
@@ -743,6 +853,9 @@ function RecordTable({ templateId }: { templateId: string }) {
               {records.map((record) => (
                 <Fragment key={record.id}>
                   <tr>
+                    <td className="records-select-col">
+                      <input type="checkbox" aria-label={`Seleccionar registro ${record.id}`} checked={selectAllMatchingFilter || selectedIds.has(record.id)} onChange={() => toggleRecordSelection(record.id)} />
+                    </td>
                     <td>{new Date(record.created_at).toLocaleString()}</td>
                     <td><span className={`record-status ${record.status}`}>{record.status}</span></td>
                     {fields.map((field) => <td key={field}>{formatValue(record.values.find((value) => value.field_name === field)?.field_value_json)}</td>)}
@@ -750,7 +863,7 @@ function RecordTable({ templateId }: { templateId: string }) {
                   </tr>
                   {expanded === record.id ? (
                     <tr>
-                      <td colSpan={fields.length + 3}>
+                      <td colSpan={fields.length + 4}>
                         <dl className="record-detail">
                           {record.values.map((value) => (
                             <div key={value.id}>

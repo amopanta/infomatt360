@@ -80,6 +80,7 @@ class Settings(BaseSettings):
     bulk_worker_heartbeat_every_records: int = 100
     duplicate_check_window_days: int = 3
     backup_directory: str = "./backups"
+    acta_batch_max_records: int = 200
 
     # Conector opcional de Google Drive para evidencias/backups. Vacio por
     # defecto: sin credenciales configuradas, el conector queda inactivo.

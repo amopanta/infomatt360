@@ -16,10 +16,12 @@ Windows de desarrollo. xhtml2pdf cubre el caso de uso (actas con texto,
 tablas, logo e imagenes) sin esa fragilidad.
 """
 
+import csv
 import html
 import io
 import json
 import re
+import zipfile
 
 import jinja2
 from fastapi import HTTPException, status
@@ -80,6 +82,14 @@ def _html_to_pdf_bytes(compiled_html: str) -> bytes:
     if result.err:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No fue posible generar el PDF a partir de la plantilla")
     return buffer.getvalue()
+
+
+def _manifest_csv(rows: list[tuple[str, str, str]]) -> str:
+    output = io.StringIO()
+    output.write("﻿")
+    writer = csv.writer(output, lineterminator="\n")
+    writer.writerows(rows)
+    return output.getvalue()
 
 
 class ActaService:
@@ -205,6 +215,24 @@ class ActaService:
 
     def render_pdf_from_record(self, db: Session, template: ActaTemplate, record_id: str) -> bytes:
         return _html_to_pdf_bytes(self.render_html_from_blocks(db, template, record_id))
+
+    def render_pdf_batch(self, db: Session, template: ActaTemplate, record_ids: list[str]) -> bytes:
+        """Genera un ZIP con un PDF por registro (docs/96 item #5). Reusa
+        render_pdf_from_record sin cambios; un fallo individual no aborta el
+        lote -- se anota en manifest.csv, mismo espiritu 'por item' que el
+        guardado masivo de registros (save_records_bulk)."""
+        buffer = io.BytesIO()
+        manifest: list[tuple[str, str, str]] = [("record_id", "status", "error")]
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            for record_id in record_ids:
+                try:
+                    pdf_bytes = self.render_pdf_from_record(db, template, record_id)
+                    archive.writestr(f"{record_id}.pdf", pdf_bytes)
+                    manifest.append((record_id, "success", ""))
+                except HTTPException as exc:
+                    manifest.append((record_id, "failed", str(exc.detail)))
+            archive.writestr("manifest.csv", _manifest_csv(manifest))
+        return buffer.getvalue()
 
 
 acta_service = ActaService()

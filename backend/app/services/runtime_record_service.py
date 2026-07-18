@@ -801,6 +801,13 @@ class RuntimeRecordService:
             ])
         return output.getvalue()
 
+    def list_filtered_record_ids(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, unlinked_only: bool = False) -> list[str]:
+        """Resuelve todos los ids de registros que coinciden con un filtro, sin
+        paginar -- mismo patron que export_template_csv, para la seleccion
+        'todos los que coinciden con el filtro' de la generacion masiva de
+        actas (docs/96 item #5)."""
+        return [row.id for row in self._filtered_records_query(db, template_id, search, status, unlinked_only).order_by(RuntimeRecord.created_at.desc()).all()]
+
     def _csv_value(self, raw: str) -> str:
         try:
             value = json.loads(raw)

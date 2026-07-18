@@ -1,9 +1,11 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
-import { PROJECT_KEY } from '../auth/session';
+import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
 import { applyReviewAction, correctRecordField, downloadTemplateRecords, fetchProjectTemplates, fetchRecord, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, promoteRecordToParticipant, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
+import { fetchActaTemplates, renderActaFromRecord } from '../acta/api';
+import type { ActaTemplateSummary } from '../acta/types';
 import { fetchRuntimeRecordChildren, fetchRuntimeTemplate, saveRuntimeChildRecord } from '../runtime/api';
 import type { RuntimeRecordSummary } from '../runtime/api';
 import { RuntimeField } from '../runtime/RuntimeField';
@@ -87,6 +89,64 @@ function FlowSnapshotSummary({ title, snapshot }: { title: string; snapshot?: Re
       <span>{snapshot.name || 'Flujo sin nombre'} · versión {snapshot.flow_version || '—'} · {snapshot.steps.length} paso(s)</span>
       <small>{snapshot.steps.map((step) => `${step.step_order}. ${step.action_label} → ${step.status_after}`).join(' · ') || 'Sin pasos activos'}</small>
     </article>
+  );
+}
+
+/** Ver docs/109 (constructor visual de actas, docs/96 item #4): genera un
+ * PDF a partir de este registro usando una plantilla de acta ya diseñada
+ * para su formulario. Reusa el mismo endpoint que el boton "Generar PDF de
+ * prueba" del constructor -- no hay una vista previa aparte. */
+function GenerateActaPanel({
+  projectId,
+  record,
+  onMessage,
+}: {
+  projectId: string;
+  record: RuntimeRecord;
+  onMessage: (value: string) => void;
+}) {
+  const [templates, setTemplates] = useState<ActaTemplateSummary[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [generating, setGenerating] = useState(false);
+  const canManageActa = hasAnyCurrentProjectPermission(['builder.write']);
+
+  useEffect(() => {
+    fetchActaTemplates(projectId)
+      .then((rows) => setTemplates(rows.filter((template) => template.template_id === record.template_id)))
+      .catch(() => setTemplates([]));
+  }, [projectId, record.template_id]);
+
+  async function generate() {
+    if (!selectedTemplateId) return;
+    setGenerating(true);
+    try {
+      await renderActaFromRecord(selectedTemplateId, record.id, 'acta');
+      onMessage('Acta generada.');
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : 'No fue posible generar el acta.');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  if (templates.length === 0) {
+    return canManageActa ? (
+      <p className="acta-panel-empty">Este formulario aún no tiene plantillas de acta. <a href="/acta">Crear una</a>.</p>
+    ) : null;
+  }
+
+  return (
+    <div className="acta-panel">
+      <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
+        <option value="">Selecciona una plantilla de acta</option>
+        {templates.map((template) => (
+          <option key={template.id} value={template.id}>{template.name}</option>
+        ))}
+      </select>
+      <button type="button" className="secondary" onClick={() => void generate()} disabled={!selectedTemplateId || generating}>
+        {generating ? 'Generando...' : 'Generar acta'}
+      </button>
+    </div>
   );
 }
 
@@ -567,6 +627,7 @@ function DeepLinkedRecordCard({
       <PromoteToParticipantPanel projectId={projectId} record={record} onPromoted={onRecordUpdated} onMessage={onMessage} />
       <LinkedSubformSection projectId={projectId} record={record} onMessage={onMessage} />
       <ReviewPanel projectId={projectId} record={record} onMessage={onMessage} />
+      <GenerateActaPanel projectId={projectId} record={record} onMessage={onMessage} />
     </section>
   );
 }
@@ -701,6 +762,7 @@ function RecordTable({ templateId }: { templateId: string }) {
                         <PromoteToParticipantPanel projectId={projectId} record={record} onPromoted={updateRecordInList} onMessage={setMessage} />
                         <LinkedSubformSection projectId={projectId} record={record} onMessage={setMessage} />
                         <ReviewPanel projectId={projectId} record={record} onMessage={setMessage} />
+                        <GenerateActaPanel projectId={projectId} record={record} onMessage={setMessage} />
                       </td>
                     </tr>
                   ) : null}

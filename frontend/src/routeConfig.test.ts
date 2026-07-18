@@ -18,6 +18,8 @@ describe('resolveAppRoute', () => {
 
   it('mapea rutas administrativas con permisos esperados', () => {
     expect(resolveAppRoute('/builder')).toEqual({ key: 'builder', permissions: ['builder.write'] });
+    expect(resolveAppRoute('/acta')).toEqual({ key: 'acta', permissions: ['builder.write'] });
+    expect(resolveAppRoute('/acta/template-1')).toEqual({ key: 'acta', permissions: ['builder.write'] });
     expect(resolveAppRoute('/admin/users')).toEqual({ key: 'adminUsers', permissions: ['identity.users.manage'] });
     expect(resolveAppRoute('/admin/api-keys')).toEqual({ key: 'apiKeys', permissions: ['integrations.api_keys.manage'] });
     expect(resolveAppRoute('/admin/approval-flows')).toEqual({ key: 'approvalFlows', permissions: ['records.approve'] });

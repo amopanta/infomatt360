@@ -1,4 +1,5 @@
 export type AppRouteKey =
+  | 'acta'
   | 'builder'
   | 'bulkJobs'
   | 'metrics'
@@ -41,6 +42,7 @@ export function navigateTo(pathname: string): void {
 
 export function resolveAppRoute(pathname: string): AppRoute {
   if (pathname.startsWith('/builder')) return { key: 'builder', permissions: ['builder.write'] };
+  if (pathname.startsWith('/acta')) return { key: 'acta', permissions: ['builder.write'] };
   if (pathname.startsWith('/admin/bulk-jobs')) return { key: 'bulkJobs', permissions: ['integrations.api_keys.manage', 'records.write'] };
   if (pathname.startsWith('/admin/metrics')) return { key: 'metrics', permissions: ['identity.users.manage', 'integrations.api_keys.manage', 'records.approve', 'records.write'] };
   if (pathname.startsWith('/admin/approval-flows')) return { key: 'approvalFlows', permissions: ['records.approve'] };

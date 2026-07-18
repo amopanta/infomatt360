@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { AccountSecurityApp } from './modules/account/AccountSecurityApp';
+import { ActaApp } from './modules/acta/ActaApp';
 import { AdminUserSecurityApp } from './modules/admin/AdminUserSecurityApp';
 import { AiAuditApp } from './modules/admin/AiAuditApp';
 import { ApiKeysApp } from './modules/admin/ApiKeysApp';
@@ -84,6 +85,7 @@ function renderRoute(route: AppRoute) {
   const content = (() => {
     switch (route.key) {
       case 'builder': return <BuilderApp />;
+      case 'acta': return <ActaApp />;
       case 'bulkJobs': return <BulkJobsApp />;
       case 'metrics': return <OperationalMetricsApp />;
       case 'approvalFlows': return <ApprovalFlowsApp />;

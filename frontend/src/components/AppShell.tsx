@@ -7,6 +7,7 @@ import { navigateTo } from '../routeConfig';
 const menu = [
   { label: 'Dashboard', href: '/' },
   { label: 'Formularios', href: '/builder', permissions: ['builder.write'] },
+  { label: 'Actas', href: '/acta', permissions: ['builder.write'] },
   { label: 'Participantes', href: '/participants' },
   { label: 'Registros', href: '/records' },
   { label: 'Reportes', href: '/reports' },

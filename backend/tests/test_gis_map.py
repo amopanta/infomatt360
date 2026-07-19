@@ -10,7 +10,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.assignment import UserProjectAssignment
-from app.models.builder import BuilderTemplate
+from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.gis import GisFeature
 from app.models.identity import Project, User
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
@@ -31,10 +31,16 @@ def test_gis_project_map_merges_runtime_and_manual_features():
             project,
             other,
             template,
+            BuilderComponent(template_id=template.id, component_type="GPS", name="ubicacion", label="Ubicacion"),
+            BuilderComponent(template_id=template.id, component_type="TEXT", name="falso_geo", label="Observaciones"),
             UserProjectAssignment(user_id=user.id, project_id=project.id, status="active"),
             record,
             RuntimeRecordValue(record_id=record.id, field_name="ubicacion", field_value_json=json.dumps({"type": "Point", "coordinates": [-74.07, 4.71]})),
             RuntimeRecordValue(record_id=record.id, field_name="sin_mapa", field_value_json=json.dumps("texto")),
+            # Caso adversarial: un campo TEXT cuyo valor casualmente tiene forma
+            # de GeoJSON no debe aparecer en el mapa -- el filtro por
+            # component_type debe ganar sobre el shape-sniffing de JSON.
+            RuntimeRecordValue(record_id=record.id, field_name="falso_geo", field_value_json=json.dumps({"type": "Point", "coordinates": [-74.09, 4.73]})),
             GisFeature(id="manual-feature", project_id=project.id, feature_type="Point", latitude="4.72", longitude="-74.08", status="active"),
         ])
         db.commit()
@@ -55,6 +61,7 @@ def test_gis_project_map_merges_runtime_and_manual_features():
             features = response.json()["features"]
             assert len(features) == 2
             assert {item["source"] for item in features} == {"gis", "runtime"}
+            assert all(item.get("field_name") != "falso_geo" for item in features)
             runtime = next(item for item in features if item["source"] == "runtime")
             assert runtime["record_id"] == "map-record"
             assert runtime["template_name"] == "Visita"

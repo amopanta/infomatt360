@@ -168,14 +168,13 @@ body { margin: 0; }
 .maps-canvas-card header { display: flex; justify-content: space-between; align-items: center; gap: 18px; margin-bottom: 16px; }
 .maps-canvas-card h2, .maps-canvas-card p, .maps-detail h2 { margin: 0 0 5px; }
 .maps-canvas-card header a, .maps-detail a { color: #0066cc; font-weight: 800; }
-.maps-canvas { width: 100%; height: auto; display: block; border-radius: 18px; border: 1px solid #b9d3e8; }
-.maps-background { fill: #eef7fb; }
-.maps-grid { stroke: #cfe3ed; stroke-width: 1; stroke-dasharray: 6 6; }
-.maps-marker { cursor: pointer; outline: none; }
-.maps-marker circle { fill: #00c2ff; stroke: #0a2540; stroke-width: 2; transition: r 0.15s ease, fill 0.15s ease; }
-.maps-marker text { fill: #0a2540; font-size: 13px; font-weight: 800; paint-order: stroke; stroke: #ffffff; stroke-width: 4; pointer-events: none; }
-.maps-marker.active circle, .maps-marker:hover circle, .maps-marker:focus circle { fill: #0066cc; stroke: #00c2ff; stroke-width: 3; }
-.maps-empty { fill: #536878; font-size: 18px; font-weight: 800; }
+.maps-leaflet-container { width: 100%; height: 560px; border-radius: 18px; border: 1px solid #b9d3e8; }
+.maps-nearby-panel { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.maps-nearby-panel label { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: #0a2540; }
+.maps-nearby-panel input { width: 80px; padding: 7px 9px; border: 1px solid #cfd8e3; border-radius: 8px; font: inherit; }
+.maps-nearby-panel button { border: 0; border-radius: 10px; padding: 8px 12px; color: #ffffff; background: #0066cc; font-weight: 800; cursor: pointer; }
+.maps-nearby-panel button:nth-of-type(2) { color: #0066cc; background: #ffffff; border: 1px solid #0066cc; }
+.maps-nearby-hint { color: #536878; font-size: 12px; }
 .maps-detail { align-self: start; display: flex; flex-direction: column; gap: 12px; }
 .maps-detail > strong { color: #0066cc; font-size: 20px; }
 .maps-source { align-self: flex-start; padding: 5px 9px; border-radius: 999px; color: #0a5c36; background: #dcfae6; font-size: 12px; font-weight: 800; }

@@ -7,6 +7,8 @@ pytest
 httpx
 sqlalchemy
 psycopg2-binary
+geoalchemy2
+shapely
 alembic
 redis
 passlib[bcrypt]

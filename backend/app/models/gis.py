@@ -6,6 +6,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.time import utc_now
 from app.db.base import Base
+from app.db.geo_types import Geography
 
 
 def new_uuid() -> str:
@@ -36,6 +37,7 @@ class GisFeature(Base):
     latitude: Mapped[str | None] = mapped_column(String(60), nullable=True)
     longitude: Mapped[str | None] = mapped_column(String(60), nullable=True)
     geometry_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    geom: Mapped[str | None] = mapped_column(Geography, nullable=True)
     properties_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(40), default="active", nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

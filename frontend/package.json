@@ -12,12 +12,15 @@
   "dependencies": {
     "@vitejs/plugin-react": "latest",
     "jsqr": "^1.4.0",
+    "leaflet": "^1.9.4",
     "react": "latest",
     "react-dom": "latest",
+    "react-leaflet": "^5.0.0",
     "typescript": "latest",
     "vite": "latest"
   },
   "devDependencies": {
+    "@types/leaflet": "^1.9.21",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "fake-indexeddb": "^6.2.5",

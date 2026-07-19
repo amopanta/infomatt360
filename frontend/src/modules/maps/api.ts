@@ -28,3 +28,10 @@ export async function fetchProjectMap(projectId: string): Promise<ProjectMap> {
   if (!response.ok) throw new Error('No fue posible cargar el mapa del proyecto.');
   return response.json();
 }
+
+export async function fetchNearbyFeatures(projectId: string, lat: number, lng: number, radiusKm: number): Promise<MapFeature[]> {
+  const params = new URLSearchParams({ lat: String(lat), lng: String(lng), radius_km: String(radiusKm) });
+  const response = await fetch(`${API_BASE_URL}/gis/features/${projectId}/nearby?${params}`, { headers: authorizationHeader() });
+  if (!response.ok) throw new Error('No fue posible buscar elementos cercanos.');
+  return response.json();
+}

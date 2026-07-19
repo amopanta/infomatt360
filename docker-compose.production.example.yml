@@ -1,5 +1,11 @@
 services:
   postgres:
+    # GIS real (docs/96 item #8, docs/113): la migracion 0068_gis_geometry_column
+    # ejecuta "CREATE EXTENSION IF NOT EXISTS postgis" contra este servicio.
+    # La imagen plana postgres:16 no trae PostGIS -- para que esa migracion
+    # tenga exito en produccion, cambiar a una imagen con la extension
+    # preinstalada, por ejemplo postgis/postgis:16-3.4, o instalar el paquete
+    # postgresql-16-postgis-3 en una imagen derivada.
     image: postgres:16
     restart: unless-stopped
     environment:

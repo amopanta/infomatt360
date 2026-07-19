@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.identity import User
-from app.schemas.gis import GisFeatureCreate, GisFeatureRead, GisLayerCreate, GisLayerRead, GisProjectMap
+from app.schemas.gis import GisFeatureCreate, GisFeatureRead, GisLayerCreate, GisLayerRead, GisMapFeature, GisProjectMap
 from app.services.assignment_service import assignment_service
 from app.services.gis_service import gis_service
 
@@ -44,3 +44,10 @@ def project_map(project_id: str, db: Session = Depends(get_db), current_user: Us
     if not assignment_service.user_has_project_access(db, current_user.id, project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
     return gis_service.project_map(db, project_id)
+
+
+@router.get("/features/{project_id}/nearby", response_model=list[GisMapFeature])
+def nearby_features(project_id: str, lat: float, lng: float, radius_km: float = 1.0, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[GisMapFeature]:
+    if not assignment_service.user_has_project_access(db, current_user.id, project_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    return gis_service.nearby_features(db, project_id, lat, lng, radius_km)

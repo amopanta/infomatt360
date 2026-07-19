@@ -10,7 +10,7 @@ import csv
 import hashlib
 import json
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from io import StringIO
 from uuid import uuid4
 
@@ -24,9 +24,11 @@ from app.models.files import FileAsset
 from app.models.bulk_import import BulkImportJob
 from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
+from app.schemas.external_api import ExternalRecordTabularPage, ExternalRecordTabularRow
 from app.schemas.runtime_record import RuntimeBulkJobDetail, RuntimeBulkJobRead, RuntimeBulkJobSummary, RuntimeBulkSaveItemResult, RuntimeBulkSaveRequest, RuntimeBulkSaveResponse, RuntimeRecordCreate, RuntimeRecordFieldCorrection, RuntimeRecordPage, RuntimeRecordRead, RuntimeValueCreate, RuntimeValueRead
 from app.services.ai_audit_service import ai_audit_service
 from app.services.approval_flow_service import approval_flow_service
+from app.services.builder_service import builder_service
 from app.services.metrics_service import metrics_service
 
 logger = logging.getLogger(__name__)
@@ -808,6 +810,48 @@ class RuntimeRecordService:
         actas (docs/96 item #5)."""
         return [row.id for row in self._filtered_records_query(db, template_id, search, status, unlinked_only).order_by(RuntimeRecord.created_at.desc()).all()]
 
+    def search_template_records_tabular(
+        self,
+        db: Session,
+        template_id: str,
+        status: str | None = None,
+        updated_since: datetime | None = None,
+        limit: int = 25,
+        offset: int = 0,
+    ) -> ExternalRecordTabularPage:
+        """Version plana/tabular de search_template_records para consumo por
+        BI (docs/96 item #9): las columnas se derivan del esquema del
+        formulario (BuilderComponent, ya ordenado por sort_order), no de que
+        campos aparecieron en este lote -- a diferencia de export_template_csv,
+        el conjunto de columnas es estable entre llamadas con distintos
+        filtros."""
+        columns = [component.name for component in builder_service.list_components(db, template_id)]
+        query = self._filtered_records_query(db, template_id, status=status, updated_since=updated_since)
+        total = query.count()
+        records = query.order_by(RuntimeRecord.created_at.desc()).offset(offset).limit(limit).all()
+        record_ids = [record.id for record in records]
+        values = db.query(RuntimeRecordValue).filter(RuntimeRecordValue.record_id.in_(record_ids)).all() if record_ids else []
+        by_record: dict[str, dict[str, object]] = {}
+        for value in values:
+            try:
+                parsed = json.loads(value.field_value_json)
+            except (json.JSONDecodeError, TypeError):
+                parsed = value.field_value_json
+            by_record.setdefault(value.record_id, {})[value.field_name] = self._safe_bi_scalar(parsed)
+        items = [
+            ExternalRecordTabularRow(
+                record_id=record.id,
+                status=record.status,
+                submitted_by=record.submitted_by,
+                participant_id=record.participant_id,
+                created_at=record.created_at,
+                updated_at=record.updated_at,
+                fields={name: by_record.get(record.id, {}).get(name) for name in columns},
+            )
+            for record in records
+        ]
+        return ExternalRecordTabularPage(template_id=template_id, columns=columns, items=items, total=total, limit=limit, offset=offset)
+
     def _csv_value(self, raw: str) -> str:
         try:
             value = json.loads(raw)
@@ -821,15 +865,35 @@ class RuntimeRecordService:
             return self._safe_csv_cell(json.dumps(value, ensure_ascii=False, separators=(",", ":")))
         return self._safe_csv_cell(str(value))
 
-    def _safe_csv_cell(self, value: str) -> str:
-        return f"'{value}" if value.startswith(("=", "+", "-", "@", "\t", "\r")) else value
+    _FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
 
-    def _filtered_records_query(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, unlinked_only: bool = False):
+    def _is_formula_like(self, value: str) -> bool:
+        return value.startswith(self._FORMULA_PREFIXES)
+
+    def _safe_csv_cell(self, value: str) -> str:
+        return f"'{value}" if self._is_formula_like(value) else value
+
+    def _safe_bi_scalar(self, value: object) -> object:
+        """Mismo blindaje anti-inyeccion de formulas que _safe_csv_cell, pero
+        preservando tipos JSON (no todo se vuelve string) para la respuesta
+        tabular de BI -- un valor pulido desde Power BI/Tableau puede
+        terminar pegado en Excel/Sheets por el analista igual que el CSV
+        interno. Solo se blinda el string escalar de mas alto nivel;
+        listas/objetos (REPEAT, MATRIX, GPS, etc.) se pasan tal cual --
+        limitacion conocida y documentada, no un intento de blindar JSON
+        anidado recursivamente."""
+        if isinstance(value, str) and self._is_formula_like(value):
+            return f"'{value}"
+        return value
+
+    def _filtered_records_query(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, unlinked_only: bool = False, updated_since: datetime | None = None):
         query = db.query(RuntimeRecord).filter(RuntimeRecord.template_id == template_id)
         if status:
             query = query.filter(RuntimeRecord.status == status)
         if unlinked_only:
             query = query.filter(RuntimeRecord.participant_id.is_(None))
+        if updated_since is not None:
+            query = query.filter(RuntimeRecord.updated_at >= updated_since)
         normalized_search = search.strip() if search else ""
         if normalized_search:
             needle = f"%{normalized_search}%"

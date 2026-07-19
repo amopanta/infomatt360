@@ -1,25 +1,15 @@
 import secrets
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_api_key_secret, verify_api_key_secret
-from app.core.time import utc_now
+from app.core.time import to_naive_utc, utc_now
 from app.models.api_key import ProjectApiKey
 from app.schemas.api_key import ApiKeyCreate, ApiKeyCreateResponse, ApiKeyRead
-
-
-def _to_naive_utc(value: datetime | None) -> datetime | None:
-    """Normaliza a UTC sin zona, igual que utc_now() (columnas SQLAlchemy
-    DateTime existentes). El frontend envia expires_at con sufijo "Z"
-    (datetime consciente de zona); compararlo directo contra utc_now() sin
-    normalizar lanza TypeError (naive vs. aware)."""
-    if value is None or value.tzinfo is None:
-        return value
-    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 @dataclass(frozen=True)
@@ -73,7 +63,7 @@ class ApiKeyService:
     prefix = "im360"
 
     def create_key(self, db: Session, payload: ApiKeyCreate, created_by: str) -> ApiKeyCreateResponse:
-        expires_at = _to_naive_utc(payload.expires_at)
+        expires_at = to_naive_utc(payload.expires_at)
         if expires_at is not None and expires_at <= utc_now():
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="expires_at debe ser una fecha futura")
         key_id = secrets.token_urlsafe(12).replace("-", "").replace("_", "")[:16]

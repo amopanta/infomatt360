@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>InfoMatt360 - Conector Tableau (WDC)</title>
+    <script src="https://connectors.tableau.com/libs/tableauwdc-2.3.latest.js"></script>
+    <style>
+      body { font-family: system-ui, sans-serif; max-width: 480px; margin: 40px auto; padding: 0 16px; color: #0a2540; }
+      h1 { font-size: 20px; }
+      label { display: block; margin-top: 14px; font-weight: 700; font-size: 13px; }
+      input { width: 100%; padding: 9px; margin-top: 4px; border: 1px solid #cfd8e3; border-radius: 8px; font: inherit; box-sizing: border-box; }
+      button { margin-top: 18px; margin-right: 8px; padding: 10px 16px; border: 0; border-radius: 8px; background: #0066cc; color: #fff; font-weight: 700; cursor: pointer; }
+      button.secondary { background: #ffffff; color: #0066cc; border: 1px solid #0066cc; }
+      pre { white-space: pre-wrap; background: #f5f8fb; padding: 10px; border-radius: 8px; margin-top: 12px; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <h1>InfoMatt360 &mdash; Conector de datos web para Tableau</h1>
+    <p>Completa los datos de conexión y presiona "Obtener datos" (o "Listar formularios" para ver los IDs disponibles antes de conectar).</p>
+    <label for="apiBaseUrl">URL base de la API</label>
+    <input id="apiBaseUrl" type="text" placeholder="https://tu-dominio/api/v1" value="/api/v1" />
+    <label for="apiKey">API key</label>
+    <input id="apiKey" type="password" placeholder="im360_..." />
+    <label for="templateId">ID del formulario</label>
+    <input id="templateId" type="text" placeholder="template-id" />
+    <label for="statusFilter">Filtro de estado (vacío = todos)</label>
+    <input id="statusFilter" type="text" value="approved" />
+    <button id="loadTemplatesButton" type="button" class="secondary">Listar formularios</button>
+    <button id="submitButton" type="button">Obtener datos</button>
+    <pre id="formStatus"></pre>
+    <script type="module" src="/src/integrations/tableauWdc/main.ts"></script>
+  </body>
+</html>

@@ -18,7 +18,13 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     rollupOptions: {
-      input: fileURLToPath(new URL('index.html', import.meta.url)),
+      // Entrada multi-pagina (docs/96 item #9, docs/114): tableau-wdc es un
+      // Web Data Connector estatico, no parte de la SPA -- Tableau lo carga
+      // por URL directa, no via el shell de React.
+      input: {
+        main: fileURLToPath(new URL('index.html', import.meta.url)),
+        'tableau-wdc': fileURLToPath(new URL('tableau-wdc/index.html', import.meta.url)),
+      },
     },
   },
   plugins: [
@@ -45,6 +51,10 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // tableau-wdc no es parte de la app instalable (lo carga Tableau
+        // por URL directa, no un usuario navegando la SPA) -- se excluye del
+        // precache de la PWA.
+        globIgnores: ['tableau-wdc/**'],
         // El app shell (JS/CSS/HTML) se precachea para que la app cargue
         // incluso sin red. Las llamadas a la API usan NetworkFirst: intenta
         // la red primero (datos frescos) y cae al cache solo si no hay

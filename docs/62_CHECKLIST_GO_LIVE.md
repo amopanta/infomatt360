@@ -85,6 +85,7 @@ sin backups o sin capacidad de diagnostico.
 - [ ] Reportes XLSX/CSV validados.
 - [ ] API key de integracion probada.
 - [ ] Lote bulk `queued` probado con worker.
+- [ ] `worker-scheduler` corriendo (respaldos automaticos y sondeo IMAP dependen de el, ver docs/116).
 
 ## 8. Operacion y rollback
 
@@ -115,4 +116,5 @@ Con Docker Compose de referencia:
 docker compose -f docker-compose.production.example.yml --env-file .env.production ps
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs backend
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs worker-bulk
+docker compose -f docker-compose.production.example.yml --env-file .env.production logs worker-scheduler
 ```

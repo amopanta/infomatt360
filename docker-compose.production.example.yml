@@ -82,6 +82,31 @@ services:
       - uploads_data:/var/lib/infomatt360/uploads
     command: ["python", "-m", "app.cli.process_bulk_jobs", "--limit", "50", "--loop", "--sleep-seconds", "5", "--worker-id", "worker-bulk-01"]
 
+  worker-scheduler:
+    # Sin este worker, ScheduledTask (respaldos recurrentes, docs/78, y el
+    # sondeo IMAP de la bandeja externa, docs/116) solo queda guardado en la
+    # base de datos pero nadie lo ejecuta -- ver run_scheduled_tasks.py.
+    build:
+      context: .
+      dockerfile: deploy/backend.Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: postgresql+psycopg2://infomatt360:${POSTGRES_PASSWORD}@postgres:5432/infomatt360
+      REDIS_URL: redis://redis:6379/0
+      API_RATE_LIMIT_BACKEND: redis
+      AUTH_THROTTLE_BACKEND: redis
+      AUTO_CREATE_TABLES: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - uploads_data:/var/lib/infomatt360/uploads
+    command: ["python", "-m", "app.cli.run_scheduled_tasks", "--limit", "50", "--loop", "--sleep-seconds", "60"]
+
   frontend:
     build:
       context: .

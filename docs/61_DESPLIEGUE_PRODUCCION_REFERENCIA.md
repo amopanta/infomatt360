@@ -107,6 +107,18 @@ python -m app.cli.process_bulk_jobs --limit 50 --loop --sleep-seconds 5 --worker
 Esto mantiene las cargas masivas fuera del proceso web y evita que la API se
 degrade con sincronizaciones pesadas.
 
+### Worker scheduler
+
+Usa la misma imagen del backend, pero ejecuta:
+
+```text
+python -m app.cli.run_scheduled_tasks --limit 50 --loop --sleep-seconds 60
+```
+
+Sin este worker, las `ScheduledTask` recurrentes (respaldos automaticos,
+docs/78, y el sondeo de la bandeja externa IMAP, docs/116) quedan guardadas
+en la base de datos pero nunca se ejecutan.
+
 ### Frontend
 
 Se sirve con nginx. Para produccion real, colocar un proxy/TLS delante o adaptar

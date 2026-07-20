@@ -6,9 +6,9 @@ export type MailProfile = {
   sender_email: string;
   server_host?: string | null;
   server_port?: string | null;
-  config_json?: string | null;
   is_default: boolean;
   status: string;
+  last_imap_uid?: number | null;
 };
 
 export type MailAutoconfigSuggestion = {
@@ -53,6 +53,7 @@ export async function fetchMailProfiles(projectId: string): Promise<MailProfile[
 export type MailProfileCreatePayload = {
   projectId: string;
   name: string;
+  provider: 'smtp' | 'imap';
   senderEmail: string;
   serverHost?: string;
   serverPort?: string;
@@ -63,13 +64,17 @@ export type MailProfileCreatePayload = {
 };
 
 export async function createMailProfile(payload: MailProfileCreatePayload): Promise<MailProfile> {
-  const configJson = JSON.stringify({ use_tls: payload.useTls ?? true, username: payload.username || undefined, password: payload.password || undefined });
+  const configJson =
+    payload.provider === 'imap'
+      ? JSON.stringify({ username: payload.username || undefined, password: payload.password || undefined })
+      : JSON.stringify({ use_tls: payload.useTls ?? true, username: payload.username || undefined, password: payload.password || undefined });
   const response = await fetch(`${API_BASE_URL}/messages/profiles`, {
     method: 'POST',
     headers: headers(),
     body: JSON.stringify({
       project_id: payload.projectId,
       name: payload.name,
+      provider: payload.provider,
       sender_email: payload.senderEmail,
       server_host: payload.serverHost || null,
       server_port: payload.serverPort || null,

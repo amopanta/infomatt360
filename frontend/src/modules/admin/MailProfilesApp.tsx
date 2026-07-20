@@ -4,14 +4,19 @@ import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
 import { createMailProfile, fetchMailProfiles, suggestMailAutoconfig, testSendMailProfile } from './mailApi';
 import type { MailProfile } from './mailApi';
+import { createScheduledMailPollTask, fetchScheduledTasks } from './schedulerApi';
+import type { ScheduledTask } from './schedulerApi';
 
 export function MailProfilesApp() {
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [profiles, setProfiles] = useState<MailProfile[]>([]);
+  const [mailPollTasks, setMailPollTasks] = useState<ScheduledTask[]>([]);
   const [message, setMessage] = useState('');
   const [testMessages, setTestMessages] = useState<Record<string, string>>({});
+  const [activatingId, setActivatingId] = useState<string | null>(null);
 
   const [name, setName] = useState('');
+  const [provider, setProvider] = useState<'smtp' | 'imap'>('smtp');
   const [senderEmail, setSenderEmail] = useState('');
   const [serverHost, setServerHost] = useState('');
   const [serverPort, setServerPort] = useState('');
@@ -32,7 +37,30 @@ export function MailProfilesApp() {
     }
   }
 
-  useEffect(() => { void loadProfiles(); }, [projectId]);
+  async function loadMailPollTasks() {
+    if (!projectId) return;
+    try {
+      const tasks = await fetchScheduledTasks(projectId);
+      setMailPollTasks(tasks.filter((task) => task.task_type === 'mail_poll'));
+    } catch {
+      setMailPollTasks([]);
+    }
+  }
+
+  useEffect(() => { void loadProfiles(); void loadMailPollTasks(); }, [projectId]);
+
+  async function submitActivatePolling(profile: MailProfile) {
+    setActivatingId(profile.id);
+    try {
+      await createScheduledMailPollTask(projectId, profile.id, profile.name);
+      setMessage('Sondeo IMAP activado: se ejecuta cada hora desde el worker de tareas programadas.');
+      await loadMailPollTasks();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No fue posible activar el sondeo IMAP.');
+    } finally {
+      setActivatingId(null);
+    }
+  }
 
   async function handleEmailBlur() {
     const email = senderEmail.trim();
@@ -58,6 +86,7 @@ export function MailProfilesApp() {
       await createMailProfile({
         projectId,
         name: name.trim() || senderEmail.trim(),
+        provider,
         senderEmail: senderEmail.trim(),
         serverHost: serverHost.trim(),
         serverPort: serverPort.trim(),
@@ -66,7 +95,11 @@ export function MailProfilesApp() {
         password,
         isDefault,
       });
-      setMessage('Perfil de correo creado. Usa "Enviar prueba" para validar el envio real.');
+      setMessage(
+        provider === 'imap'
+          ? 'Perfil IMAP creado. Actívalo en la tabla de abajo para empezar a sondear la bandeja externa.'
+          : 'Perfil de correo creado. Usa "Enviar prueba" para validar el envio real.',
+      );
       setName('');
       setSenderEmail('');
       setServerHost('');
@@ -108,18 +141,25 @@ export function MailProfilesApp() {
             </div>
           </header>
           <div className="ai-analyze-inline">
+            <label>Tipo
+              <select value={provider} onChange={(event) => setProvider(event.target.value as 'smtp' | 'imap')}>
+                <option value="smtp">Envío (SMTP)</option>
+                <option value="imap">Bandeja externa de solo lectura (IMAP)</option>
+              </select>
+            </label>
             <label>Nombre<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Correo institucional" /></label>
-            <label>Correo remitente<input value={senderEmail} onChange={(event) => setSenderEmail(event.target.value)} onBlur={() => void handleEmailBlur()} placeholder="notificaciones@midominio.com" /></label>
-            <label>Servidor SMTP<input value={serverHost} onChange={(event) => setServerHost(event.target.value)} placeholder="smtp.midominio.com" /></label>
-            <label>Puerto<input value={serverPort} onChange={(event) => setServerPort(event.target.value)} placeholder="587" /></label>
+            <label>{provider === 'imap' ? 'Casilla a leer' : 'Correo remitente'}<input value={senderEmail} onChange={(event) => setSenderEmail(event.target.value)} onBlur={() => void handleEmailBlur()} placeholder="notificaciones@midominio.com" /></label>
+            <label>Servidor {provider === 'imap' ? 'IMAP' : 'SMTP'}<input value={serverHost} onChange={(event) => setServerHost(event.target.value)} placeholder={provider === 'imap' ? 'imap.midominio.com' : 'smtp.midominio.com'} /></label>
+            <label>Puerto<input value={serverPort} onChange={(event) => setServerPort(event.target.value)} placeholder={provider === 'imap' ? '993' : '587'} /></label>
             <label>Usuario<input value={username} onChange={(event) => setUsername(event.target.value)} /></label>
             <label>Contraseña<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-            <label><input type="checkbox" checked={useTls} onChange={(event) => setUseTls(event.target.checked)} /> Usar TLS (STARTTLS)</label>
+            {provider === 'smtp' ? <label><input type="checkbox" checked={useTls} onChange={(event) => setUseTls(event.target.checked)} /> Usar TLS (STARTTLS)</label> : null}
             <label><input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} /> Predeterminado</label>
             <button className="primary" disabled={creating || !senderEmail.trim() || !serverHost.trim() || !serverPort.trim()} onClick={() => void submitCreate()}>
               {creating ? 'Creando…' : 'Crear perfil'}
             </button>
           </div>
+          {provider === 'imap' ? <p>Bandeja de solo lectura: se sondea INBOX cada hora, sin adjuntos ni respuesta desde la app (ver docs/116).</p> : null}
           {autoconfigNote ? <p>{autoconfigNote}</p> : null}
         </section>
 
@@ -136,28 +176,47 @@ export function MailProfilesApp() {
               <thead>
                 <tr>
                   <th>Nombre</th>
+                  <th>Tipo</th>
                   <th>Remitente</th>
                   <th>Servidor</th>
                   <th>Predeterminado</th>
-                  <th>Resultado de prueba</th>
+                  <th>Estado</th>
                   <th></th>
                 </tr>
               </thead>
               <tbody>
-                {profiles.map((profile) => (
-                  <tr key={profile.id}>
-                    <td>{profile.name}</td>
-                    <td>{profile.sender_email}</td>
-                    <td>{profile.server_host ? `${profile.server_host}:${profile.server_port ?? ''}` : '—'}</td>
-                    <td>{profile.is_default ? 'Si' : 'No'}</td>
-                    <td>{testMessages[profile.id] ?? '—'}</td>
-                    <td>
-                      <button disabled={testingId === profile.id} onClick={() => void submitTestSend(profile.id)}>
-                        {testingId === profile.id ? 'Enviando…' : 'Enviar prueba'}
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                {profiles.map((profile) => {
+                  const mailPollTask = mailPollTasks.find((task) => task.target_id === profile.id);
+                  return (
+                    <tr key={profile.id}>
+                      <td>{profile.name}</td>
+                      <td>{profile.provider === 'imap' ? 'IMAP (lectura)' : 'SMTP'}</td>
+                      <td>{profile.sender_email}</td>
+                      <td>{profile.server_host ? `${profile.server_host}:${profile.server_port ?? ''}` : '—'}</td>
+                      <td>{profile.is_default ? 'Si' : 'No'}</td>
+                      <td>
+                        {profile.provider === 'imap'
+                          ? mailPollTask
+                            ? `Sondeo activo (cada hora) — ${mailPollTask.last_result ?? 'aún sin ejecutar'}`
+                            : 'Sondeo inactivo'
+                          : testMessages[profile.id] ?? '—'}
+                      </td>
+                      <td>
+                        {profile.provider === 'imap' ? (
+                          mailPollTask ? null : (
+                            <button disabled={activatingId === profile.id} onClick={() => void submitActivatePolling(profile)}>
+                              {activatingId === profile.id ? 'Activando…' : 'Activar sondeo IMAP'}
+                            </button>
+                          )
+                        ) : (
+                          <button disabled={testingId === profile.id} onClick={() => void submitTestSend(profile.id)}>
+                            {testingId === profile.id ? 'Enviando…' : 'Enviar prueba'}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

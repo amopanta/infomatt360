@@ -22,3 +22,4 @@ openpyxl
 jinja2
 xhtml2pdf
 boto3
+imap-tools

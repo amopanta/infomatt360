@@ -41,3 +41,18 @@ export async function createScheduledBackupTask(projectId: string, frequency: st
   });
   return parseOrThrow(response, 'No fue posible programar el respaldo automatico.');
 }
+
+export async function createScheduledMailPollTask(projectId: string, mailProfileId: string, mailProfileName: string): Promise<ScheduledTask> {
+  const response = await fetch(`${API_BASE_URL}/scheduler/tasks`, {
+    method: 'POST',
+    headers: headers(),
+    body: JSON.stringify({
+      project_id: projectId,
+      name: `Sondeo IMAP: ${mailProfileName}`,
+      task_type: 'mail_poll',
+      target_id: mailProfileId,
+      frequency: 'hourly',
+    }),
+  });
+  return parseOrThrow(response, 'No fue posible activar el sondeo IMAP.');
+}

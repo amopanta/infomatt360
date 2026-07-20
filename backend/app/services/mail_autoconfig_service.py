@@ -6,12 +6,12 @@ proveedores corporativos. En su lugar se usa una tabla de proveedores
 conocidos, mas una prueba real de envio antes de guardar la cuenta.
 """
 
-import json
 import logging
 import smtplib
 from email.message import EmailMessage
 
 from app.models.messages import MailProfile
+from app.services.message_service import decrypt_mail_config
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class MailAutoconfigService:
         if not profile.server_host or not profile.server_port:
             return False, "El perfil no tiene servidor SMTP configurado"
 
-        credentials = self._parse_config(profile.config_json)
+        credentials = decrypt_mail_config(profile.config_json)
         message = EmailMessage()
         message["Subject"] = "Prueba de configuracion de correo InfoMatt360"
         message["From"] = profile.sender_email
@@ -56,15 +56,6 @@ class MailAutoconfigService:
         except (OSError, smtplib.SMTPException) as exc:
             logger.warning("Prueba de envio SMTP fallida para perfil %s: %s", profile.id, exc)
             return False, f"No fue posible enviar el correo de prueba: {exc}"
-
-    def _parse_config(self, config_json: str | None) -> dict[str, object]:
-        if not config_json:
-            return {}
-        try:
-            parsed = json.loads(config_json)
-            return parsed if isinstance(parsed, dict) else {}
-        except json.JSONDecodeError:
-            return {}
 
 
 mail_autoconfig_service = MailAutoconfigService()

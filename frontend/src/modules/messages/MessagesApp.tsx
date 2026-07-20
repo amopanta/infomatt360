@@ -2,17 +2,19 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
-import { fetchCounts, fetchInbox, fetchProjectUsers, fetchSent, markMessageRead, sendMessage } from './api';
-import type { InternalMessage, MessageCounts, MessageUser } from './api';
+import { fetchCounts, fetchExternalInbox, fetchInbox, fetchProjectUsers, fetchSent, markExternalRead, markMessageRead, sendMessage } from './api';
+import type { ExternalMailMessage, InternalMessage, MessageCounts, MessageUser } from './api';
 
 export function MessagesApp() {
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [inbox, setInbox] = useState<InternalMessage[]>([]);
   const [sent, setSent] = useState<InternalMessage[]>([]);
+  const [external, setExternal] = useState<ExternalMailMessage[]>([]);
   const [counts, setCounts] = useState<MessageCounts>({ unread: 0, inbox: 0, sent: 0 });
   const [users, setUsers] = useState<MessageUser[]>([]);
-  const [tab, setTab] = useState<'inbox' | 'sent'>('inbox');
+  const [tab, setTab] = useState<'inbox' | 'sent' | 'external'>('inbox');
   const [message, setMessage] = useState('Cargando mensajes...');
+  const [externalMessage, setExternalMessage] = useState('');
 
   async function reload() {
     const [nextInbox, nextSent, nextCounts] = await Promise.all([fetchInbox(projectId), fetchSent(projectId), fetchCounts(projectId)]);
@@ -22,8 +24,19 @@ export function MessagesApp() {
     setMessage(nextInbox.length || nextSent.length ? '' : 'No hay mensajes internos todavía.');
   }
 
+  async function reloadExternal() {
+    try {
+      const nextExternal = await fetchExternalInbox(projectId);
+      setExternal(nextExternal);
+      setExternalMessage(nextExternal.length ? '' : 'No hay mensajes en la bandeja externa todavía.');
+    } catch (error) {
+      setExternalMessage(error instanceof Error ? error.message : 'No fue posible cargar la bandeja externa.');
+    }
+  }
+
   useEffect(() => {
     void reload().catch((error: Error) => setMessage(error.message));
+    void reloadExternal();
     void fetchProjectUsers(projectId).then(setUsers).catch(() => setUsers([]));
   }, [projectId]);
 
@@ -33,6 +46,15 @@ export function MessagesApp() {
       await reload();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No fue posible actualizar el mensaje.');
+    }
+  }
+
+  async function markExternalReadHandler(id: string) {
+    try {
+      await markExternalRead(projectId, id);
+      await reloadExternal();
+    } catch (error) {
+      setExternalMessage(error instanceof Error ? error.message : 'No fue posible actualizar el mensaje.');
     }
   }
 
@@ -48,16 +70,26 @@ export function MessagesApp() {
         <section className="messages-panel">
           <header>
             <div>
-              <h2>Bandeja interna</h2>
-              <p>Comunicación operativa entre usuarios asignados al proyecto.</p>
+              <h2>{tab === 'external' ? 'Bandeja externa' : 'Bandeja interna'}</h2>
+              <p>{tab === 'external' ? 'Correos leídos por IMAP desde un buzón externo configurado en Correo autoconfigurado (solo lectura, ver docs/116).' : 'Comunicación operativa entre usuarios asignados al proyecto.'}</p>
             </div>
             <div className="messages-tabs">
               <button className={tab === 'inbox' ? 'active' : ''} onClick={() => setTab('inbox')}>Recibidos</button>
               <button className={tab === 'sent' ? 'active' : ''} onClick={() => setTab('sent')}>Enviados</button>
+              <button className={tab === 'external' ? 'active' : ''} onClick={() => setTab('external')}>Bandeja externa</button>
             </div>
           </header>
-          {message ? <p role="status">{message}</p> : null}
-          <MessageList messages={tab === 'inbox' ? inbox : sent} mode={tab} onRead={markRead} />
+          {tab === 'external' ? (
+            <>
+              {externalMessage ? <p role="status">{externalMessage}</p> : null}
+              <ExternalMessageList messages={external} onRead={markExternalReadHandler} />
+            </>
+          ) : (
+            <>
+              {message ? <p role="status">{message}</p> : null}
+              <MessageList messages={tab === 'inbox' ? inbox : sent} mode={tab} onRead={markRead} />
+            </>
+          )}
         </section>
       </main>
     </AppShell>
@@ -119,6 +151,28 @@ function MessageList({ messages, mode, onRead }: { messages: InternalMessage[]; 
           <p>{item.body}</p>
           <small>{mode === 'inbox' ? `De: ${item.sender_id || 'Sistema'}` : `Para: ${item.recipient_id}`}</small>
           {mode === 'inbox' && item.status === 'unread' ? <button onClick={() => void onRead(item.id)}>Marcar leído</button> : null}
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function ExternalMessageList({ messages, onRead }: { messages: ExternalMailMessage[]; onRead: (id: string) => Promise<void> }) {
+  if (!messages.length) return <p>No hay mensajes en esta bandeja.</p>;
+  return (
+    <div className="messages-list">
+      {messages.map((item) => (
+        <article key={item.id} className={`message-item ${item.status === 'unread' ? 'unread' : ''}`}>
+          <header>
+            <div>
+              <strong>{item.subject}</strong>
+              <small>{item.received_at ? new Date(item.received_at).toLocaleString() : 'Sin fecha'}</small>
+            </div>
+            <span>{item.status}</span>
+          </header>
+          <p>{item.body}</p>
+          <small>{`De: ${item.from_address}`}</small>
+          {item.status === 'unread' ? <button onClick={() => void onRead(item.id)}>Marcar leído</button> : null}
         </article>
       ))}
     </div>

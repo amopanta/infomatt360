@@ -5,7 +5,18 @@ from app.api.deps import get_current_user
 from app.db.session import get_db
 from app.models.identity import User
 from app.models.messages import MailProfile
-from app.schemas.messages import InternalMessageCreate, InternalMessageRead, InternalMessageUpdate, MailAutoconfigSuggestion, MailProfileCreate, MailProfileRead, MailTestSendResponse, MessageCounts
+from app.schemas.messages import (
+    ExternalMailMessageRead,
+    ExternalMailMessageUpdate,
+    InternalMessageCreate,
+    InternalMessageRead,
+    InternalMessageUpdate,
+    MailAutoconfigSuggestion,
+    MailProfileCreate,
+    MailProfileRead,
+    MailTestSendResponse,
+    MessageCounts,
+)
 from app.services.assignment_service import assignment_service
 from app.services.mail_autoconfig_service import mail_autoconfig_service
 from app.services.message_service import message_service
@@ -91,3 +102,28 @@ def update_internal_message(project_id: str, message_id: str, payload: InternalM
     if not message:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mensaje no encontrado")
     return message_service.set_status(db, message, payload.status)
+
+
+@router.get("/external/{project_id}/inbox", response_model=list[ExternalMailMessageRead])
+def list_external_inbox(
+    project_id: str,
+    mail_profile_id: str | None = None,
+    status_filter: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> list[ExternalMailMessageRead]:
+    if not assignment_service.user_has_project_access(db, current_user.id, project_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    return message_service.list_external_inbox(db, project_id, mail_profile_id, status_filter, min(limit, 100), max(offset, 0))
+
+
+@router.patch("/external/{project_id}/{message_id}", response_model=ExternalMailMessageRead)
+def update_external_message(project_id: str, message_id: str, payload: ExternalMailMessageUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ExternalMailMessageRead:
+    if not assignment_service.user_has_project_access(db, current_user.id, project_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    message = message_service.get_project_external_message(db, message_id, project_id)
+    if not message:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Mensaje no encontrado")
+    return message_service.set_external_status(db, message, payload.status)

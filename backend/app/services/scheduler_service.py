@@ -15,8 +15,10 @@ from datetime import timedelta
 from sqlalchemy.orm import Session
 
 from app.core.time import utc_now
+from app.models.messages import MailProfile
 from app.models.scheduler import ScheduledTask, TaskRun
 from app.schemas.scheduler import ScheduledTaskCreate, ScheduledTaskRead, TaskRunCreate, TaskRunRead
+from app.services import imap_service
 from app.services.backup_service import backup_service
 
 # Frecuencias recurrentes soportadas por el worker. "manual" (el default del
@@ -119,6 +121,11 @@ class SchedulerService:
             if job.status == "completed":
                 return "success", f"Respaldo completado: {job.file_path} ({job.size_bytes} bytes)"
             return "failed", job.error or "El respaldo fallo sin detalle de error"
+        if task.task_type == "mail_poll":
+            profile = db.query(MailProfile).filter(MailProfile.id == task.target_id).first()
+            if profile is None:
+                return "failed", "El perfil de correo IMAP referenciado ya no existe"
+            return imap_service.poll_profile(db, profile)
         return "failed", f"task_type '{task.task_type}' no esta soportado por el worker de tareas programadas"
 
 

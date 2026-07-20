@@ -15,8 +15,17 @@ class MailProfileCreate(BaseModel):
     status: str = "active"
 
 
-class MailProfileRead(MailProfileCreate):
+class MailProfileRead(BaseModel):
     id: str
+    project_id: str
+    name: str
+    provider: str
+    sender_email: str
+    server_host: str | None = None
+    server_port: str | None = None
+    is_default: bool
+    status: str
+    last_imap_uid: int | None = None
 
 
 class MailAutoconfigSuggestion(BaseModel):
@@ -54,3 +63,20 @@ class MessageCounts(BaseModel):
     unread: int
     inbox: int
     sent: int
+
+
+class ExternalMailMessageRead(BaseModel):
+    id: str
+    project_id: str
+    mail_profile_id: str
+    uid: int
+    from_address: str
+    subject: str
+    body: str
+    received_at: datetime | None = None
+    fetched_at: datetime
+    status: str = "unread"
+
+
+class ExternalMailMessageUpdate(BaseModel):
+    status: str = Field(pattern="^(unread|read|archived)$")

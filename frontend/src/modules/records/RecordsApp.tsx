@@ -4,7 +4,7 @@ import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
 import { applyReviewAction, correctRecordField, downloadTemplateRecords, fetchProjectTemplates, fetchRecord, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, promoteRecordToParticipant, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
-import { fetchActaTemplates, renderActaBatch, renderActaFromRecord } from '../acta/api';
+import { fetchActaTemplates, printActaBatch, printActaFromRecord, renderActaBatch, renderActaFromRecord } from '../acta/api';
 import type { ActaTemplateSummary } from '../acta/types';
 import { fetchRuntimeRecordChildren, fetchRuntimeTemplate, saveRuntimeChildRecord } from '../runtime/api';
 import type { RuntimeRecordSummary } from '../runtime/api';
@@ -13,6 +13,9 @@ import { parseFieldConfig } from '../runtime/fieldConfig';
 import type { RuntimeComponent, RuntimeFormValues, RuntimeTemplate } from '../runtime/types';
 import { fetchProjectParticipants } from '../participants/api';
 import type { Participant } from '../participants/api';
+import { isDesktopApp } from '../desktop/desktopBridge';
+import { PrinterPicker } from '../desktop/PrinterPicker';
+import { formatBatchPrintMessage } from '../desktop/printSummary';
 import { deselectPage, isPageFullySelected, selectPage, toggleSelection } from './selection';
 
 const REJECTION_STATUSES = new Set(['rejected', 'returned']);
@@ -109,6 +112,9 @@ function GenerateActaPanel({
   const [templates, setTemplates] = useState<ActaTemplateSummary[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [printerName, setPrinterName] = useState('');
+  const [copies, setCopies] = useState(1);
+  const [printing, setPrinting] = useState(false);
   const canManageActa = hasAnyCurrentProjectPermission(['builder.write']);
 
   useEffect(() => {
@@ -130,6 +136,19 @@ function GenerateActaPanel({
     }
   }
 
+  async function print() {
+    if (!selectedTemplateId) return;
+    setPrinting(true);
+    try {
+      const result = await printActaFromRecord(selectedTemplateId, record.id, printerName || undefined, copies);
+      onMessage(result.success ? 'Acta enviada a impresión.' : `No fue posible imprimir: ${result.failureReason}`);
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : 'No fue posible imprimir el acta.');
+    } finally {
+      setPrinting(false);
+    }
+  }
+
   if (templates.length === 0) {
     return canManageActa ? (
       <p className="acta-panel-empty">Este formulario aún no tiene plantillas de acta. <a href="/acta">Crear una</a>.</p>
@@ -147,6 +166,14 @@ function GenerateActaPanel({
       <button type="button" className="secondary" onClick={() => void generate()} disabled={!selectedTemplateId || generating}>
         {generating ? 'Generando...' : 'Generar acta'}
       </button>
+      {isDesktopApp() && (
+        <>
+          <PrinterPicker printerName={printerName} onPrinterNameChange={setPrinterName} copies={copies} onCopiesChange={setCopies} />
+          <button type="button" className="secondary" onClick={() => void print()} disabled={!selectedTemplateId || printing}>
+            {printing ? 'Imprimiendo...' : 'Imprimir'}
+          </button>
+        </>
+      )}
     </div>
   );
 }
@@ -177,6 +204,9 @@ function BulkActaBar({
   const [templates, setTemplates] = useState<ActaTemplateSummary[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [generating, setGenerating] = useState(false);
+  const [printerName, setPrinterName] = useState('');
+  const [copies, setCopies] = useState(1);
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
     fetchActaTemplates(projectId)
@@ -197,6 +227,19 @@ function BulkActaBar({
     }
   }
 
+  async function printBatch() {
+    if (!selectedTemplateId) return;
+    setPrinting(true);
+    try {
+      const result = await printActaBatch(selectedTemplateId, selection, printerName || undefined, copies);
+      onMessage(formatBatchPrintMessage(result));
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : 'No fue posible imprimir el lote de actas.');
+    } finally {
+      setPrinting(false);
+    }
+  }
+
   return (
     <div className="records-bulk-bar">
       <span>{selectAllMatchingFilter ? `Todos los que coinciden con el filtro (${total})` : `${selectedCount} registro(s) seleccionado(s)`}</span>
@@ -209,6 +252,14 @@ function BulkActaBar({
       <button type="button" onClick={() => void generateBatch()} disabled={!selectedTemplateId || generating}>
         {generating ? 'Generando...' : 'Generar actas en lote'}
       </button>
+      {isDesktopApp() && (
+        <>
+          <PrinterPicker printerName={printerName} onPrinterNameChange={setPrinterName} copies={copies} onCopiesChange={setCopies} />
+          <button type="button" onClick={() => void printBatch()} disabled={!selectedTemplateId || printing}>
+            {printing ? 'Imprimiendo...' : 'Imprimir lote'}
+          </button>
+        </>
+      )}
       <button type="button" className="secondary" onClick={onClear}>Limpiar selección</button>
     </div>
   );

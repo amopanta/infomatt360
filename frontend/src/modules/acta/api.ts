@@ -3,6 +3,26 @@ import type { ActaFieldOption, ActaLayout, ActaTemplateSummary } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
 
+/** Fetch compartido por las 4 variantes de generación de acta (descarga y
+ * ahora impresión, docs/96 item #10): mismo POST + headers + manejo de
+ * error, solo cambia qué se hace con la respuesta binaria. */
+async function fetchActaBinary(url: string, body: unknown, errorMessage: string): Promise<Response> {
+  const response = await fetch(url, { method: 'POST', headers: jsonAuthHeaders(), body: JSON.stringify(body) });
+  if (!response.ok) throw new Error((await safeErrorDetail(response)) ?? errorMessage);
+  return response;
+}
+
+function downloadBlob(blob: Blob, fileName: string): void {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 export async function fetchActaTemplates(projectId: string): Promise<ActaTemplateSummary[]> {
   const response = await fetch(`${API_BASE_URL}/acta-templates/project/${projectId}`, { headers: authorizationHeader() });
   if (!response.ok) throw new Error('No fue posible consultar las plantillas de acta.');
@@ -24,21 +44,20 @@ export async function updateActaLayoutTemplate(templateId: string, payload: { pr
 /** Descarga el PDF generado a partir de un registro real, mismo patron de
  * blob que `downloadReportSummary` (ver frontend/src/modules/reports/api.ts). */
 export async function renderActaFromRecord(templateId: string, recordId: string, fileNameHint: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/acta-templates/${templateId}/render-from-record`, {
-    method: 'POST',
-    headers: jsonAuthHeaders(),
-    body: JSON.stringify({ record_id: recordId }),
-  });
-  if (!response.ok) throw new Error((await safeErrorDetail(response)) ?? 'No fue posible generar el acta.');
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `${fileNameHint}.pdf`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const response = await fetchActaBinary(`${API_BASE_URL}/acta-templates/${templateId}/render-from-record`, { record_id: recordId }, 'No fue posible generar el acta.');
+  downloadBlob(await response.blob(), `${fileNameHint}.pdf`);
+}
+
+/** Imprime el acta de un registro en el cliente de escritorio (docs/96 item
+ * #10): pide el mismo PDF que `renderActaFromRecord` pero via
+ * `arrayBuffer()` en vez de disparar una descarga, y lo entrega a
+ * `window.desktopBridge` para impresión nativa (`webContents.print`). Solo
+ * disponible dentro de Electron -- lanza si `desktopBridge` no existe. */
+export async function printActaFromRecord(templateId: string, recordId: string, deviceName: string | undefined, copies: number) {
+  if (!window.desktopBridge) throw new Error('La impresión nativa solo está disponible en el cliente de escritorio.');
+  const response = await fetchActaBinary(`${API_BASE_URL}/acta-templates/${templateId}/render-from-record`, { record_id: recordId }, 'No fue posible generar el acta.');
+  const pdfBytes = await response.arrayBuffer();
+  return window.desktopBridge.printDocument({ pdfBytes, deviceName, copies });
 }
 
 export type ActaBatchSelection = { recordIds?: string[]; search?: string; status?: string; unlinkedOnly?: boolean };
@@ -60,21 +79,19 @@ export function buildBatchPayload(selection: ActaBatchSelection): ActaBatchPaylo
 /** Descarga un ZIP con un PDF por registro (docs/96 item #5, docs/110),
  * mismo patron de blob que `renderActaFromRecord`. */
 export async function renderActaBatch(templateId: string, selection: ActaBatchSelection, fileNameHint: string): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}/acta-templates/${templateId}/render-batch`, {
-    method: 'POST',
-    headers: jsonAuthHeaders(),
-    body: JSON.stringify(buildBatchPayload(selection)),
-  });
-  if (!response.ok) throw new Error((await safeErrorDetail(response)) ?? 'No fue posible generar el lote de actas.');
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = `${fileNameHint}.zip`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  const response = await fetchActaBinary(`${API_BASE_URL}/acta-templates/${templateId}/render-batch`, buildBatchPayload(selection), 'No fue posible generar el lote de actas.');
+  downloadBlob(await response.blob(), `${fileNameHint}.zip`);
+}
+
+/** Imprime un lote de actas (docs/96 items #5/#10): mismo ZIP que
+ * `renderActaBatch`, entregado a `window.desktopBridge.printBatch` para
+ * que el proceso principal lo desempaquete e imprima secuencialmente
+ * (`desktop/src/printing.js::printBatchZip`). */
+export async function printActaBatch(templateId: string, selection: ActaBatchSelection, deviceName: string | undefined, copies: number) {
+  if (!window.desktopBridge) throw new Error('La impresión nativa solo está disponible en el cliente de escritorio.');
+  const response = await fetchActaBinary(`${API_BASE_URL}/acta-templates/${templateId}/render-batch`, buildBatchPayload(selection), 'No fue posible generar el lote de actas.');
+  const zipBytes = await response.arrayBuffer();
+  return window.desktopBridge.printBatch({ zipBytes, deviceName, copies });
 }
 
 /** Reusa `GET /builder/components/{template_id}` (ya existente para el

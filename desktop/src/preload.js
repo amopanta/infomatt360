@@ -13,4 +13,7 @@ contextBridge.exposeInMainWorld("desktopBridge", {
   getPendingCount: () => ipcRenderer.invoke("desktop:pending-count"),
   syncNow: (credentials) => ipcRenderer.invoke("desktop:sync-now", credentials),
   purgeOldSynced: (retentionDays) => ipcRenderer.invoke("desktop:purge-old-synced", retentionDays),
+  listPrinters: () => ipcRenderer.invoke("desktop:list-printers"),
+  printDocument: (payload) => ipcRenderer.invoke("desktop:print-document", payload),
+  printBatch: (payload) => ipcRenderer.invoke("desktop:print-batch", payload),
 });

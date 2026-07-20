@@ -414,6 +414,9 @@ body { margin: 0; }
 .acta-panel select { border: 1px solid #cfd8e3; border-radius: 8px; padding: 6px 8px; font: inherit; min-width: 220px; }
 .acta-panel-empty { margin-top: 8px; color: #536878; font-size: 13px; }
 .acta-panel-empty a { color: #0066cc; font-weight: 800; }
+.printer-picker { display: inline-flex; align-items: center; gap: 6px; }
+.printer-picker select { border: 1px solid #cfd8e3; border-radius: 8px; padding: 6px 8px; font: inherit; min-width: 220px; }
+.printer-picker input[type="number"] { width: 52px; border: 1px solid #cfd8e3; border-radius: 8px; padding: 6px 8px; font: inherit; }
 
 @media (max-width: 1100px) { .runtime-column { grid-column: span var(--tablet-span, 12); } }
 @media (max-width: 1200px) { .builder-layout { grid-template-columns: minmax(240px, 300px) minmax(0, 1fr); } .builder-palette { position: static; grid-column: 1 / -1; max-height: none; } .acta-builder-body { grid-template-columns: minmax(220px, 260px) minmax(0, 1fr); } .reports-editor { grid-template-columns: minmax(220px, 260px) minmax(0, 1fr); } }

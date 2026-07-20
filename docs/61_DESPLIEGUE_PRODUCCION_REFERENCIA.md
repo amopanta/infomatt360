@@ -89,12 +89,25 @@ docker compose -f docker-compose.production.example.yml --env-file .env.producti
 
 ### Backend
 
-Expone la API en el puerto `8000`. Debe quedar detras de un proxy con HTTPS.
-El endpoint de readiness es:
+Corre en 2 replicas (`backend-1`, `backend-2`) detras de `backend-lb`, que es
+el que expone el puerto `8000` (ver "Balanceador de carga" abajo). Ninguna
+replica publica puerto al host directamente. Debe quedar detras de un proxy
+con HTTPS. El endpoint de readiness es:
 
 ```text
 GET /api/v1/health/ready
 ```
+
+### Balanceador de carga (backend-lb)
+
+nginx (`deploy/nginx.backend-lb.conf`) balancea round-robin entre `backend-1`
+y `backend-2` (ver docs/117), con `proxy_next_upstream` para saltar a la otra
+replica si una falla. Tiene IP fija (`172.28.0.10`, subred `172.28.0.0/24`
+declarada al final de `docker-compose.production.example.yml`) para que
+`API_RATE_LIMIT_TRUSTED_PROXY_IPS` (`.env.production.example`) pueda confiar
+en su `X-Forwarded-For` y el backend siga viendo la IP real del cliente para
+rate limiting y throttle de login -- sin esa variable configurada, todo el
+trafico se veria como si viniera de `backend-lb`.
 
 ### Worker bulk
 

@@ -86,6 +86,7 @@ sin backups o sin capacidad de diagnostico.
 - [ ] API key de integracion probada.
 - [ ] Lote bulk `queued` probado con worker.
 - [ ] `worker-scheduler` corriendo (respaldos automaticos y sondeo IMAP dependen de el, ver docs/116).
+- [ ] `backend-lb` corriendo y balanceando entre `backend-1`/`backend-2` (ver docs/117); `API_RATE_LIMIT_TRUSTED_PROXY_IPS` configurado con su IP fija.
 
 ## 8. Operacion y rollback
 
@@ -114,7 +115,9 @@ Con Docker Compose de referencia:
 
 ```powershell
 docker compose -f docker-compose.production.example.yml --env-file .env.production ps
-docker compose -f docker-compose.production.example.yml --env-file .env.production logs backend
+docker compose -f docker-compose.production.example.yml --env-file .env.production logs backend-1
+docker compose -f docker-compose.production.example.yml --env-file .env.production logs backend-2
+docker compose -f docker-compose.production.example.yml --env-file .env.production logs backend-lb
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs worker-bulk
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs worker-scheduler
 ```

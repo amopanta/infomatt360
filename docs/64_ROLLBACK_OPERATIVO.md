@@ -46,7 +46,7 @@ autenticacion, permisos, migraciones o estructura de datos.
 2. Reiniciar servicios:
 
 ```powershell
-docker compose -f docker-compose.production.example.yml --env-file .env.production up -d --build backend frontend worker-bulk worker-scheduler
+docker compose -f docker-compose.production.example.yml --env-file .env.production up -d --build backend-1 backend-2 backend-lb frontend worker-bulk worker-scheduler
 ```
 
 3. Validar:
@@ -58,7 +58,9 @@ docker compose -f docker-compose.production.example.yml --env-file .env.producti
 4. Revisar logs:
 
 ```powershell
-docker compose -f docker-compose.production.example.yml --env-file .env.production logs backend
+docker compose -f docker-compose.production.example.yml --env-file .env.production logs backend-1
+docker compose -f docker-compose.production.example.yml --env-file .env.production logs backend-2
+docker compose -f docker-compose.production.example.yml --env-file .env.production logs backend-lb
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs worker-bulk
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs worker-scheduler
 ```

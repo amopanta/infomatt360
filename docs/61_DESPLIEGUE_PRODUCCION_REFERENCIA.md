@@ -195,6 +195,15 @@ p50/p95/p99, requests por familia de status, throughput del worker bulk) se
 provisionan solos desde `deploy/grafana/provisioning/` -- no hace falta
 configurarlos a mano.
 
+### Prueba de carga (loadtest/)
+
+`loadtest/k6-infomatt360.js` (docs/119) genera la evidencia real de
+capacidad que pedia la auditoria tecnica externa. A escala minima (default)
+es seguro correrla contra cualquier entorno; a escala de 3.000 usuarios
+(`TARGET_VUS=3000`) subir antes `API_RATE_LIMIT_REQUESTS` temporalmente --
+ver `loadtest/README.md`, seccion sobre rate limiting por IP. Ver
+`loadtest/README.md` para el procedimiento completo.
+
 ## Verificaciones despues de desplegar
 
 ```powershell

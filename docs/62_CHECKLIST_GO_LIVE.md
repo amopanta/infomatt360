@@ -74,6 +74,12 @@ sin backups o sin capacidad de diagnostico.
 - [ ] Logs centralizados y buscables por `X-Request-ID`.
 - [ ] Monitor liviano `scripts/monitor-health.cmd` configurado o reemplazado por monitoreo externo.
 
+## 6b. Prueba de carga (evidencia de capacidad, docs/119)
+
+- [ ] `loadtest/k6-infomatt360.js` corrida a escala de referencia (`TARGET_VUS=3000`, ver `loadtest/README.md`) contra este entorno, con resultado guardado.
+- [ ] Thresholds del script (`http_req_failed<1%`, `p(95)` de busquedas `<500ms`) cumplidos, o desviaciones documentadas.
+- [ ] `API_RATE_LIMIT_REQUESTS` revertido a su valor real despues de la prueba (se sube temporalmente solo durante la corrida, ver `loadtest/README.md`).
+
 ## 7. Validacion funcional
 
 - [ ] `scripts/check-health.cmd` contra URLs productivas.

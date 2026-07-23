@@ -61,6 +61,9 @@ if ($failures.Count -eq 0) {
   RequireContains $compose "(?m)^\s*grafana:" "Servicio grafana"
   RequireContains $compose "secrets/metrics_token" "Montaje del token de scraping de metricas"
   RequireContains $compose "GF_SECURITY_ADMIN_PASSWORD" "Contrasena de Grafana"
+  RequireContains $compose "(?m)^\s*pgbouncer:" "Servicio pgbouncer"
+  RequireContains $compose "POOL_MODE:\s*transaction" "Modo de pool transaction en pgbouncer"
+  RequireContains $compose "@pgbouncer:6432" "DATABASE_URL de la aplicacion apuntando a pgbouncer, no directo a postgres"
 
   RequireContains $dockerignore "(?m)^\.env\r?$" "Exclusion .env"
   RequireContains $dockerignore "(?m)^\.env\.production\r?$" "Exclusion .env.production"

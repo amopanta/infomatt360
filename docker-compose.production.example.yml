@@ -32,6 +32,32 @@ services:
       timeout: 5s
       retries: 5
 
+  # E-003 (auditoria tecnica externa julio 2026, docs/120): pool de conexiones
+  # entre el backend y Postgres. Cada replica del backend ya trae su propio
+  # pool de SQLAlchemy (DB_POOL_SIZE + DB_MAX_OVERFLOW); sin PgBouncer, el
+  # total de conexiones reales a Postgres crece linealmente con el numero de
+  # replicas y puede agotar max_connections mucho antes de que Postgres se
+  # quede sin capacidad real. PgBouncer multiplexa muchas conexiones de
+  # cliente sobre un numero mucho menor de conexiones reales a Postgres.
+  # pool_mode=transaction (el mas eficiente) es seguro aqui: este proyecto no
+  # usa advisory locks, LISTEN/NOTIFY ni prepared statements de sesion
+  # (verificado, ver docs/120). No publica puerto al host -- solo lo
+  # consumen los servicios internos de este mismo compose.
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://infomatt360:${POSTGRES_PASSWORD}@postgres:5432/infomatt360
+      AUTH_TYPE: scram-sha-256
+      POOL_MODE: transaction
+      LISTEN_PORT: "6432"
+      MAX_CLIENT_CONN: "500"
+      DEFAULT_POOL_SIZE: "20"
+      ADMIN_USERS: infomatt360
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   # E-001 (auditoria tecnica externa julio 2026, docs/117): 2 replicas del
   # backend en vez de una sola instancia, mas backend-lb (nginx) haciendo
   # balanceo de carga real -- sin esto, un solo proceso backend era un punto
@@ -46,7 +72,7 @@ services:
     env_file:
       - .env.production
     environment:
-      DATABASE_URL: postgresql+psycopg2://infomatt360:${POSTGRES_PASSWORD}@postgres:5432/infomatt360
+      DATABASE_URL: postgresql+psycopg2://infomatt360:${POSTGRES_PASSWORD}@pgbouncer:6432/infomatt360
       REDIS_URL: redis://redis:6379/0
       API_RATE_LIMIT_BACKEND: redis
       AUTH_THROTTLE_BACKEND: redis
@@ -56,6 +82,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      pgbouncer:
+        condition: service_started
     volumes:
       - uploads_data:/var/lib/infomatt360/uploads
     healthcheck:
@@ -72,7 +100,7 @@ services:
     env_file:
       - .env.production
     environment:
-      DATABASE_URL: postgresql+psycopg2://infomatt360:${POSTGRES_PASSWORD}@postgres:5432/infomatt360
+      DATABASE_URL: postgresql+psycopg2://infomatt360:${POSTGRES_PASSWORD}@pgbouncer:6432/infomatt360
       REDIS_URL: redis://redis:6379/0
       API_RATE_LIMIT_BACKEND: redis
       AUTH_THROTTLE_BACKEND: redis
@@ -82,6 +110,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      pgbouncer:
+        condition: service_started
     volumes:
       - uploads_data:/var/lib/infomatt360/uploads
     healthcheck:
@@ -124,7 +154,7 @@ services:
     env_file:
       - .env.production
     environment:
-      DATABASE_URL: postgresql+psycopg2://infomatt360:${POSTGRES_PASSWORD}@postgres:5432/infomatt360
+      DATABASE_URL: postgresql+psycopg2://infomatt360:${POSTGRES_PASSWORD}@pgbouncer:6432/infomatt360
       REDIS_URL: redis://redis:6379/0
       API_RATE_LIMIT_BACKEND: redis
       AUTH_THROTTLE_BACKEND: redis
@@ -134,6 +164,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      pgbouncer:
+        condition: service_started
     volumes:
       - uploads_data:/var/lib/infomatt360/uploads
     command: ["python", "-m", "app.cli.process_bulk_jobs", "--limit", "50", "--loop", "--sleep-seconds", "5", "--worker-id", "worker-bulk-01"]
@@ -149,7 +181,7 @@ services:
     env_file:
       - .env.production
     environment:
-      DATABASE_URL: postgresql+psycopg2://infomatt360:${POSTGRES_PASSWORD}@postgres:5432/infomatt360
+      DATABASE_URL: postgresql+psycopg2://infomatt360:${POSTGRES_PASSWORD}@pgbouncer:6432/infomatt360
       REDIS_URL: redis://redis:6379/0
       API_RATE_LIMIT_BACKEND: redis
       AUTH_THROTTLE_BACKEND: redis
@@ -159,6 +191,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      pgbouncer:
+        condition: service_started
     volumes:
       - uploads_data:/var/lib/infomatt360/uploads
     command: ["python", "-m", "app.cli.run_scheduled_tasks", "--limit", "50", "--loop", "--sleep-seconds", "60"]

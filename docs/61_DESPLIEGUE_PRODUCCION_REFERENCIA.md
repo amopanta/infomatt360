@@ -24,6 +24,9 @@ deploy/prometheus.yml
 deploy/grafana/provisioning/
 ```
 
+(PgBouncer, docs/120, no necesita archivo de configuracion propio -- se
+configura entero por variables de entorno en `docker-compose.production.example.yml`.)
+
 Estos archivos son una base de referencia. Antes de usarlos en produccion real
 deben conectarse a dominio, TLS/HTTPS, backups, monitoreo y gestion de secretos
 del proveedor de infraestructura.
@@ -82,12 +85,12 @@ cd backend
 .\.venv\Scripts\python.exe -m alembic upgrade head
 ```
 
-6. Levantar `postgres`, `redis` y las replicas del backend primero (el stack
-   de observabilidad necesita un token que solo se puede generar con el
-   backend ya arriba):
+6. Levantar `postgres`, `redis`, `pgbouncer` y las replicas del backend
+   primero (el stack de observabilidad necesita un token que solo se puede
+   generar con el backend ya arriba):
 
 ```powershell
-docker compose -f docker-compose.production.example.yml --env-file .env.production up -d --build postgres redis backend-1 backend-2 backend-lb worker-bulk worker-scheduler frontend
+docker compose -f docker-compose.production.example.yml --env-file .env.production up -d --build postgres redis pgbouncer backend-1 backend-2 backend-lb worker-bulk worker-scheduler frontend
 ```
 
 7. Generar el token de scraping de Prometheus (docs/118) y guardarlo donde
@@ -158,8 +161,35 @@ la imagen para el dominio final.
 
 ### PostgreSQL
 
-Debe tener backups, monitoreo de disco y politica de retencion. En alto volumen,
-considerar PgBouncer.
+Debe tener backups, monitoreo de disco y politica de retencion. Las
+migraciones (`alembic upgrade head`, paso 5 arriba) van directo a `postgres`,
+nunca a traves de `pgbouncer` -- DDL y comandos administrativos no son el
+caso de uso que PgBouncer optimiza, y es una operacion manual puntual, no
+trafico de aplicacion en regimen.
+
+### PgBouncer
+
+Pool de conexiones (E-003, auditoria tecnica externa julio 2026, docs/120).
+`backend-1`, `backend-2`, `worker-bulk` y `worker-scheduler` ya no se
+conectan directo a `postgres:5432` -- su `DATABASE_URL` apunta a
+`pgbouncer:6432`. Sin esto, el numero de conexiones reales a Postgres crece
+linealmente con el numero de replicas del backend (cada una con su propio
+pool de SQLAlchemy, `DB_POOL_SIZE`/`DB_MAX_OVERFLOW`) y puede agotar
+`max_connections` de Postgres mucho antes de que la base se quede sin
+capacidad real -- justo el problema que aparece al escalar mas alla de las
+2 replicas de E-001.
+
+`pool_mode=transaction` (el mas eficiente: la conexion real a Postgres se
+libera apenas termina cada transaccion, no se mantiene atada al ciclo de
+vida de la conexion del cliente). Verificado que este proyecto no usa
+advisory locks, `LISTEN`/`NOTIFY` ni prepared statements de sesion -- las
+tres cosas que transaction pooling no soporta correctamente -- asi que es
+seguro usarlo aqui (docs/120).
+
+No publica puerto al host: solo lo consumen los servicios internos de este
+mismo compose. Sin archivo de configuracion propio -- toda su configuracion
+sale de variables de entorno (`DATABASE_URL`, `AUTH_TYPE`, `POOL_MODE`,
+etc.) en `docker-compose.production.example.yml`.
 
 ### Redis
 

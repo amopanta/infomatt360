@@ -29,7 +29,7 @@ sin backups o sin capacidad de diagnostico.
 - [ ] Politica de backups definida: frecuencia, retencion, responsable y ubicacion.
 - [ ] Prueba de restauracion realizada en ambiente no productivo con `scripts/restore-postgres.cmd`.
 - [ ] Espacio en disco monitoreado.
-- [ ] PgBouncer evaluado si habra multiples replicas o alto volumen.
+- [ ] `pgbouncer` corriendo, `DATABASE_URL` de `backend-1`/`backend-2`/`worker-bulk`/`worker-scheduler` apuntando a `pgbouncer:6432` (no directo a `postgres:5432`), ver docs/120.
 
 ## 3. Redis y limites
 
@@ -123,6 +123,7 @@ Con Docker Compose de referencia:
 
 ```powershell
 docker compose -f docker-compose.production.example.yml --env-file .env.production ps
+docker compose -f docker-compose.production.example.yml --env-file .env.production logs pgbouncer
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs backend-1
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs backend-2
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs backend-lb

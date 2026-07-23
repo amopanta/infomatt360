@@ -43,6 +43,8 @@ flowchart TB
     WORKER["worker-bulk\nmisma imagen backend\napp.cli.process_bulk_jobs --loop"]
     WORKERSCHED["worker-scheduler\nmisma imagen backend\napp.cli.run_scheduled_tasks --loop"]
 
+    PGB[("pgbouncer\npool_mode=transaction\nsin puerto al host")]
+
     subgraph Datos
         PG[("PostgreSQL 16\n(producción)")]
         SQLITE[("SQLite\n(desarrollo/demo)")]
@@ -72,7 +74,7 @@ flowchart TB
     PWA --> NGINX
 
     API --> MW --> SVC
-    SVC --> PG
+    SVC --> PGB
     SVC --> SQLITE
     SVC --> REDIS
     SVC --> UPLOADS
@@ -84,19 +86,21 @@ flowchart TB
     SVC --> AI
     SVC --> MIRROR
 
-    WORKER --> PG
+    WORKER --> PGB
     WORKER --> REDIS
     WORKER --> UPLOADS
 
-    WORKERSCHED --> PG
+    WORKERSCHED --> PGB
     WORKERSCHED --> REDIS
     WORKERSCHED --> UPLOADS
+
+    PGB -->|"pool_mode=transaction"| PG
 
     PROM -->|"scrape directo cada 15s\nGET /api/v1/health/metrics/prometheus"| API
     GRAF -->|"PromQL"| PROM
 ```
 
-Fuente de los componentes y sus relaciones: `docker-compose.production.example.yml` (servicios `postgres`, `redis`, `backend-1`, `backend-2`, `backend-lb`, `worker-bulk`, `worker-scheduler`, `frontend`, `prometheus`, `grafana`), `deploy/backend.Dockerfile`, `deploy/frontend.Dockerfile`, `deploy/nginx.backend-lb.conf`, `deploy/prometheus.yml`, `deploy/grafana/provisioning/`, `backend/app/main.py` (middlewares y router), `backend/app/core/config.py` (integraciones opcionales).
+Fuente de los componentes y sus relaciones: `docker-compose.production.example.yml` (servicios `postgres`, `redis`, `pgbouncer`, `backend-1`, `backend-2`, `backend-lb`, `worker-bulk`, `worker-scheduler`, `frontend`, `prometheus`, `grafana`), `deploy/backend.Dockerfile`, `deploy/frontend.Dockerfile`, `deploy/nginx.backend-lb.conf`, `deploy/prometheus.yml`, `deploy/grafana/provisioning/`, `backend/app/main.py` (middlewares y router), `backend/app/core/config.py` (integraciones opcionales).
 
 ---
 
@@ -222,28 +226,31 @@ Todas las integraciones externas son **opcionales y quedan inactivas por defecto
 
 *(No proviene del grafo — evidencia de `docker-compose.production.example.yml` y `deploy/*`.)*
 
-La receta de referencia (`docker-compose.production.example.yml`) define 10 servicios:
+La receta de referencia (`docker-compose.production.example.yml`) define 11 servicios:
 
 | Servicio | Imagen/build | Puerto expuesto (host:contenedor) | Depende de | Healthcheck |
 |---|---|---|---|---|
 | `postgres` | `postgres:16` | interno (no publicado al host) | — | `pg_isready` cada 10s |
 | `redis` | `redis:7-alpine` (AOF activado) | interno | — | `redis-cli ping` cada 10s |
-| `backend-1` | build `deploy/backend.Dockerfile` | interno (no publicado al host) | `postgres` (healthy), `redis` (healthy) | `GET /api/v1/health/ready` cada 30s |
-| `backend-2` | build `deploy/backend.Dockerfile` | interno (no publicado al host) | `postgres` (healthy), `redis` (healthy) | `GET /api/v1/health/ready` cada 30s |
+| `pgbouncer` | `edoburu/pgbouncer:latest` | interno (no publicado al host) | `postgres` (healthy) | sin healthcheck definido |
+| `backend-1` | build `deploy/backend.Dockerfile` | interno (no publicado al host) | `postgres` (healthy), `redis` (healthy), `pgbouncer` (iniciado) | `GET /api/v1/health/ready` cada 30s |
+| `backend-2` | build `deploy/backend.Dockerfile` | interno (no publicado al host) | `postgres` (healthy), `redis` (healthy), `pgbouncer` (iniciado) | `GET /api/v1/health/ready` cada 30s |
 | `backend-lb` | `nginx:1.27-alpine` + `deploy/nginx.backend-lb.conf` | `8000:80` | `backend-1` (healthy), `backend-2` (healthy) | `wget --spider http://127.0.0.1/api/v1/health/ready` cada 30s |
-| `worker-bulk` | misma imagen que `backend-1`/`backend-2` | — (sin puerto, proceso batch) | `postgres` (healthy), `redis` (healthy) | sin healthcheck definido |
-| `worker-scheduler` | misma imagen que `backend-1`/`backend-2` | — (sin puerto, proceso batch) | `postgres` (healthy), `redis` (healthy) | sin healthcheck definido |
+| `worker-bulk` | misma imagen que `backend-1`/`backend-2` | — (sin puerto, proceso batch) | `postgres` (healthy), `redis` (healthy), `pgbouncer` (iniciado) | sin healthcheck definido |
+| `worker-scheduler` | misma imagen que `backend-1`/`backend-2` | — (sin puerto, proceso batch) | `postgres` (healthy), `redis` (healthy), `pgbouncer` (iniciado) | sin healthcheck definido |
 | `frontend` | build `deploy/frontend.Dockerfile` (nginx) | `8080:80` | `backend-lb` (healthy) | sin healthcheck definido |
 | `prometheus` | `prom/prometheus:v3.0.1` | interno (no publicado al host) | `backend-1` (healthy), `backend-2` (healthy) | sin healthcheck definido |
 | `grafana` | `grafana/grafana:11.4.0` | `3000:3000` | `prometheus` | sin healthcheck definido |
 
-**Volúmenes persistentes:** `postgres_data`, `redis_data`, `uploads_data` (montado en `backend-1`, `backend-2`, `worker-bulk` y `worker-scheduler` como `/var/lib/infomatt360/uploads`), `prometheus_data`, `grafana_data`.
+**Volúmenes persistentes:** `postgres_data`, `redis_data`, `uploads_data` (montado en `backend-1`, `backend-2`, `worker-bulk` y `worker-scheduler` como `/var/lib/infomatt360/uploads`), `prometheus_data`, `grafana_data`. `pgbouncer` no tiene volumen propio — es stateless, toda su configuración sale de variables de entorno en el compose.
+
+**Pool de conexiones (E-003, cerrado 2026-07-23, docs/120):** `pgbouncer` (`edoburu/pgbouncer`, sin Dockerfile propio, toda su config vía variables de entorno — `DATABASE_URL`, `AUTH_TYPE=scram-sha-256`, `POOL_MODE=transaction`, `LISTEN_PORT=6432`) se interpone entre `postgres` y el resto de servicios de aplicación (`backend-1`, `backend-2`, `worker-bulk`, `worker-scheduler`), cuyo `DATABASE_URL` ya no apunta a `postgres:5432` sino a `pgbouncer:6432`. Motivo: cada réplica del backend trae su propio pool de SQLAlchemy (`DB_POOL_SIZE`/`DB_MAX_OVERFLOW`), así que el número de conexiones reales a Postgres crece linealmente con el número de réplicas — sin un pooler intermedio, escalar horizontalmente (E-001) puede agotar `max_connections` de Postgres mucho antes de que la base se quede sin capacidad real. `pool_mode=transaction` (el más eficiente) se verificó seguro para este proyecto: sin uso de advisory locks, `LISTEN`/`NOTIFY` ni prepared statements de sesión (las tres cosas que ese modo no soporta correctamente). Las migraciones Alembic (paso manual, `docs/61`) siguen yendo directo a `postgres:5432`, nunca a través de `pgbouncer` — DDL administrativo puntual, no tráfico de aplicación en régimen. No publica puerto al host.
 
 **Observabilidad (docs/118, cerrado 2026-07-23):** `prometheus` scrapea `backend-1:8000` y `backend-2:8000` directo cada 15s en `/api/v1/health/metrics/prometheus` (nunca a través de `backend-lb` — `metrics_service.py` guarda contadores en memoria por proceso, así que scrapear vía el balanceador daría una serie inconsistente entre scrapes). Requiere autenticación (mismo JWT que cualquier otro endpoint, `require_metrics_viewer`); como Prometheus no puede iniciar sesión interactivamente, `python -m app.cli.generate_metrics_token` crea un usuario de servicio no interactivo (rol asignado a nivel de Organización, mismo patrón "Administrador nacional" de docs/101, permiso `integrations.api_keys.manage` reutilizado por no existir uno dedicado de solo-métricas) y emite un JWT de 10 años; el token vive en `secrets/metrics_token` (fuera de git) montado en el contenedor, nunca en el compose ni en variables de entorno. `prometheus` no publica puerto al host (su UI no tiene autenticación propia); se consulta a través de `grafana` (puerto `3000`, sí requiere login, contraseña en `GF_SECURITY_ADMIN_PASSWORD`) con un datasource y un dashboard inicial ("InfoMatt360 - Visión general") provisionados automáticamente desde `deploy/grafana/provisioning/`.
 
 **Balanceo de carga y réplicas (E-001, cerrado 2026-07-20, docs/117):** `backend-lb` (nginx, `deploy/nginx.backend-lb.conf`) reparte round-robin entre `backend-1` y `backend-2` (`upstream backend_upstream { server backend-1:8000; server backend-2:8000; }`), con `proxy_next_upstream error timeout http_502 http_503 http_504` para saltar a la otra réplica si una falla. Es el único servicio del grupo backend que publica el puerto `8000` al host — `backend-1`/`backend-2` ya no lo hacen. Tiene IP fija `172.28.0.10` en la subred `172.28.0.0/24` (declarada en el bloque `networks` al final del compose) para que `backend-1`/`backend-2` puedan distinguir su tráfico vía `API_RATE_LIMIT_TRUSTED_PROXY_IPS=172.28.0.10` (`.env.production.example`) y no traten a todos los clientes como si vinieran de la IP de `backend-lb` en el rate limiting/throttle de login.
 
-**Topología de red:** todos los servicios comparten la red `default` de Docker Compose, con subred fija `172.28.0.0/24`; solo `backend-lb` (8000), `frontend` (8080) y `grafana` (3000) publican puertos al host. `postgres`, `redis`, `backend-1`, `backend-2` y `prometheus` **no** son accesibles fuera de la red interna de Compose en esta receta — `prometheus` deliberadamente, por no tener autenticación propia (ver observabilidad arriba).
+**Topología de red:** todos los servicios comparten la red `default` de Docker Compose, con subred fija `172.28.0.0/24`; solo `backend-lb` (8000), `frontend` (8080) y `grafana` (3000) publican puertos al host. `postgres`, `redis`, `pgbouncer`, `backend-1`, `backend-2` y `prometheus` **no** son accesibles fuera de la red interna de Compose en esta receta — `prometheus` deliberadamente, por no tener autenticación propia (ver observabilidad arriba).
 
 **Reverse proxy / TLS / dominio:** **no está incluido en la receta**. `docs/61_DESPLIEGUE_PRODUCCION_REFERENCIA.md` es explícito: *"Estos archivos son una base de referencia. Antes de usarlos en producción real deben conectarse a dominio, TLS/HTTPS, backups, monitoreo y gestión de secretos del proveedor de infraestructura."* → **Pendiente de confirmar por infraestructura.** (`backend-lb` resuelve el balanceo entre réplicas, no TLS ni dominio — sigue siendo un salto distinto.)
 
@@ -262,6 +269,7 @@ La receta de referencia (`docker-compose.production.example.yml`) define 10 serv
 | `backend-lb` | `nginx:1.27-alpine` (sin build propio) | Config vía `deploy/nginx.backend-lb.conf` montado como volumen, sin Dockerfile — mismo criterio que `frontend` pero sin build multi-stage |
 | `prometheus` | `prom/prometheus:v3.0.1` (oficial, sin build propio) | Config vía `deploy/prometheus.yml` montado como volumen |
 | `grafana` | `grafana/grafana:11.4.0` (oficial, sin build propio) | Provisioning vía `deploy/grafana/provisioning/` montado como volumen |
+| `pgbouncer` | `edoburu/pgbouncer:latest` (comunidad, sin build propio) | Toda la config vía variables de entorno del compose, sin archivo montado — ver sección 8 |
 
 `worker-bulk` y `worker-scheduler` reutilizan la imagen `backend` con un comando distinto cada uno (ver sección 8) — ninguno tiene Dockerfile propio.
 
@@ -279,6 +287,7 @@ La receta de referencia (`docker-compose.production.example.yml`) define 10 serv
 | `6379` | Redis | Interno a la red Compose |
 | `9090` | Prometheus | Interno a la red Compose — deliberadamente sin publicar al host, su UI no tiene autenticación propia |
 | `3000` | Grafana (publicado al host) | `docker-compose.production.example.yml` — sí tiene login propio |
+| `6432` | PgBouncer | Interno a la red Compose — `backend-1`/`backend-2`/`worker-bulk`/`worker-scheduler` se conectan aquí, no directo al `5432` de Postgres |
 
 ### 9.3 Variables de entorno
 

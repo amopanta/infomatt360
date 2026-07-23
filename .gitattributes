@@ -1,0 +1,6 @@
+# .dockerignore usa patrones de exclusion de coincidencia exacta por linea.
+# Con line endings CRLF (Windows core.autocrlf=true), cada patron termina en
+# "\r" y Docker/Podman/buildah dejan de excluir nada -- confirmado en vivo
+# (docs/117): esto rompio un build real intentando copiar backend/.pytest_cache.
+# Forzar LF aqui evita que vuelva a pasar en cualquier checkout de Windows.
+.dockerignore text eol=lf

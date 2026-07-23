@@ -28,6 +28,8 @@ El hallazgo **E-001** de la auditoría técnica externa de julio 2026 (categorí
 - `docs/62_CHECKLIST_GO_LIVE.md`: ítem de checklist + comandos de logs para `backend-1`/`backend-2`/`backend-lb`.
 - `docs/64_ROLLBACK_OPERATIVO.md`: comandos de `up`/`logs` actualizados a los 3 servicios.
 - `docs/ARQUITECTURA_TECNICA_INFOMATT360.md`: diagrama Mermaid (nodo `backend-lb`, subgraph backend marcado "x2 réplicas"), tabla de servicios (6 → 8 filas), tablas de imágenes/puertos, variable `API_RATE_LIMIT_TRUSTED_PROXY_IPS` con valor real, sección 8 ya no marca "Pendiente de confirmar por infraestructura" para escalado horizontal/balanceador (sí sigue pendiente la evidencia de carga real que justifique más de 2 réplicas).
+- `backend/alembic/env.py` (hallazgo crítico, ver abajo): ensancha `alembic_version.version_num` en Postgres antes de migrar.
+- `.gitattributes` (nuevo, hallazgo secundario, ver abajo): fuerza LF en `.dockerignore`.
 
 ## Corrección de un bug preexistente encontrado de paso
 
@@ -38,7 +40,40 @@ El hallazgo **E-001** de la auditoría técnica externa de julio 2026 (categorí
 - `python -c "import yaml; yaml.safe_load(open('docker-compose.production.example.yml'))"`: YAML válido, 8 servicios, `networks`/`depends_on`/IP fija con la forma esperada.
 - `.\scripts\check-production-package.ps1`: **Paquete productivo de referencia OK** (0 fallos, incluyendo los 5 checks de `.dockerignore` recién arreglados y los nuevos de esta feature).
 
-**Límite explícito, no fingido:** no hay Docker ni un VPS real disponible en este entorno de desarrollo para levantar el stack completo y confirmar en vivo que nginx efectivamente reparte tráfico entre `backend-1`/`backend-2` y que el failover funciona si una réplica cae — mismo criterio de honestidad ya aplicado en docs/113 (Postgres/PostGIS real) y docs/114 (Tableau Desktop real). Lo verificado aquí es la validez sintáctica/estructural de toda la configuración y que la receta se auto-documenta y se auto-valida de forma coherente; la prueba real de balanceo/failover queda pendiente de un despliegue real en el VPS que decida el usuario, idealmente junto con el script de prueba de carga (aún no construido) que generaría la evidencia de 3.000 usuarios que pide la auditoría original.
+### Prueba real con Podman (2026-07-23)
+
+A diferencia de items anteriores de esta sesión donde no había forma de probar en vivo, esta vez sí: Podman (con su VM WSL2) ya estaba instalado en esta máquina. Se levantó la receta completa (`docker-compose.production.example.yml`, imagen `postgres` sustituida por `postgis/postgis:16-3.4` solo para esta prueba porque la imagen `postgres:16` de la receta no trae PostGIS — limitación ya documentada en el propio archivo) contra una base Postgres real, desde cero:
+
+- **Round-robin real confirmado:** 20 requests externas consecutivas a `http://localhost:8000/api/v1/health/ready` (el puerto publicado por `backend-lb`) se repartieron **10/10** entre `backend-1` y `backend-2`, verificado contando líneas de log de cada réplica antes/después.
+- **Failover real confirmado:** con `backend-1` detenido (`podman stop`), 8 requests consecutivas a través de `backend-lb` siguieron devolviendo `200 OK` sin ninguna falla visible al cliente. El log de `backend-lb` muestra exactamente el mecanismo esperado: `upstream timed out ... while connecting to upstream ... 172.28.0.175:8000` (backend-1) seguido de `upstream server temporarily disabled` (respetando `max_fails=3 fail_timeout=10s`) y el reintento automático contra `backend-2` vía `proxy_next_upstream`.
+- **Nota operativa real, no un defecto:** el primer request tras la caída de una réplica tarda hasta `proxy_connect_timeout` (10s configurados) en fallar antes de reintentar contra la réplica sana; los siguientes son inmediatos mientras el servidor caído sigue "temporarily disabled". Si se quiere un failover más rápido para el primer request post-caída, se puede bajar `proxy_connect_timeout` en `deploy/nginx.backend-lb.conf` (ej. a 3s) — no se cambió en este commit porque 10s es razonable para una LAN/VPS real y no hay evidencia de que sea un problema.
+- `worker-scheduler` y `worker-bulk` corriendo contra la misma base real: ambos loopean limpio (`{"processed":0,"succeeded":0,"failed":0}` / equivalente) sin errores de conexión a Postgres/Redis.
+- `frontend` sirve `200 OK` en el puerto 8080.
+- Migraciones (`alembic upgrade head`) corridas contra Postgres real desde una base vacía llegaron a `0069_external_mail_messages` (head) sin intervención manual — ver hallazgo crítico abajo, que solo se descubrió gracias a esta prueba.
+
+Stack completo desmontado al final (`podman compose down -v`, imágenes de prueba eliminadas, archivos `.env`/`.env.production` temporales borrados) — no queda nada residual en el repo ni en Podman.
+
+**Límite que sigue siendo real:** esto prueba el balanceo/failover en un solo host (la VM de Podman), no latencia de red real entre nodos ni el comportamiento bajo carga real (eso sigue pendiente del script k6/locust, aún no construido, y de un despliegue real en el VPS). Tampoco se probó Docker en Linux directamente (el target real de producción) — solo Podman en Windows, que es compatible con el mismo `docker-compose.production.example.yml` pero no es exactamente el mismo motor.
+
+## Hallazgo crítico encontrado durante esta prueba: `alembic_version` truncaba en Postgres real
+
+Al correr `alembic upgrade head` contra Postgres real por primera vez en la historia de este proyecto (todo el desarrollo/demo se había corrido siempre contra SQLite), la migración **falló** con `psycopg2.errors.StringDataRightTruncation: value too long for type character varying(32)` al llegar a `0035_assignment_composite_indexes`. Alembic crea la tabla `alembic_version` con `version_num VARCHAR(32)` por defecto, pero 4 revisiones de este repo superan los 32 caracteres:
+
+| Revisión | Caracteres |
+|---|---|
+| `0055_device_asset_lock_and_field_tokens` | 39 |
+| `0061_runtime_record_participant_link` | 36 |
+| `0062_user_organization_assignments` | 34 |
+| `0035_assignment_composite_indexes` | 33 |
+| `0054_governance_support_emergency` | 33 |
+
+SQLite no aplica límites de longitud de `VARCHAR`, por eso esto nunca se notó: **el procedimiento de despliegue documentado en docs/61 (`alembic upgrade head` contra Postgres real) estaba roto desde que se creó la migración 0035**, sin que ninguna prueba lo hubiera detectado — este es exactamente el tipo de gap que solo una prueba real contra el motor de base de datos correcto puede encontrar.
+
+**Corrección:** `backend/alembic/env.py` gana `_ensure_wide_version_table()`, llamada solo cuando `connection.dialect.name == "postgresql"`, que crea (si no existe) o ensancha la columna `alembic_version.version_num` a `VARCHAR(255)` antes de que Alembic corra ninguna migración. Se probó de extremo a extremo: con el fix aplicado, `alembic upgrade head` contra la misma base Postgres vacía llegó limpio hasta `0069_external_mail_messages`, incluyendo la creación real de la extensión PostGIS (migración 0068). `pytest -q` completo del backend después del cambio: 420 passed, mismos 5 errores preexistentes no relacionados (bloqueo de directorio de Windows).
+
+## Hallazgo secundario: `.dockerignore` con CRLF rompe builds reales de Docker/Podman
+
+Al intentar el primer build con Podman, `.pytest_cache` (bloqueado en este entorno Windows, ver memoria del proyecto) hizo fallar `COPY backend /app` porque **`.dockerignore` no estaba excluyendo nada realmente**: el archivo está commiteado con LF (confirmado con `git show HEAD:.dockerignore`), pero `core.autocrlf=true` (config de Git común en Windows) lo convierte a CRLF al hacer checkout, y buildah/Docker interpretan cada patrón de exclusión como coincidencia exacta de línea — con el `\r` de sobra, `.pytest_cache\r` nunca calza con el directorio real `.pytest_cache`. Cualquier desarrollador Windows con la configuración de Git por defecto que intente `docker build`/`podman build` localmente puede pisar el mismo problema. Corregido de forma permanente con un `.gitattributes` nuevo (`​.dockerignore text eol=lf`), que fuerza LF en el checkout sin importar `core.autocrlf` del usuario. (El mismo síntoma, con causa raíz idéntica, ya se había visto y parcheado de forma más limitada en `scripts/check-production-package.ps1` al cerrar este mismo ítem — esta es la corrección de raíz.)
 
 ## Lo que queda fuera de esta sesión
 

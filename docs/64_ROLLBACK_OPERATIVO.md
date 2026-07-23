@@ -63,7 +63,12 @@ docker compose -f docker-compose.production.example.yml --env-file .env.producti
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs backend-lb
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs worker-bulk
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs worker-scheduler
+docker compose -f docker-compose.production.example.yml --env-file .env.production logs prometheus
 ```
+
+`prometheus`/`grafana` (docs/118) no se reconstruyen en un rollback -- usan
+imagenes fijas, no build desde el repo, y no guardan estado de la
+aplicacion que dependa de la version del codigo.
 
 ## Si falla despues de migraciones de base de datos
 

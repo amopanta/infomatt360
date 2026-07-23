@@ -174,10 +174,47 @@ services:
     ports:
       - "8080:80"
 
+  prometheus:
+    # Stack de observabilidad (auditoria tecnica externa julio 2026, docs/118).
+    # Scrapea backend-1/backend-2 directo, nunca a traves de backend-lb (ver
+    # deploy/prometheus.yml). Requiere secrets/metrics_token creado antes del
+    # primer "up" -- correr "python -m app.cli.generate_metrics_token" contra
+    # backend-1/backend-2 ya arriba y guardar la salida ahi (docs/61).
+    image: prom/prometheus:v3.0.1
+    restart: unless-stopped
+    volumes:
+      - ./deploy/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./secrets/metrics_token:/run/secrets/metrics_token:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      backend-1:
+        condition: service_healthy
+      backend-2:
+        condition: service_healthy
+
+  grafana:
+    # Sin autenticacion propia, Prometheus no se expone al host (arriba); se
+    # consulta a traves de Grafana, que si tiene login. Datasource y
+    # dashboard inicial provistos en deploy/grafana/provisioning/.
+    image: grafana/grafana:11.4.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:?configure_GF_SECURITY_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+
 volumes:
   postgres_data:
   redis_data:
   uploads_data:
+  prometheus_data:
+  grafana_data:
 
 networks:
   default:

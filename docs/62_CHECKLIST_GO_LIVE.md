@@ -67,7 +67,9 @@ sin backups o sin capacidad de diagnostico.
 - [ ] `METRICS_ENABLED=true`.
 - [ ] `/api/v1/health/ready` responde `ready`.
 - [ ] `/api/v1/health/metrics` accesible solo con permisos operativos.
-- [ ] `/api/v1/health/metrics/prometheus` conectado o listo para monitoreo externo.
+- [ ] `secrets/metrics_token` generado (`python -m app.cli.generate_metrics_token`) y montado en `prometheus` (ver docs/61, docs/118).
+- [ ] `prometheus` corriendo y con los 2 targets (`backend-1`, `backend-2`) en estado `up` (`http://localhost:9090/targets` via tunel SSH, nunca expuesto al host).
+- [ ] `grafana` corriendo, `GF_SECURITY_ADMIN_PASSWORD` configurado, dashboard "InfoMatt360 - Vision general" cargando datos reales.
 - [ ] Alertas definidas para `5xx`, `429`, fallos bulk y jobs atascados.
 - [ ] Logs centralizados y buscables por `X-Request-ID`.
 - [ ] Monitor liviano `scripts/monitor-health.cmd` configurado o reemplazado por monitoreo externo.
@@ -120,4 +122,6 @@ docker compose -f docker-compose.production.example.yml --env-file .env.producti
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs backend-lb
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs worker-bulk
 docker compose -f docker-compose.production.example.yml --env-file .env.production logs worker-scheduler
+docker compose -f docker-compose.production.example.yml --env-file .env.production logs prometheus
+docker compose -f docker-compose.production.example.yml --env-file .env.production logs grafana
 ```

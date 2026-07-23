@@ -1,0 +1,107 @@
+{
+  "title": "InfoMatt360 - Vision general",
+  "uid": "infomatt360-overview",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-6h", "to": "now" },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Replicas del backend activas",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "green", "value": 2 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        { "refId": "A", "expr": "sum(up{job=\"infomatt360-backend\"})", "legendFormat": "replicas up" }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Tasa de errores 5xx (%)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 5 }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * sum(rate(infomatt360_http_requests_by_status_family_total{family=\"5xx\"}[5m])) / clamp_min(sum(rate(infomatt360_http_requests_total[5m])), 1)",
+          "legendFormat": "5xx %"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Requests/seg por replica",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "refId": "A", "expr": "sum by (instance) (rate(infomatt360_http_requests_total[5m]))", "legendFormat": "{{instance}}" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Latencia HTTP (p50/p95/p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "ms" } },
+      "targets": [
+        { "refId": "A", "expr": "avg by (stat) (infomatt360_http_request_duration_ms{stat=~\"p50|p95|p99\"})", "legendFormat": "{{stat}}" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Requests por familia de status",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "reqps" } },
+      "targets": [
+        { "refId": "A", "expr": "sum by (family) (rate(infomatt360_http_requests_by_status_family_total[5m]))", "legendFormat": "{{family}}" }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Worker bulk: ciclos y trabajos",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (metric) (infomatt360_bulk_jobs_total{metric=~\"worker_cycles|completed_jobs|failed_jobs\"})",
+          "legendFormat": "{{metric}}"
+        }
+      ]
+    }
+  ]
+}

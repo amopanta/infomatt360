@@ -1,0 +1,18 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: infomatt360-backend
+    metrics_path: /api/v1/health/metrics/prometheus
+    authorization:
+      type: Bearer
+      credentials_file: /run/secrets/metrics_token
+    static_configs:
+      # Se apunta a cada replica directamente, nunca a traves de backend-lb.
+      # metrics_service.py guarda sus contadores en memoria por proceso; si
+      # se scrapea a traves del balanceador cada request cae en una replica
+      # distinta y Prometheus ve una serie inconsistente (docs/118).
+      - targets: ["backend-1:8000", "backend-2:8000"]
+        labels:
+          service: infomatt360-backend

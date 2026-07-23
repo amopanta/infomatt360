@@ -19,6 +19,9 @@ docker-compose.production.example.yml
 deploy/backend.Dockerfile
 deploy/frontend.Dockerfile
 deploy/nginx.frontend.conf
+deploy/nginx.backend-lb.conf
+deploy/prometheus.yml
+deploy/grafana/provisioning/
 ```
 
 Estos archivos son una base de referencia. Antes de usarlos en produccion real
@@ -79,10 +82,26 @@ cd backend
 .\.venv\Scripts\python.exe -m alembic upgrade head
 ```
 
-6. Levantar servicios con la receta de referencia:
+6. Levantar `postgres`, `redis` y las replicas del backend primero (el stack
+   de observabilidad necesita un token que solo se puede generar con el
+   backend ya arriba):
 
 ```powershell
-docker compose -f docker-compose.production.example.yml --env-file .env.production up -d --build
+docker compose -f docker-compose.production.example.yml --env-file .env.production up -d --build postgres redis backend-1 backend-2 backend-lb worker-bulk worker-scheduler frontend
+```
+
+7. Generar el token de scraping de Prometheus (docs/118) y guardarlo donde
+   `docker-compose.production.example.yml` lo espera montado:
+
+```powershell
+mkdir secrets -Force
+docker compose -f docker-compose.production.example.yml --env-file .env.production exec backend-1 python -m app.cli.generate_metrics_token > secrets\metrics_token
+```
+
+8. Levantar el stack de observabilidad:
+
+```powershell
+docker compose -f docker-compose.production.example.yml --env-file .env.production up -d prometheus grafana
 ```
 
 ## Componentes
@@ -146,6 +165,35 @@ considerar PgBouncer.
 
 Se usa para rate limiting y throttling distribuido. Debe tener persistencia,
 limites de memoria y monitoreo.
+
+### Prometheus
+
+Stack de observabilidad (auditoria tecnica externa julio 2026, docs/118).
+Scrapea `backend-1` y `backend-2` directo cada 15s (`deploy/prometheus.yml`),
+nunca a traves de `backend-lb` -- las metricas viven en memoria por proceso,
+asi que scrapear a traves del balanceador daria una serie inconsistente
+(cada scrape caeria en una replica distinta). No publica puerto al host: su
+UI no tiene autenticacion propia, asi que exponerla directo a internet seria
+un hueco de seguridad real. Se consulta a traves de Grafana o via tunel SSH
+(`ssh -L 9090:localhost:9090 usuario@servidor`, luego `podman exec` o
+`docker exec` para publicar el puerto del contenedor si hace falta debug
+directo).
+
+Requiere `secrets/metrics_token` (paso 7 arriba) montado como
+`/run/secrets/metrics_token` -- si el archivo no existe antes del primer
+`up`, Docker/Podman crean un directorio vacio en su lugar en vez de fallar,
+y Prometheus arranca sin poder autenticarse. Generar el archivo siempre
+antes de levantar `prometheus`.
+
+### Grafana
+
+Puerto `3000` publicado al host (si tiene login propio). Usuario `admin`,
+contrasena en `GF_SECURITY_ADMIN_PASSWORD` (`.env.production`). Datasource
+de Prometheus y un dashboard inicial ("InfoMatt360 - Vision general": estado
+de las replicas, tasa de errores 5xx, requests/seg por replica, latencia
+p50/p95/p99, requests por familia de status, throughput del worker bulk) se
+provisionan solos desde `deploy/grafana/provisioning/` -- no hace falta
+configurarlos a mano.
 
 ## Verificaciones despues de desplegar
 

@@ -9,6 +9,7 @@ __pycache__
 *.env.local
 backend/.env
 backend/.env.production
+secrets
 backend/.venv
 backend/uploads
 frontend/node_modules

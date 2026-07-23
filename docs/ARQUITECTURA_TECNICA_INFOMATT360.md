@@ -60,6 +60,11 @@ flowchart TB
         MIRROR["Base Espejo externa\n(Postgres o SQLite)"]
     end
 
+    subgraph Observabilidad["Observabilidad (docs/118)"]
+        PROM[("Prometheus\nscrapea backend-1/backend-2 directo\nsin puerto al host")]
+        GRAF["Grafana\npuerto 3000 (host), login propio"]
+    end
+
     WEB --> NGINX
     NGINX -->|"fetch /api/v1/*"| LB
     LB --> API
@@ -86,9 +91,12 @@ flowchart TB
     WORKERSCHED --> PG
     WORKERSCHED --> REDIS
     WORKERSCHED --> UPLOADS
+
+    PROM -->|"scrape directo cada 15s\nGET /api/v1/health/metrics/prometheus"| API
+    GRAF -->|"PromQL"| PROM
 ```
 
-Fuente de los componentes y sus relaciones: `docker-compose.production.example.yml` (servicios `postgres`, `redis`, `backend-1`, `backend-2`, `backend-lb`, `worker-bulk`, `worker-scheduler`, `frontend`), `deploy/backend.Dockerfile`, `deploy/frontend.Dockerfile`, `deploy/nginx.backend-lb.conf`, `backend/app/main.py` (middlewares y router), `backend/app/core/config.py` (integraciones opcionales).
+Fuente de los componentes y sus relaciones: `docker-compose.production.example.yml` (servicios `postgres`, `redis`, `backend-1`, `backend-2`, `backend-lb`, `worker-bulk`, `worker-scheduler`, `frontend`, `prometheus`, `grafana`), `deploy/backend.Dockerfile`, `deploy/frontend.Dockerfile`, `deploy/nginx.backend-lb.conf`, `deploy/prometheus.yml`, `deploy/grafana/provisioning/`, `backend/app/main.py` (middlewares y router), `backend/app/core/config.py` (integraciones opcionales).
 
 ---
 
@@ -214,7 +222,7 @@ Todas las integraciones externas son **opcionales y quedan inactivas por defecto
 
 *(No proviene del grafo — evidencia de `docker-compose.production.example.yml` y `deploy/*`.)*
 
-La receta de referencia (`docker-compose.production.example.yml`) define 8 servicios:
+La receta de referencia (`docker-compose.production.example.yml`) define 10 servicios:
 
 | Servicio | Imagen/build | Puerto expuesto (host:contenedor) | Depende de | Healthcheck |
 |---|---|---|---|---|
@@ -226,12 +234,16 @@ La receta de referencia (`docker-compose.production.example.yml`) define 8 servi
 | `worker-bulk` | misma imagen que `backend-1`/`backend-2` | — (sin puerto, proceso batch) | `postgres` (healthy), `redis` (healthy) | sin healthcheck definido |
 | `worker-scheduler` | misma imagen que `backend-1`/`backend-2` | — (sin puerto, proceso batch) | `postgres` (healthy), `redis` (healthy) | sin healthcheck definido |
 | `frontend` | build `deploy/frontend.Dockerfile` (nginx) | `8080:80` | `backend-lb` (healthy) | sin healthcheck definido |
+| `prometheus` | `prom/prometheus:v3.0.1` | interno (no publicado al host) | `backend-1` (healthy), `backend-2` (healthy) | sin healthcheck definido |
+| `grafana` | `grafana/grafana:11.4.0` | `3000:3000` | `prometheus` | sin healthcheck definido |
 
-**Volúmenes persistentes:** `postgres_data`, `redis_data`, `uploads_data` (montado en `backend-1`, `backend-2`, `worker-bulk` y `worker-scheduler` como `/var/lib/infomatt360/uploads`).
+**Volúmenes persistentes:** `postgres_data`, `redis_data`, `uploads_data` (montado en `backend-1`, `backend-2`, `worker-bulk` y `worker-scheduler` como `/var/lib/infomatt360/uploads`), `prometheus_data`, `grafana_data`.
+
+**Observabilidad (docs/118, cerrado 2026-07-23):** `prometheus` scrapea `backend-1:8000` y `backend-2:8000` directo cada 15s en `/api/v1/health/metrics/prometheus` (nunca a través de `backend-lb` — `metrics_service.py` guarda contadores en memoria por proceso, así que scrapear vía el balanceador daría una serie inconsistente entre scrapes). Requiere autenticación (mismo JWT que cualquier otro endpoint, `require_metrics_viewer`); como Prometheus no puede iniciar sesión interactivamente, `python -m app.cli.generate_metrics_token` crea un usuario de servicio no interactivo (rol asignado a nivel de Organización, mismo patrón "Administrador nacional" de docs/101, permiso `integrations.api_keys.manage` reutilizado por no existir uno dedicado de solo-métricas) y emite un JWT de 10 años; el token vive en `secrets/metrics_token` (fuera de git) montado en el contenedor, nunca en el compose ni en variables de entorno. `prometheus` no publica puerto al host (su UI no tiene autenticación propia); se consulta a través de `grafana` (puerto `3000`, sí requiere login, contraseña en `GF_SECURITY_ADMIN_PASSWORD`) con un datasource y un dashboard inicial ("InfoMatt360 - Visión general") provisionados automáticamente desde `deploy/grafana/provisioning/`.
 
 **Balanceo de carga y réplicas (E-001, cerrado 2026-07-20, docs/117):** `backend-lb` (nginx, `deploy/nginx.backend-lb.conf`) reparte round-robin entre `backend-1` y `backend-2` (`upstream backend_upstream { server backend-1:8000; server backend-2:8000; }`), con `proxy_next_upstream error timeout http_502 http_503 http_504` para saltar a la otra réplica si una falla. Es el único servicio del grupo backend que publica el puerto `8000` al host — `backend-1`/`backend-2` ya no lo hacen. Tiene IP fija `172.28.0.10` en la subred `172.28.0.0/24` (declarada en el bloque `networks` al final del compose) para que `backend-1`/`backend-2` puedan distinguir su tráfico vía `API_RATE_LIMIT_TRUSTED_PROXY_IPS=172.28.0.10` (`.env.production.example`) y no traten a todos los clientes como si vinieran de la IP de `backend-lb` en el rate limiting/throttle de login.
 
-**Topología de red:** todos los servicios comparten la red `default` de Docker Compose, ahora con subred fija `172.28.0.0/24`; solo `backend-lb` (8000) y `frontend` (8080) publican puertos al host. `postgres`, `redis`, `backend-1` y `backend-2` **no** son accesibles fuera de la red interna de Compose en esta receta.
+**Topología de red:** todos los servicios comparten la red `default` de Docker Compose, con subred fija `172.28.0.0/24`; solo `backend-lb` (8000), `frontend` (8080) y `grafana` (3000) publican puertos al host. `postgres`, `redis`, `backend-1`, `backend-2` y `prometheus` **no** son accesibles fuera de la red interna de Compose en esta receta — `prometheus` deliberadamente, por no tener autenticación propia (ver observabilidad arriba).
 
 **Reverse proxy / TLS / dominio:** **no está incluido en la receta**. `docs/61_DESPLIEGUE_PRODUCCION_REFERENCIA.md` es explícito: *"Estos archivos son una base de referencia. Antes de usarlos en producción real deben conectarse a dominio, TLS/HTTPS, backups, monitoreo y gestión de secretos del proveedor de infraestructura."* → **Pendiente de confirmar por infraestructura.** (`backend-lb` resuelve el balanceo entre réplicas, no TLS ni dominio — sigue siendo un salto distinto.)
 
@@ -248,6 +260,8 @@ La receta de referencia (`docker-compose.production.example.yml`) define 8 servi
 | `backend` | `python:3.13-slim` | Instala `backend/requirements.txt`, expone `8000`, arranca con `uvicorn app.main:app --host 0.0.0.0 --port 8000` (`deploy/backend.Dockerfile`); usada por `backend-1` y `backend-2` |
 | `frontend` | build: `node:24-alpine` → sirve: `nginx:1.27-alpine` | Build multi-stage: `npm ci && npm run build`, luego copia `dist/` al nginx; expone `80` (`deploy/frontend.Dockerfile`) |
 | `backend-lb` | `nginx:1.27-alpine` (sin build propio) | Config vía `deploy/nginx.backend-lb.conf` montado como volumen, sin Dockerfile — mismo criterio que `frontend` pero sin build multi-stage |
+| `prometheus` | `prom/prometheus:v3.0.1` (oficial, sin build propio) | Config vía `deploy/prometheus.yml` montado como volumen |
+| `grafana` | `grafana/grafana:11.4.0` (oficial, sin build propio) | Provisioning vía `deploy/grafana/provisioning/` montado como volumen |
 
 `worker-bulk` y `worker-scheduler` reutilizan la imagen `backend` con un comando distinto cada uno (ver sección 8) — ninguno tiene Dockerfile propio.
 
@@ -263,6 +277,8 @@ La receta de referencia (`docker-compose.production.example.yml`) define 8 servi
 | `80` | `backend-lb` (nginx, dentro del contenedor) | `deploy/nginx.backend-lb.conf`, mapeado a `8000` en el host |
 | `5432` | PostgreSQL | Interno a la red Compose |
 | `6379` | Redis | Interno a la red Compose |
+| `9090` | Prometheus | Interno a la red Compose — deliberadamente sin publicar al host, su UI no tiene autenticación propia |
+| `3000` | Grafana (publicado al host) | `docker-compose.production.example.yml` — sí tiene login propio |
 
 ### 9.3 Variables de entorno
 
@@ -291,6 +307,8 @@ Fuente: `backend/app/core/config.py` (clase `Settings`, valores por defecto) con
 | `BULK_WORKER_*` (backoff, max backoff, stale after, heartbeat) | `60`/`3600`/`1800`/`100` | igual | No |
 | `GOOGLE_OAUTH_*`, `WAHA_*`, `AI_AUDIT_*` | vacío | credenciales reales si se usan | No (opcionales) |
 | `CONTENT_SECURITY_POLICY`, `REFERRER_POLICY`, `PERMISSIONS_POLICY`, `X_FRAME_OPTIONS` | valores restrictivos por defecto | igual | Sí |
+
+`GF_SECURITY_ADMIN_PASSWORD` (contraseña del usuario `admin` de Grafana, docs/118) no es una variable de `Settings` — la lee directo el contenedor `grafana`, no `backend/app/core/config.py`. El token de scraping de Prometheus tampoco es una variable de entorno: vive en el archivo `secrets/metrics_token` (fuera de git), generado con `python -m app.cli.generate_metrics_token`.
 
 **Gestión de secretos real (vault, KMS, variables de CI/CD):** no hay evidencia en el repositorio de un gestor de secretos conectado — `docs/61` solo indica *"los secretos productivos deben vivir en el gestor de secretos del servidor, proveedor cloud o pipeline CI/CD"* como recomendación, sin una implementación concreta versionada → **Pendiente de confirmar por infraestructura.**
 
@@ -325,7 +343,7 @@ Fuente: `backend/app/core/config.py` (clase `Settings`, valores por defecto) con
   - `GET /api/v1/health/metrics` — contadores HTTP + jobs bulk, requiere permiso (`METRICS_VIEW_PERMISSIONS`).
   - `GET /api/v1/health/metrics/prometheus` — mismo contenido en formato texto compatible Prometheus, requiere permiso.
   - Panel web: `/admin/metrics` (frontend, `OperationalMetricsApp.tsx`).
-- **Integración real con Prometheus/Grafana/OpenTelemetry:** el endpoint es *compatible* con scraping Prometheus, pero no hay evidencia de un `prometheus.yml` ni stack de observabilidad desplegado en el repositorio — `README.md` lo lista como acción pendiente ("conectar métricas a Prometheus/OpenTelemetry si se requiere operación industrial") → **Pendiente de confirmar por infraestructura.**
+- **Integración real con Prometheus/Grafana:** resuelta (docs/118, cerrado 2026-07-23) — `deploy/prometheus.yml` scrapea `backend-1`/`backend-2` directo (nunca a través de `backend-lb`, ver sección 8) y `deploy/grafana/provisioning/` provisiona un datasource y un dashboard inicial ("InfoMatt360 - Visión general") automáticamente. Verificado en vivo con Podman: ambos targets en estado `up`, el dashboard mostrando datos reales. OpenTelemetry (trazas distribuidas) sigue sin implementar — no hay evidencia de ello en el repositorio → **Pendiente de confirmar por infraestructura** si se necesita.
 - **Monitor liviano incluido:** `scripts/monitor-health.ps1`/`.cmd` — sondea `/health` y `/api/v1/health/ready` de backend y frontend en intervalo configurable, termina con código `2` y línea `ALERT` tras N fallos consecutivos (pensado para integrarse a una tarea programada externa, no es un daemon de monitoreo permanente).
 
 ### 10.3 Respaldos

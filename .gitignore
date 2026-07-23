@@ -9,6 +9,7 @@ __pycache__/
 backend/.env
 backend/.env.production
 backend/uploads/
+secrets/
 
 node_modules/
 dist/

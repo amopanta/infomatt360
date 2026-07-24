@@ -29,6 +29,12 @@ Los dos PDFs son narrativa de arquitectura de alto nivel (infraestructura Docker
 
 Backups automáticos, edición concurrente (enlace mágico + asset lock), captura pública por token, instalador multi-paso completo, ERP headless, WhatsApp/WAHA, auditoría semántica IA, storage S3/MinIO/Google Drive, mesa de ayuda, multi-tenancy lógico (Organization), branding dinámico, PWA offline, escritorio Electron básico, XLSForm import/export + plantilla maestra, importador multiformato (SurveyMonkey/LimeSurvey), reemplazo de plantilla en el mismo lugar — ver [[reference-published-artifacts]] y docs/59-95.
 
+## Nota: auditoría técnica externa (documento distinto, julio 2026)
+
+Esta auditoría (docs/96) es una lectura de trazabilidad contra el documento maestro de requerimientos — no debe confundirse con la **auditoría técnica externa** que el usuario compartió por separado en julio de 2026 (`AUDITORIA_TECNICA_INTEGRAL_INFOMATT360.md`, no versionada en el repo), centrada en arquitectura/seguridad/escalabilidad/observabilidad más que en cobertura de funcionalidad. Esa auditoría se trabajó aparte, triada en 4 categorías (A: fixes de seguridad baratos, B: features de sincronización, C: decisiones de infraestructura, D: refactors grandes y riesgosos).
+
+**Categoría C de esa auditoría técnica externa quedó completamente cerrada el 2026-07-23**: caché de permisos (E-004, docs/108), balanceo de carga + réplicas del backend (E-001, docs/117), stack de observabilidad Prometheus/Grafana (docs/118), script de prueba de carga k6 (docs/119) y PgBouncer (E-003, docs/120) — todos verificados en vivo con Podman, no solo validados estáticamente. Las categorías A y B de esa misma auditoría también están cerradas. Solo queda abierta la categoría D (descomponer la entidad `User`, migrar SQLAlchemy síncrono a async), explícitamente diferida hasta contar con evidencia real de carga a escala de producción.
+
 ## Decisión arquitectónica ya tomada, no una brecha
 
 El aislamiento fuerte "base independiente por proyecto o schema-per-project" (§2) fue evaluado explícitamente al inicio de este ciclo de trabajo y el usuario decidió el modelo de **tenant lógico** (`Organization` sobre `Project`, aislamiento a nivel de aplicación) en vez de aislamiento físico — ver el plan `declarative-spinning-simon.md`. No se re-abre esta decisión salvo que el usuario lo pida explícitamente.

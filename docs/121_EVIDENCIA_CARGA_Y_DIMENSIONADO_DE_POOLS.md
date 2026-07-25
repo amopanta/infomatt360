@@ -52,6 +52,38 @@ A 200 VUs el throughput **cae a menos de un tercio** del de 100 VUs. Eso no es d
 
 La latencia a 200 VUs sí sube (p95 782 ms, por encima del umbral de 500 ms que define el script). Eso es degradación honesta bajo carga, no falla — el sistema atiende todo, más lento. El umbral del script sigue siendo el correcto para una prueba de aceptación; simplemente 200 VUs está por encima de lo que este entorno de prueba sostiene con holgura.
 
+### Dónde está el techo: 300 VUs
+
+Con los pools ya dimensionados, se corrió una vez más a 300 VUs para encontrar el límite:
+
+| VUs | Requests | Throughput | p95 búsqueda | Errores |
+|---|---|---|---|---|
+| 50 | 8 749 | 72 req/s | 38 ms | 0,00% |
+| 100 | 16 075 | 133 req/s | 209 ms | 0,00% |
+| 200 | 22 545 | **186 req/s** | 782 ms | 0,00% |
+| 300 | 20 487 | **169 req/s** | **1,89 s** | 0,00% |
+
+**De 200 a 300 VUs el throughput no sube — baja levemente — mientras la latencia se multiplica por 2,4.** Ese es el techo. El sistema ya está saturado alrededor de 200 VUs y los 100 usuarios adicionales solo agregan tiempo de cola, no trabajo útil.
+
+Es la Ley de Little en vivo: con capacidad de servicio fija, sumar concurrencia solo suma espera. Coincide con lo que predice el techo de 40 hilos × 2 réplicas.
+
+**Lo importante es *cómo* satura.** A 300 VUs, con la configuración corregida:
+
+- 0 errores en 20 487 requests
+- 0 respuestas `502`/`499` en nginx
+- 0 `QueuePool timeout`
+- PgBouncer con `cl_waiting: 0` y `maxwait: 0s`
+- Los contenedores **nunca** pasaron a `unhealthy`
+- Reparto entre réplicas: 10 267 vs 10 266 (un request de diferencia)
+
+Contraste directo con la configuración anterior, donde 200 VUs ya producía colapso, `502` y 80 segundos de `unhealthy`. Pasado el punto de saturación, el sistema ahora **encola y se pone lento en vez de romperse** — que es exactamente el comportamiento que se quiere.
+
+### "Aguanta" no es lo mismo que "sirve"
+
+A 300 VUs hay 0% de error, pero **p95 de 1,89 s es una mala experiencia de usuario**. Cero errores no significa utilizable.
+
+La capacidad *útil* de esta configuración en este entorno está cerca de los **200 VUs** (throughput máximo, p95 782 ms). Si el objetivo es p95 < 500 ms —el umbral que define el propio script— el techo real está entre 100 y 200 VUs. Al dimensionar la infraestructura real, la métrica a mirar es el punto donde la latencia todavía es aceptable, no el punto donde empiezan los errores: están bastante separados.
+
 ## Qué se cambió
 
 - `.env.production.example`: `DB_POOL_SIZE` 10 → **40**, `DB_MAX_OVERFLOW` 20 → **40**. El 40 no es arbitrario: iguala el techo de 40 hilos del threadpool, de modo que el pool deja de ser el límite. El overflow da margen para picos.
@@ -67,7 +99,13 @@ Ver `loadtest/README.md`. El paso que no se puede saltear: subir `API_RATE_LIMIT
 
 Esto se midió en una VM de Podman con 2 GiB de RAM, con el generador de carga compitiendo por los mismos CPUs que los 11 contenedores. **Los números absolutos no son trasladables a un VPS real** — 186 req/s no es "la capacidad de InfoMatt360".
 
-Lo que sí es trasladable es la forma del problema y la relación entre los parámetros: el cuello estaba en los pools, no en CPU ni en la base, y el dimensionado correcto se deriva del techo de 40 hilos del threadpool, que es una propiedad del código (endpoints síncronos), no del hardware.
+Lo que sí es trasladable son tres cosas, ninguna dependiente del hardware:
+
+1. **Dónde está el cuello:** en los pools, no en CPU ni en la base.
+2. **Cómo se dimensionan:** a partir del techo de 40 hilos del threadpool, que es una propiedad del código (endpoints síncronos), no de la máquina.
+3. **La forma de la curva:** throughput que crece, hace plateau y luego cae levemente mientras la latencia sube en forma lineal. Ese plateau marca el punto de saturación en cualquier hardware; lo que cambia con un VPS más grande es *en qué número de usuarios* ocurre, no que ocurra.
+
+Y una lección de método que sí aplica a la prueba real: **el punto donde la latencia deja de ser aceptable llega bastante antes que el punto donde aparecen errores**. A 300 VUs este stack da 0% de error con p95 de 1,89 s. Dimensionar mirando la tasa de error habría dado una respuesta cómoda y equivocada.
 
 **Esto no cierra la prueba de 3.000 usuarios que pide la auditoría técnica externa** — eso sigue requiriendo un despliegue real en VPS. Pero cambia qué mirar primero cuando ese despliegue exista: estos dos parámetros, antes que cualquier refactor grande.
 

@@ -52,7 +52,15 @@ services:
       POOL_MODE: transaction
       LISTEN_PORT: "6432"
       MAX_CLIENT_CONN: "500"
-      DEFAULT_POOL_SIZE: "20"
+      # 60, no 20, dimensionado con evidencia de carga real (docs/121). Con
+      # 20, PgBouncer quedaba mas ajustado que las conexiones que sus propios
+      # clientes podian pedirle (2 replicas x 80 + 2 workers), asi que en vez
+      # de multiplexar movia la cola: bajo 200 usuarios concurrentes se
+      # midieron 42 clientes esperando y hasta 6s de maxwait. Con 60 esa
+      # espera bajo a cero. Sigue holgadamente por debajo del max_connections
+      # de Postgres (100 por defecto) -- si se suben replicas mas alla de 2,
+      # revisar ambos numeros juntos.
+      DEFAULT_POOL_SIZE: "60"
       ADMIN_USERS: infomatt360
     depends_on:
       postgres:

@@ -179,6 +179,15 @@ pool de SQLAlchemy, `DB_POOL_SIZE`/`DB_MAX_OVERFLOW`) y puede agotar
 capacidad real -- justo el problema que aparece al escalar mas alla de las
 2 replicas de E-001.
 
+`DEFAULT_POOL_SIZE=60` no es un valor arbitrario: se dimensiono con
+evidencia de carga real (docs/121). Con el valor anterior (20), PgBouncer
+quedaba mas ajustado que las conexiones que sus propios clientes podian
+pedirle, asi que en vez de multiplexar movia la cola (42 clientes esperando,
+6s de maxwait bajo 200 usuarios concurrentes). Va junto con
+`DB_POOL_SIZE=40`/`DB_MAX_OVERFLOW=40` en `.env.production` -- si se cambian
+las replicas del backend, revisar los tres numeros juntos contra el
+`max_connections` de Postgres (100 por defecto).
+
 `pool_mode=transaction` (el mas eficiente: la conexion real a Postgres se
 libera apenas termina cada transaccion, no se mantiene atada al ciclo de
 vida de la conexion del cliente). Verificado que este proyecto no usa

@@ -45,6 +45,20 @@ Mismo criterio que docs/117/118/119 — no solo YAML validado, sino el pool func
 
 **Límite explícito, no fingido:** esto prueba que el pool multiplexa conexiones correctamente en un solo host de desarrollo con carga moderada (20 VUs). El beneficio real de PgBouncer se demuestra a escala de producción con muchas más réplicas y conexiones simultáneas — eso solo se puede confirmar con un despliegue real en el VPS del usuario, idealmente corriendo `loadtest/k6-infomatt360.js` (docs/119) a la escala completa de 3.000 usuarios y comparando el conteo de conexiones reales en Postgres con y sin PgBouncer.
 
+## Actualización 2026-07-25: `DEFAULT_POOL_SIZE` subido de 20 a 60
+
+La primera prueba de carga real (docs/121) mostró que `DEFAULT_POOL_SIZE=20`
+era **más ajustado que las conexiones que sus propios clientes podían
+pedirle** (2 réplicas × 80 + 2 workers). En vez de multiplexar, PgBouncer
+movía la cola: bajo 200 usuarios concurrentes se midieron `cl_waiting: 42`,
+`sv_idle: 0` y `maxwait: 6s`. Con 60, esa espera bajó a cero.
+
+Esto no invalida el diseño de este documento — PgBouncer sigue haciendo lo
+que promete, multiplexar muchos clientes sobre menos conexiones reales. Lo
+que estaba mal era el número: un pooler cuyo pool de servidor es más chico
+que la concurrencia real de sus clientes deja de ser una solución y pasa a
+ser el cuello. Ver [docs/121](121_EVIDENCIA_CARGA_Y_DIMENSIONADO_DE_POOLS.md).
+
 ## Lo que queda fuera de esta sesión
 
 **La categoría C de la auditoría técnica externa queda completamente cerrada** (E-001 balanceo/réplicas, E-004 cache de permisos ya cerrado antes, observabilidad, script de prueba de carga, y ahora PgBouncer). Solo queda la categoría D (descomposición de la entidad `User`, migración de SQLAlchemy síncrono a `AsyncSession`/asyncpg), explícitamente diferida hasta que el usuario corra la prueba de carga real de 3.000 usuarios (docs/119) contra un despliegue real y esa evidencia muestre que hace falta.

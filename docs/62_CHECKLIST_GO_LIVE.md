@@ -23,7 +23,8 @@ sin backups o sin capacidad de diagnostico.
 ## 2. Base de datos
 
 - [ ] `DATABASE_URL` apunta a PostgreSQL, no SQLite.
-- [ ] Pool configurado: `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS`, `DB_POOL_RECYCLE_SECONDS`.
+- [ ] Pool configurado: `DB_POOL_SIZE=40`, `DB_MAX_OVERFLOW=40` (no los `10`/`20` del default del codigo: se agotan antes que el threadpool de 40 hilos, ver docs/121), `DB_POOL_TIMEOUT_SECONDS`, `DB_POOL_RECYCLE_SECONDS`.
+- [ ] Si se cambio el numero de replicas del backend, revisar `DB_POOL_SIZE`/`DB_MAX_OVERFLOW`, el `DEFAULT_POOL_SIZE` de `pgbouncer` y el `max_connections` de Postgres **juntos** (docs/121).
 - [ ] Migraciones Alembic ejecutadas con `alembic upgrade head`.
 - [ ] Backup inicial tomado antes de abrir trafico con `scripts/backup-postgres.cmd`.
 - [ ] Politica de backups definida: frecuencia, retencion, responsable y ubicacion.

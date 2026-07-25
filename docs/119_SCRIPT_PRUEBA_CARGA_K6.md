@@ -40,6 +40,18 @@ Mismo criterio que docs/117/docs/118 — no solo escrito, sino corrido de verdad
 
 **Límite explícito, no fingido:** esto prueba que el script funciona correctamente de punta a punta (autenticación, lectura paginada, escritura marcada, thresholds), no que la aplicación soporta 3.000 usuarios reales. Generar esa evidencia real requiere correr el script contra un despliegue real en el VPS que decida el usuario, con `TARGET_VUS=3000` y el rate limiting ajustado a propósito — una VM de desarrollo con un solo host Podman no puede producir un número creíble a esa escala.
 
+## Actualización 2026-07-25: el script encontró un cuello real
+
+Esta herramienta se usó por primera vez para lo que fue construida —
+encontrar un límite y explicarlo— y **encontró un cuello concreto en el
+dimensionado de pools del paquete productivo**: a 200 usuarios concurrentes
+el stack colapsaba con 16% de error, y ajustando dos parámetros de
+configuración (sin tocar código) pasó a 0% de error con 5× más throughput.
+
+Los resultados completos, la causa raíz (el techo de 40 hilos del threadpool
+de Starlette frente a un pool de 30 conexiones) y los valores nuevos están en
+[docs/121](121_EVIDENCIA_CARGA_Y_DIMENSIONADO_DE_POOLS.md).
+
 ## Lo que queda fuera de esta sesión
 
 De la categoría C de la auditoría técnica externa: solo queda **E-003 (PgBouncer)**. La categoría D (descomposición de `User`, migración a SQLAlchemy async) sigue explícitamente diferida hasta que el usuario corra la prueba de carga real de 3.000 usuarios con esta herramienta y esa evidencia muestre que hace falta.

@@ -23,6 +23,7 @@ function RequireContains($Path, $Pattern, $Description) {
 }
 
 $compose = RequireFile "docker-compose.production.example.yml"
+$envProductionExample = RequireFile ".env.production.example"
 $dockerignore = RequireFile ".dockerignore"
 $backendDockerfile = RequireFile "deploy\backend.Dockerfile"
 $frontendDockerfile = RequireFile "deploy\frontend.Dockerfile"
@@ -63,7 +64,11 @@ if ($failures.Count -eq 0) {
   RequireContains $compose "GF_SECURITY_ADMIN_PASSWORD" "Contrasena de Grafana"
   RequireContains $compose "(?m)^\s*pgbouncer:" "Servicio pgbouncer"
   RequireContains $compose "POOL_MODE:\s*transaction" "Modo de pool transaction en pgbouncer"
+  RequireContains $compose 'DEFAULT_POOL_SIZE:\s*"60"' "Pool de pgbouncer dimensionado con evidencia de carga (docs/121)"
   RequireContains $compose "@pgbouncer:6432" "DATABASE_URL de la aplicacion apuntando a pgbouncer, no directo a postgres"
+
+  RequireContains $envProductionExample "(?m)^DB_POOL_SIZE=40\r?$" "DB_POOL_SIZE dimensionado con evidencia de carga (docs/121)"
+  RequireContains $envProductionExample "(?m)^DB_MAX_OVERFLOW=40\r?$" "DB_MAX_OVERFLOW dimensionado con evidencia de carga (docs/121)"
 
   RequireContains $dockerignore "(?m)^\.env\r?$" "Exclusion .env"
   RequireContains $dockerignore "(?m)^\.env\.production\r?$" "Exclusion .env.production"

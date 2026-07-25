@@ -159,7 +159,7 @@ Nota: la **cohesión** reportada por Graphify mide qué tan interconectados est�
 ## 5. Base de datos y almacenamiento
 
 - **Motor:** SQLAlchemy soporta el motor indicado por `DATABASE_URL`. En desarrollo/demo: SQLite (`backend/.env`, `DATABASE_URL=sqlite:///./infomatt360_dev.db`). En producción: PostgreSQL 16 obligatorio — `backend/app/main.py::validate_startup_settings()` **bloquea el arranque** si `DATABASE_URL` empieza con `sqlite` y `ENVIRONMENT=production`.
-- **Pool de conexiones:** configurable vía `DB_POOL_SIZE` (10), `DB_MAX_OVERFLOW` (20), `DB_POOL_TIMEOUT_SECONDS` (30), `DB_POOL_RECYCLE_SECONDS` (1800) — `backend/app/core/config.py`.
+- **Pool de conexiones:** configurable vía `DB_POOL_SIZE`, `DB_MAX_OVERFLOW`, `DB_POOL_TIMEOUT_SECONDS` (30), `DB_POOL_RECYCLE_SECONDS` (1800) — `backend/app/core/config.py`. El default del código es `10`/`20`, adecuado para una instancia única de desarrollo; **el paquete productivo usa `40`/`40`**, dimensionado con evidencia de carga real (docs/121): como 244 de los 247 endpoints son síncronos y corren en el threadpool de Starlette (40 hilos por proceso), un pool menor a 40 se agota antes de que el backend sature sus propios hilos.
 - **Migraciones:** Alembic, 63 revisiones a la fecha (`backend/alembic/versions/`). `AUTO_CREATE_TABLES` debe ser `false` en producción (validado al arranque); en ese modo el esquema se gestiona **solo** vía `alembic upgrade head`, nunca `Base.metadata.create_all`.
 - **Estructura de datos del motor de captura:** modelo EAV (Entity-Attribute-Value) — `runtime_records` (cabecera: proyecto, plantilla, estado, participante) + `runtime_record_values` (una fila por campo capturado: `record_id`, `field_name`, `field_value_json`). Confirmado por `RuntimeRecord`/`RuntimeRecordValue` como god nodes (77 y aristas propias, `backend/app/models/runtime_record.py`).
 - **Almacenamiento de archivos/evidencias:**
@@ -299,7 +299,7 @@ Fuente: `backend/app/core/config.py` (clase `Settings`, valores por defecto) con
 | `DEBUG` | `true` | `false` | Sí |
 | `AUTO_CREATE_TABLES` | `true` | `false` | Sí |
 | `DATABASE_URL` | `sqlite:///./infomatt360_dev.db` | `postgresql+psycopg2://...` | Sí (no SQLite) |
-| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_TIMEOUT_SECONDS` / `DB_POOL_RECYCLE_SECONDS` | `10` / `20` / `30` / `1800` | igual | No (tiene default razonable) |
+| `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_TIMEOUT_SECONDS` / `DB_POOL_RECYCLE_SECONDS` | `10` / `20` / `30` / `1800` | **`40` / `40`** / `30` / `1800` (docs/121) | Sí en producción: el default del código se agota antes que el threadpool |
 | `SECRET_KEY` | valor de desarrollo | generado con `scripts/generate-secret.cmd`, ≥32 caracteres | Sí |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_DAYS` | `60` / `7` | igual | No |
 | `REFRESH_COOKIE_SECURE` | `false` | `true` | Sí |

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -37,6 +37,20 @@ def list_organizations(db: Session = Depends(get_db), current_user: User = Depen
 def update_branding(organization_id: str, payload: OrganizationBrandingUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> OrganizationBrandingRead:
     require_any_permission(db, current_user.id, {ORGANIZATIONS_BRANDING_MANAGE, ORGANIZATIONS_MANAGE})
     return organization_service.upsert_branding(db, organization_id, payload)
+
+
+@router.post("/{organization_id}/branding/logo", response_model=OrganizationBrandingRead, summary="Subir el logo de la organizacion")
+async def upload_branding_logo(
+    organization_id: str,
+    request: Request,
+    upload: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> OrganizationBrandingRead:
+    """Guarda el archivo y deja logo_url apuntando al endpoint publico que lo sirve (docs/122)."""
+    require_any_permission(db, current_user.id, {ORGANIZATIONS_BRANDING_MANAGE, ORGANIZATIONS_MANAGE})
+    content = await upload.read()
+    return organization_service.save_logo(db, organization_id, content, upload.content_type, str(request.base_url))
 
 
 @router.get("/{organization_id}/branding", response_model=OrganizationBrandingRead | None, summary="Consultar marca blanca de la organizacion")

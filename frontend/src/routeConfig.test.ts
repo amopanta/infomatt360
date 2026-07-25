@@ -25,6 +25,7 @@ describe('resolveAppRoute', () => {
     expect(resolveAppRoute('/admin/approval-flows')).toEqual({ key: 'approvalFlows', permissions: ['records.approve'] });
     expect(resolveAppRoute('/admin/bulk-jobs')).toEqual({ key: 'bulkJobs', permissions: ['integrations.api_keys.manage', 'records.write'] });
     expect(resolveAppRoute('/admin/metrics')).toEqual({ key: 'metrics', permissions: ['identity.users.manage', 'integrations.api_keys.manage', 'records.approve', 'records.write'] });
+    expect(resolveAppRoute('/admin/branding')).toEqual({ key: 'brandingAdmin', permissions: ['organizations.branding.manage', 'organizations.manage'] });
   });
 
   it('prioriza rutas administrativas especificas antes que rutas generales', () => {

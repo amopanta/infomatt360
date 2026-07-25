@@ -27,6 +27,7 @@ const menu = [
   { label: 'Carga masiva Excel', href: '/admin/excel-import', permissions: ['identity.users.manage'] },
   { label: 'Almacenamiento', href: '/admin/storage', permissions: ['storage.manage'] },
   { label: 'Correo', href: '/admin/mail-profiles', permissions: ['messages.write'] },
+  { label: 'Marca', href: '/admin/branding', permissions: ['organizations.branding.manage', 'organizations.manage'] },
   { label: 'Formularios abiertos', href: '/admin/public-links', permissions: ['builder.write'] },
   { label: 'Importar/Exportar XLSForm', href: '/admin/xlsform', permissions: ['builder.write'] },
   { label: 'Sincronizacion', href: '/admin/bulk-jobs', permissions: ['integrations.api_keys.manage', 'records.write'] },

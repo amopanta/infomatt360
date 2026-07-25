@@ -12,6 +12,7 @@ import { DonorSyncApp } from './modules/admin/DonorSyncApp';
 import { ErpApp } from './modules/admin/ErpApp';
 import { ExcelImportApp } from './modules/admin/ExcelImportApp';
 import { GovernanceApp } from './modules/admin/GovernanceApp';
+import { BrandingApp } from './modules/admin/BrandingApp';
 import { MailProfilesApp } from './modules/admin/MailProfilesApp';
 import { OperationalMetricsApp } from './modules/admin/OperationalMetricsApp';
 import { PublicLinksApp } from './modules/admin/PublicLinksApp';
@@ -100,6 +101,7 @@ function renderRoute(route: AppRoute) {
       case 'excelImport': return <ExcelImportApp />;
       case 'storage': return <StorageApp />;
       case 'mailProfiles': return <MailProfilesApp />;
+      case 'brandingAdmin': return <BrandingApp />;
       case 'publicLinks': return <PublicLinksApp />;
       case 'xlsform': return <XlsformApp />;
       case 'adminUsers': return <AdminUserSecurityApp />;

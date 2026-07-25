@@ -4,11 +4,13 @@ Este servicio centraliza la logica de usuarios, proyectos y roles usando
 SQLAlchemy. Los routers solo deben recibir solicitudes y delegar reglas.
 """
 
+from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.security import hash_password
 from app.models.identity import Project, Role, User
+from app.models.organization import Organization
 from app.schemas.identity import ProjectCreate, ProjectRead, RoleCreate, RoleRead, UserCreate, UserRead
 
 
@@ -91,6 +93,20 @@ class IdentityService:
 
     def list_projects(self, db: Session) -> list[ProjectRead]:
         return [_project_to_read(project) for project in db.query(Project).order_by(Project.created_at.desc()).all()]
+
+    def set_project_organization(self, db: Session, project_id: str, organization_id: str | None) -> ProjectRead:
+        """Vincula el proyecto a una organizacion (o lo desvincula con None)."""
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if project is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Proyecto no encontrado")
+        if organization_id is not None:
+            organization = db.query(Organization).filter(Organization.id == organization_id).first()
+            if organization is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Organizacion no encontrada")
+        project.organization_id = organization_id
+        db.commit()
+        db.refresh(project)
+        return _project_to_read(project)
 
     def create_role(self, db: Session, payload: RoleCreate) -> RoleRead:
         role = Role(

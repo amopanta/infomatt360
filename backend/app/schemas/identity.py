@@ -67,6 +67,16 @@ class ProjectRead(ProjectCreate):
     id: str
 
 
+class ProjectOrganizationUpdate(BaseModel):
+    """Vincular (o desvincular con None) un proyecto a una organizacion.
+
+    El branding de las actas y el alcance del rol de organizacion (docs/101)
+    dependen de este enlace; hasta docs/122 no existia forma de editarlo.
+    """
+
+    organization_id: str | None = None
+
+
 class RoleCreate(BaseModel):
     """Rol configurable por proyecto."""
 

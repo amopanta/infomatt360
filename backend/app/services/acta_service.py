@@ -34,7 +34,7 @@ from app.models.acta import ActaTemplate
 from app.models.identity import Project
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
 from app.schemas.acta import ActaLayout, ActaLayoutTemplateCreate, ActaTemplateCreate, ActaTemplateRead
-from app.services.organization_service import organization_service
+from app.services.organization_service import logo_file_for_url, organization_service
 
 _jinja_env = jinja2.Environment(autoescape=True)
 
@@ -192,7 +192,14 @@ class ActaService:
             if block.type == "logo":
                 if branding and branding.logo_url:
                     align = html.escape(block.alignment)
-                    body_parts.append(f'<div style="text-align:{align}"><img src="{html.escape(branding.logo_url)}" style="max-height:80px"></div>')
+                    # Si el logo fue subido a esta misma instancia (docs/122),
+                    # xhtml2pdf lo lee directo del disco en vez de que el
+                    # backend se haga un fetch HTTP a si mismo -- mas robusto
+                    # (hairpin NAT, TLS interno) y mas rapido. URLs externas
+                    # siguen incrustandose por URL, igual que antes.
+                    local_logo = logo_file_for_url(branding.logo_url)
+                    logo_src = str(local_logo) if local_logo is not None else branding.logo_url
+                    body_parts.append(f'<div style="text-align:{align}"><img src="{html.escape(logo_src)}" style="max-height:80px"></div>')
                 else:
                     body_parts.append("<!-- bloque logo: sin logo configurado en la organizacion -->")
             elif block.type == "header":

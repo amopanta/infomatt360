@@ -13,7 +13,7 @@ from app.api.permissions import require_any_permission
 from app.core.permissions import IDENTITY_USERS_MANAGE, ORGANIZATIONS_MANAGE
 from app.db.session import get_db
 from app.models.identity import User
-from app.schemas.identity import ProjectCreate, ProjectRead, RoleCreate, RoleRead, UserCreate, UserRead
+from app.schemas.identity import ProjectCreate, ProjectOrganizationUpdate, ProjectRead, RoleCreate, RoleRead, UserCreate, UserRead
 from app.services.identity_service import identity_service
 
 router = APIRouter()
@@ -43,6 +43,15 @@ def create_project(payload: ProjectCreate, db: Session = Depends(get_db), curren
 def list_projects(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[ProjectRead]:
     require_any_permission(db, current_user.id, {ORGANIZATIONS_MANAGE})
     return identity_service.list_projects(db)
+
+
+@router.patch("/projects/{project_id}", response_model=ProjectRead, summary="Vincular proyecto a una organizacion")
+def set_project_organization(project_id: str, payload: ProjectOrganizationUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ProjectRead:
+    """Hasta docs/122 no existia forma de editar este enlace; el branding de
+    las actas y el alcance del rol de organizacion (docs/101) dependen de el.
+    """
+    require_any_permission(db, current_user.id, {ORGANIZATIONS_MANAGE})
+    return identity_service.set_project_organization(db, project_id, payload.organization_id)
 
 
 @router.post("/roles", response_model=RoleRead, status_code=status.HTTP_201_CREATED, summary="Crear rol")

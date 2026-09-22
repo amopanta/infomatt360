@@ -14,6 +14,7 @@ from app.core.time import utc_now
 from app.models.builder import BuilderTemplate
 from app.models.builder_public_link import BuilderPublicLink
 from app.schemas.builder_public_link import BuilderPublicLinkCreate, BuilderPublicLinkIssued, BuilderPublicLinkRead
+from app.services.template_availability import ensure_accepting
 
 
 def _hash_token(raw_token: str) -> str:
@@ -41,6 +42,14 @@ class BuilderPublicLinkService:
             raise ValueError("Plantilla no encontrada")
         if template.status != "published":
             raise ValueError("Solo se puede generar un enlace publico para una plantilla publicada")
+        if payload.label and payload.label.startswith("encuestado:"):
+            existing = db.query(BuilderPublicLink).filter(
+                BuilderPublicLink.template_id == template.id,
+                BuilderPublicLink.label == payload.label,
+                or_(BuilderPublicLink.revoked_at.is_(None), BuilderPublicLink.submission_count > 0),
+            ).first()
+            if existing is not None:
+                raise ValueError("Ya existe un enlace para este codigo de encuestado")
 
         raw_token = secrets.token_urlsafe(32)
         row = BuilderPublicLink(
@@ -79,6 +88,10 @@ class BuilderPublicLinkService:
         now = utc_now()
         if row is None or row.revoked_at is not None or (row.expires_at is not None and row.expires_at <= now):
             raise ValueError("Enlace publico invalido, vencido o revocado")
+        template = db.get(BuilderTemplate, row.template_id)
+        if template is None:
+            raise ValueError("El formulario no existe")
+        ensure_accepting(template)
         if row.max_submissions is not None and row.submission_count >= row.max_submissions:
             raise ValueError("Este enlace publico ya alcanzo el maximo de respuestas permitidas")
         return row

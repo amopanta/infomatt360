@@ -21,6 +21,10 @@ type Props = {
   onPreview: () => void;
   onSave: () => void;
   saving?: boolean;
+  lockedFieldIds?: Set<string>;
+  lockedSectionIds?: Set<string>;
+  lockTechnicalNames?: boolean;
+  disableReorder?: boolean;
 };
 
 export function BuilderCanvas({
@@ -38,6 +42,10 @@ export function BuilderCanvas({
   onPreview,
   onSave,
   saving = false,
+  lockedFieldIds = new Set(),
+  lockedSectionIds = new Set(),
+  lockTechnicalNames = false,
+  disableReorder = false,
 }: Props) {
   const [draggedField, setDraggedField] = useState<{ sectionId: string; fieldIndex: number } | null>(null);
   const [dropTarget, setDropTarget] = useState<{ sectionId: string; fieldIndex: number } | null>(null);
@@ -88,7 +96,7 @@ export function BuilderCanvas({
               <button type="button" className={section.id === activeSectionId ? 'primary' : 'secondary'} onClick={() => onActiveSectionChange(section.id)}>
                 {section.id === activeSectionId ? 'Grupo activo' : 'Agregar aqui'}
               </button>
-              <button type="button" className="secondary danger" disabled={sections.length <= 1} onClick={() => onRemoveSection(section.id)}>Eliminar grupo</button>
+              <button type="button" className="secondary danger" disabled={sections.length <= 1 || lockedSectionIds.has(section.id)} onClick={() => onRemoveSection(section.id)}>Eliminar grupo</button>
             </div>
           </header>
           {section.fields.length === 0 ? (
@@ -116,7 +124,7 @@ export function BuilderCanvas({
                   <span
                     className="builder-drag-handle"
                     title="Arrastra para cambiar el orden"
-                    draggable
+                    draggable={!disableReorder && !lockedFieldIds.has(field.id)}
                     onDragStart={(event) => {
                       event.dataTransfer.effectAllowed = 'move';
                       event.dataTransfer.setData('text/plain', field.id);
@@ -131,7 +139,7 @@ export function BuilderCanvas({
                   </span>
                   <strong>{field.label || 'Pregunta sin titulo'}</strong>
                   <small>{field.type}</small>
-                  <button type="button" className="secondary" onClick={() => onRemoveField(field.id)}>Eliminar</button>
+                  <button type="button" className="secondary" disabled={lockedFieldIds.has(field.id)} onClick={() => onRemoveField(field.id)}>Eliminar</button>
                 </div>
                 <div className="builder-field-row">
                   <label>
@@ -140,7 +148,7 @@ export function BuilderCanvas({
                   </label>
                   <label>
                     <span>Nombre tecnico</span>
-                    <input value={field.name} onChange={(event) => onFieldChange(field.id, { name: event.target.value })} />
+                    <input value={field.name} disabled={lockTechnicalNames && lockedFieldIds.has(field.id)} onChange={(event) => onFieldChange(field.id, { name: event.target.value })} />
                   </label>
                   <label>
                     <span>Ayuda / placeholder</span>

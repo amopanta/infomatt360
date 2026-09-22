@@ -5,7 +5,11 @@ from app.api.deps import get_current_user
 from app.api.builder_access import require_page_access, require_row_access, require_section_access, require_template_access
 from app.db.session import get_db
 from app.models.identity import User
-from app.schemas.builder_layout import BuilderColumnCreate, BuilderColumnRead, BuilderPageCreate, BuilderPageRead, BuilderRowCreate, BuilderRowRead, BuilderSectionCreate, BuilderSectionRead
+from app.schemas.builder_layout import BuilderColumnCreate, BuilderColumnRead, BuilderPageCreate, BuilderPageRead, BuilderRowCreate, BuilderRowRead, BuilderSectionCreate, BuilderSectionRead, BuilderSectionTitleUpdate
+from app.api.permissions import require_project_permission
+from app.core.permissions import BUILDER_WRITE
+from app.models.builder import BuilderTemplate
+from app.models.builder_layout import BuilderPage
 from app.services.builder_layout_service import builder_layout_service
 
 router = APIRouter()
@@ -33,6 +37,15 @@ def create_section(payload: BuilderSectionCreate, db: Session = Depends(get_db),
 def list_sections(page_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[BuilderSectionRead]:
     require_page_access(db, current_user.id, page_id)
     return builder_layout_service.list_sections(db, page_id)
+
+
+@router.patch("/sections/detail/{section_id}/title", response_model=BuilderSectionRead)
+def update_section_title(section_id: str, payload: BuilderSectionTitleUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> BuilderSectionRead:
+    section = require_section_access(db, current_user.id, section_id)
+    page = db.get(BuilderPage, section.page_id)
+    template = db.get(BuilderTemplate, page.template_id)
+    require_project_permission(db, current_user.id, template.project_id, BUILDER_WRITE)
+    return builder_layout_service.set_section_title(db, section_id, payload.title)
 
 
 @router.post("/rows", response_model=BuilderRowRead)

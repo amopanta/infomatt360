@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class BuilderPageCreate(BaseModel):
@@ -24,6 +24,10 @@ class BuilderSectionCreate(BaseModel):
 
 class BuilderSectionRead(BuilderSectionCreate):
     id: str
+
+
+class BuilderSectionTitleUpdate(BaseModel):
+    title: str = Field(min_length=1, max_length=180)
 
 
 class BuilderRowCreate(BaseModel):

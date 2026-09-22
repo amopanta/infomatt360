@@ -43,6 +43,17 @@ class BuilderLayoutService:
         rows = db.query(BuilderSection).filter(BuilderSection.page_id == page_id).order_by(BuilderSection.sort_order).all()
         return [section_to_read(row) for row in rows]
 
+    def set_section_title(self, db: Session, section_id: str, title: str) -> BuilderSectionRead:
+        row = db.get(BuilderSection, section_id)
+        row.title = title.strip()
+        siblings = db.query(BuilderSection.id).filter(BuilderSection.page_id == row.page_id).limit(2).all()
+        if len(siblings) == 1:
+            page = db.get(BuilderPage, row.page_id)
+            page.title = row.title
+        db.commit()
+        db.refresh(row)
+        return section_to_read(row)
+
     def create_row(self, db: Session, payload: BuilderRowCreate) -> BuilderRowRead:
         row = BuilderRow(section_id=payload.section_id, sort_order=payload.sort_order, responsive="true" if payload.responsive else "false")
         db.add(row)

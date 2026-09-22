@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
+import { fetchDashboard } from '../dashboard/api';
+import type { DashboardSummary } from '../dashboard/api';
 import { downloadReportSummary, fetchReportBoard, saveReportBoard } from './api';
 import type { ReportTemplateMetric } from './api';
 import { ReportBoardEditor } from './ReportBoardEditor';
@@ -15,6 +17,8 @@ export function ReportsApp() {
   const [editing, setEditing] = useState(false);
   const [draftWidgets, setDraftWidgets] = useState<ReportWidget[]>([]);
   const [saving, setSaving] = useState(false);
+  const [activity, setActivity] = useState<DashboardSummary | null>(null);
+  const [tab, setTab] = useState<'operativo' | 'indicadores' | 'analitico' | 'donantes' | 'geografico'>('operativo');
   const canEdit = hasAnyCurrentProjectPermission(['builder.write']);
 
   useEffect(() => {
@@ -24,7 +28,20 @@ export function ReportsApp() {
         setMessage('');
       })
       .catch((error: Error) => setMessage(error.message));
+    fetchDashboard(projectId).then(setActivity).catch(() => setActivity(null));
   }, [projectId]);
+
+  function exportCsv() {
+    if (!board) return;
+    const rows = [['Formulario', 'Estado', 'Registros', 'Último registro'], ...board.summary.templates.map((item) => [item.template_name, item.template_status, String(item.records_total), item.last_record_at ?? ''])];
+    const content = '\uFEFF' + rows.map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `reporte-${projectId}.csv`;
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 
   async function exportXlsx() {
     try {
@@ -56,16 +73,15 @@ export function ReportsApp() {
 
   return (
     <AppShell title="Reportes">
-      <main className="reports-shell">
+      <main className="reports-shell reports-studio">
         <header className="reports-header">
           <div>
-            <h2>Tablero de reportes</h2>
-            <p>Personaliza qué se muestra: KPIs, gráficos y tablas sobre tus formularios.</p>
+            <h2><span className="reports-logo-mark">▦</span> InfoMatt360 <small>· Módulo de reportes</small></h2>
+            <p>Indicadores y resultados del proyecto</p>
           </div>
           <div className="reports-actions">
-            <button onClick={() => void exportXlsx()}>Exportar XLSX</button>
-            <a href="/records">Ver registros</a>
-            {canEdit && !editing ? <button className="secondary" onClick={startEditing}>Personalizar tablero</button> : null}
+            <a href="/reports/catalog">Mis reportes e indicadores</a>
+            {canEdit && !editing ? <button className="secondary" onClick={startEditing}>⚙ Personalizar y gestionar</button> : null}
           </div>
         </header>
         {message ? <p role="status">{message}</p> : null}
@@ -80,11 +96,24 @@ export function ReportsApp() {
             onCancel={() => setEditing(false)}
           />
         ) : board ? (
-          <section className="reports-board">
-            {board.widgets.map((widget, index) => (
-              <ReportWidgetView key={index} widget={widget} resolved={board.resolved[index]} summary={board.summary.templates} />
-            ))}
-          </section>
+          <>
+            <nav className="reports-tabs" aria-label="Secciones de reportes">
+              {([['operativo', '▤ Operativo'], ['indicadores', '▥ Indicadores'], ['analitico', '⌁ Analítico'], ['donantes', '▣ Donantes'], ['geografico', '⌖ Geográfico']] as const).map(([key, label]) => <button type="button" key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key)}>{label}</button>)}
+            </nav>
+            {tab === 'operativo' && <>
+              <section className="reports-overview" aria-label="Resumen operativo">
+                <article><strong>{board.summary.records_total.toLocaleString()}</strong><span>Formularios enviados</span><small>Registros del proyecto</small></article>
+                <article><strong>{(board.summary.records_by_status.pending ?? board.summary.records_by_status.submitted ?? 0).toLocaleString()}</strong><span>Pendientes de revisión</span><small>Según estado del registro</small></article>
+                <article><strong>{board.summary.records_total ? `${Math.round(((board.summary.records_by_status.approved ?? 0) / board.summary.records_total) * 100)}%` : '0%'}</strong><span>Aprobados</span><small>Del total de registros</small></article>
+                <article><strong>{board.summary.templates.length.toLocaleString()}</strong><span>Formularios</span><small>En este proyecto</small></article>
+              </section>
+              <div className="reports-operational-grid"><section className="reports-board">{board.widgets.map((widget, index) => <ReportWidgetView key={index} widget={widget} resolved={board.resolved[index]} summary={board.summary.templates} />)}</section><aside className="reports-recent"><h3>☷ Últimos envíos</h3>{activity?.recent_records.length ? <table><thead><tr><th>Formulario</th><th>Estado</th></tr></thead><tbody>{activity.recent_records.slice(0, 6).map((record) => <tr key={record.id}><td><a href={`/records/${record.template_id}`}>{record.template_name}</a><small>{new Date(record.created_at).toLocaleString()}</small></td><td><span>{record.status}</span></td></tr>)}</tbody></table> : <p>Aún no hay envíos recientes.</p>}</aside></div>
+            </>}
+            {(tab === 'indicadores' || tab === 'analitico') && <section className="reports-board">{board.widgets.map((widget, index) => ({ widget, resolved: board.resolved[index], index })).filter(({ widget }) => tab === 'indicadores' ? widget.type === 'kpi' : widget.type === 'chart' || widget.type === 'table').map(({ widget, resolved, index }) => <ReportWidgetView key={index} widget={widget} resolved={resolved} summary={board.summary.templates} />)}{!board.widgets.some((widget) => tab === 'indicadores' ? widget.type === 'kpi' : widget.type === 'chart' || widget.type === 'table') && <p>Agrega bloques desde “Personalizar y gestionar”.</p>}</section>}
+            {tab === 'donantes' && <section className="reports-empty"><h3>Donantes</h3><p>Personaliza este tablero con los indicadores de tus formularios de donantes.</p>{canEdit && <button type="button" onClick={startEditing}>Agregar indicador</button>}</section>}
+            {tab === 'geografico' && <section className="reports-empty"><h3>Vista geográfica</h3><p>Consulta los registros con ubicación en el mapa del proyecto.</p><a href="/maps">Abrir mapas</a></section>}
+            <footer className="reports-export"><button type="button" onClick={() => void exportXlsx()}>▤ Excel</button><button type="button" onClick={exportCsv}>▤ CSV</button><button type="button" onClick={() => window.print()}>▤ PDF / Imprimir</button></footer>
+          </>
         ) : null}
       </main>
     </AppShell>

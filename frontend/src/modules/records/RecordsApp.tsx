@@ -20,7 +20,7 @@ import { deselectPage, isPageFullySelected, selectPage, toggleSelection } from '
 
 const REJECTION_STATUSES = new Set(['rejected', 'returned']);
 
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 30;
 
 function templateIdFromPath(): string {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -750,8 +750,12 @@ function DeepLinkedRecordCard({
 function RecordTable({ templateId }: { templateId: string }) {
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [records, setRecords] = useState<RuntimeRecord[]>([]);
+  const [templateFields, setTemplateFields] = useState<Array<{ name: string; label: string }>>([]);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
+  const [fieldFilters, setFieldFilters] = useState<Record<string, string>>({});
+  const [sortBy, setSortBy] = useState('created_at');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [unlinkedOnly, setUnlinkedOnly] = useState(false);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
@@ -771,6 +775,24 @@ function RecordTable({ templateId }: { templateId: string }) {
   const [selectAllMatchingFilter, setSelectAllMatchingFilter] = useState(false);
 
   useEffect(() => {
+    let active = true;
+    fetchRuntimeTemplate(templateId)
+      .then((template) => {
+        if (!active) return;
+        const names = new Set<string>();
+        setTemplateFields(flattenComponents(template)
+          .filter((component) => {
+            if (!component.name || names.has(component.name)) return false;
+            names.add(component.name);
+            return true;
+          })
+          .map((component) => ({ name: component.name, label: component.label || component.name })));
+      })
+      .catch(() => { if (active) setTemplateFields([]); });
+    return () => { active = false; };
+  }, [templateId]);
+
+  useEffect(() => {
     if (!deepLink.recordId) return;
     fetchRecord(deepLink.recordId)
       .then(setDeepLinkedRecord)
@@ -780,7 +802,7 @@ function RecordTable({ templateId }: { templateId: string }) {
   useEffect(() => {
     let active = true;
     setMessage('Cargando registros...');
-    searchTemplateRecords({ templateId, search: query.trim(), status, unlinkedOnly, limit: PAGE_SIZE, offset })
+    searchTemplateRecords({ templateId, search: query.trim(), status, unlinkedOnly, fieldFilters, sortBy, sortDir, limit: PAGE_SIZE, offset })
       .then((page) => {
         if (!active) return;
         setRecords(page.items);
@@ -791,13 +813,30 @@ function RecordTable({ templateId }: { templateId: string }) {
     return () => {
       active = false;
     };
-  }, [templateId, query, status, unlinkedOnly, offset]);
+  }, [templateId, query, status, unlinkedOnly, fieldFilters, sortBy, sortDir, offset]);
+
+  function sortColumn(name: string) {
+    setSortDir((current) => sortBy === name && current === 'asc' ? 'desc' : 'asc');
+    setSortBy(name);
+    setOffset(0);
+  }
+
+  function updateFieldFilter(name: string, value: string) {
+    setFieldFilters((current) => ({ ...current, [name]: value }));
+    setOffset(0);
+  }
 
   function updateRecordInList(updated: RuntimeRecord) {
     setRecords((current) => current.map((record) => record.id === updated.id ? updated : record));
   }
 
-  const fields = useMemo(() => Array.from(new Set(records.flatMap((record) => record.values.map((value) => value.field_name)))).slice(0, 5), [records]);
+  const fields = useMemo(() => {
+    const names = new Set(templateFields.map((field) => field.name));
+    const capturedFields = records.flatMap((record) => record.values.map((value) => value.field_name));
+    return [...templateFields, ...Array.from(new Set(capturedFields))
+      .filter((name) => !names.has(name))
+      .map((name) => ({ name, label: name }))];
+  }, [records, templateFields]);
   const pageStart = total ? offset + 1 : 0;
   const pageEnd = Math.min(offset + records.length, total);
   const pageIds = useMemo(() => records.map((record) => record.id), [records]);
@@ -843,22 +882,6 @@ function RecordTable({ templateId }: { templateId: string }) {
           <a href="/records">Volver a formularios</a>
           <div className="records-toolbar-actions">
             <input type="search" placeholder="Buscar por campo, valor, estado o usuario" value={query} onChange={(event) => { setQuery(event.target.value); setOffset(0); }} />
-            <select aria-label="Filtrar por estado" value={status} onChange={(event) => { setStatus(event.target.value); setOffset(0); }}>
-              <option value="">Todos los estados</option>
-              <option value="draft">Borrador</option>
-              <option value="submitted">Enviado</option>
-              <option value="under_review">En revisión</option>
-              <option value="tech_approved">Aprobado técnico</option>
-              <option value="coordinator_approved">Aprobado coordinación</option>
-              <option value="returned">Devuelto</option>
-              <option value="corrected">Corregido</option>
-              <option value="approved">Aprobado</option>
-              <option value="rejected">Rechazado</option>
-              <option value="cancelled">Cancelado</option>
-              <option value="archived">Archivado</option>
-              <option value="synced">Sincronizado</option>
-              <option value="voided">Anulado</option>
-            </select>
             <label className="records-unlinked-filter">
               <input type="checkbox" checked={unlinkedOnly} onChange={(event) => { setUnlinkedOnly(event.target.checked); setOffset(0); }} />
               Sin participante enlazado
@@ -874,6 +897,7 @@ function RecordTable({ templateId }: { templateId: string }) {
           <button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>Anterior</button>
           <button disabled={offset + PAGE_SIZE >= total} onClick={() => setOffset(offset + PAGE_SIZE)}>Siguiente</button>
         </div>
+        <p className="records-grid-hint">Todas las preguntas aparecen como columnas. Busca dentro de cada columna, ordénala desde su encabezado y desplázate horizontalmente para ver la grilla completa.</p>
         {message ? <p role="status">{message}</p> : null}
         {selectedIds.size > 0 || selectAllMatchingFilter ? (
           <BulkActaBar
@@ -887,17 +911,26 @@ function RecordTable({ templateId }: { templateId: string }) {
             onClear={clearSelection}
           />
         ) : null}
-        <div className="records-table-wrap">
+        <div className="records-table-wrap" role="region" aria-label="Grilla de respuestas" tabIndex={0}>
           <table className="records-table">
             <thead>
               <tr>
                 <th className="records-select-col">
                   <input type="checkbox" aria-label="Seleccionar todos los de esta página" checked={pageFullySelected} onChange={togglePageSelection} disabled={pageIds.length === 0} />
                 </th>
-                <th>Fecha</th>
-                <th>Estado</th>
-                {fields.map((field) => <th key={field}>{field}</th>)}
-                <th>Detalle</th>
+                <th><button type="button" className="records-sort" onClick={() => sortColumn('created_at')}>Fecha de envío {sortBy === 'created_at' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
+                <th><button type="button" className="records-sort" onClick={() => sortColumn('status')}>Validación {sortBy === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
+                <th><button type="button" className="records-sort" onClick={() => sortColumn('submitted_by')}>Capturado por {sortBy === 'submitted_by' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
+                {fields.map((field) => <th key={field.name} title={field.name}><button type="button" className="records-sort" onClick={() => sortColumn(`field:${field.name}`)}>{field.label} {sortBy === `field:${field.name}` ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>)}
+                <th>Acciones</th>
+              </tr>
+              <tr className="records-filter-row">
+                <th />
+                <th />
+                <th><select aria-label="Filtrar por validación" value={status} onChange={(event) => { setStatus(event.target.value); setOffset(0); }}><option value="">Todos</option><option value="draft">Borrador</option><option value="submitted">Enviado</option><option value="under_review">En revisión</option><option value="tech_approved">Aprobado técnico</option><option value="coordinator_approved">Aprobado coordinación</option><option value="returned">Devuelto</option><option value="corrected">Corregido</option><option value="approved">Aprobado</option><option value="rejected">Rechazado</option><option value="cancelled">Cancelado</option><option value="archived">Archivado</option><option value="synced">Sincronizado</option><option value="voided">Anulado</option></select></th>
+                <th />
+                {fields.map((field) => <th key={field.name}><input type="search" aria-label={`Buscar en ${field.label}`} placeholder="Buscar" value={fieldFilters[field.name] ?? ''} onChange={(event) => updateFieldFilter(field.name, event.target.value)} /></th>)}
+                <th />
               </tr>
             </thead>
             <tbody>
@@ -909,12 +942,16 @@ function RecordTable({ templateId }: { templateId: string }) {
                     </td>
                     <td>{new Date(record.created_at).toLocaleString()}</td>
                     <td><span className={`record-status ${record.status}`}>{record.status}</span></td>
-                    {fields.map((field) => <td key={field}>{formatValue(record.values.find((value) => value.field_name === field)?.field_value_json)}</td>)}
-                    <td><button onClick={() => setExpanded(expanded === record.id ? null : record.id)}>{expanded === record.id ? 'Cerrar' : 'Ver'}</button></td>
+                    <td title={record.submitted_by ?? ''}>{record.submitted_by || '—'}</td>
+                    {fields.map((field) => {
+                      const value = formatValue(record.values.find((item) => item.field_name === field.name)?.field_value_json, true);
+                      return <td key={field.name} title={value}>{value}</td>;
+                    })}
+                    <td className="records-row-actions"><button aria-label={`Ver registro ${record.id}`} title="Ver respuesta" onClick={() => setExpanded(expanded === record.id ? null : record.id)}>{expanded === record.id ? 'Cerrar' : 'Ver'}</button><a href={`/records/${templateId}?recordId=${record.id}`} title="Abrir ficha completa">Abrir</a></td>
                   </tr>
                   {expanded === record.id ? (
                     <tr>
-                      <td colSpan={fields.length + 4}>
+                      <td colSpan={fields.length + 5}>
                         <dl className="record-detail">
                           {record.values.map((value) => (
                             <div key={value.id}>

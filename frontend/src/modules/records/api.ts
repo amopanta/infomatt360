@@ -1,7 +1,7 @@
 export type RecordValue = { id: string; field_name: string; field_value_json: string };
 export type RuntimeRecord = { id: string; template_id: string; status: string; submitted_by?: string | null; approval_flow_id?: string | null; approval_flow_version?: string | null; participant_id?: string | null; lock_version: number; created_at: string; updated_at: string; values: RecordValue[] };
 export type RuntimeRecordPage = { items: RuntimeRecord[]; total: number; limit: number; offset: number };
-export type TemplateSummary = { id: string; name: string; description?: string | null; status: string };
+export type TemplateSummary = { id: string; name: string; description?: string | null; theme_json?: string | null; status: string; created_at?: string | null; updated_at?: string | null; published_at?: string | null; starts_at?: string | null; ends_at?: string | null; availability?: string; accepting_responses?: boolean; owner_name?: string | null; submissions_count?: number };
 export type ReviewAction = { id: string; project_id: string; record_id: string; from_status?: string | null; to_status: string; action: string; notes?: string | null; rejected_field_name?: string | null; user_id: string; approval_flow_id?: string | null; approval_flow_version?: number | null; created_at?: string | null };
 export type ReviewNextAction = { label: string; to_status: string; action: string; required_permission?: string | null; source: string };
 export type ReviewApprovalProgress = {
@@ -85,11 +85,14 @@ export async function fetchRecord(recordId: string): Promise<RuntimeRecord> {
   return response.json();
 }
 
-export async function searchTemplateRecords(params: { templateId: string; search?: string; status?: string; limit?: number; offset?: number; unlinkedOnly?: boolean }): Promise<RuntimeRecordPage> {
+export async function searchTemplateRecords(params: { templateId: string; search?: string; status?: string; limit?: number; offset?: number; unlinkedOnly?: boolean; fieldFilters?: Record<string, string>; sortBy?: string; sortDir?: 'asc' | 'desc' }): Promise<RuntimeRecordPage> {
   const query = new URLSearchParams();
   if (params.search) query.set('search', params.search);
   if (params.status) query.set('status', params.status);
   if (params.unlinkedOnly) query.set('unlinked_only', 'true');
+  if (params.fieldFilters && Object.values(params.fieldFilters).some(Boolean)) query.set('field_filters', JSON.stringify(params.fieldFilters));
+  if (params.sortBy) query.set('sort_by', params.sortBy);
+  if (params.sortDir) query.set('sort_dir', params.sortDir);
   query.set('limit', String(params.limit ?? 25));
   query.set('offset', String(params.offset ?? 0));
   const response = await fetch(`${API_BASE_URL}/runtime/template/${params.templateId}/records/search?${query.toString()}`, { headers: headers() });

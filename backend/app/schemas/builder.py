@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.core.field_types import normalize_field_type
@@ -15,6 +17,30 @@ class BuilderTemplateCreate(BaseModel):
 
 class BuilderTemplateRead(BuilderTemplateCreate):
     id: str
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    published_at: datetime | None = None
+    owner_name: str | None = None
+    submissions_count: int = 0
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
+    availability: str = "draft"
+    accepting_responses: bool = False
+
+
+class BuilderTemplateStatusUpdate(BaseModel):
+    status: str = Field(pattern="^(draft|published|paused|archived)$")
+
+
+class BuilderTemplatePropertiesUpdate(BaseModel):
+    name: str = Field(min_length=1, max_length=180)
+    description: str | None = None
+    theme_json: str | None = None
+
+
+class BuilderTemplateScheduleUpdate(BaseModel):
+    starts_at: datetime | None = None
+    ends_at: datetime | None = None
 
 
 class BuilderComponentCreate(BaseModel):
@@ -41,6 +67,12 @@ class BuilderComponentCreate(BaseModel):
 
 class BuilderComponentRead(BuilderComponentCreate):
     id: str
+
+
+class BuilderComponentPropertiesUpdate(BaseModel):
+    label: str = Field(min_length=1, max_length=220)
+    name: str = Field(min_length=1, max_length=120)
+    config_json: str | None = None
 
 
 class BuilderVersionCreate(BaseModel):

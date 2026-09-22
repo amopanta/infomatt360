@@ -16,8 +16,9 @@ router = APIRouter()
 
 @router.post("/", response_model=ReportRead)
 def create_report(payload: ReportCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ReportRead:
-    if not assignment_service.user_has_project_access(db, current_user.id, payload.project_id):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    require_project_permission(db, current_user.id, payload.project_id, BUILDER_WRITE)
+    if payload.report_type == "indicator_board":
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Usa /reports/catalog para reportes de indicadores")
     return report_service.create_report(db, payload)
 
 
@@ -69,4 +70,4 @@ def update_report_board(project_id: str, payload: ReportBoardUpdate, db: Session
 
 @router.post("/links", response_model=ReportLinkRead)
 def create_report_link(payload: ReportLinkCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ReportLinkRead:
-    return report_service.create_link(db, payload)
+    raise HTTPException(status_code=status.HTTP_410_GONE, detail="Usa los enlaces seguros de /reports/catalog/{id}/links")

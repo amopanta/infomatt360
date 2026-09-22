@@ -37,6 +37,7 @@ from app.api.v1.public import router as public_router
 from app.api.v1.public_forms import router as public_forms_router
 from app.api.v1.records import router as records_router
 from app.api.v1.reports import router as reports_router
+from app.api.v1.report_catalog import router as report_catalog_router
 from app.api.v1.review import router as review_router
 from app.api.v1.runtime import router as runtime_router
 from app.api.v1.scheduler import router as scheduler_router
@@ -81,6 +82,7 @@ api_v1_router.include_router(external_api_router, prefix="/external-api", tags=[
 api_v1_router.include_router(mirror_router, prefix="/mirror", tags=["mirror"])
 api_v1_router.include_router(scheduler_router, prefix="/scheduler", tags=["scheduler"])
 api_v1_router.include_router(reports_router, prefix="/reports", tags=["reports"])
+api_v1_router.include_router(report_catalog_router, prefix="/reports", tags=["reports"])
 api_v1_router.include_router(acta_router, prefix="/acta-templates", tags=["acta"])
 api_v1_router.include_router(ai_router, prefix="/ai", tags=["ai"])
 api_v1_router.include_router(ai_audit_router, prefix="/ai-audit", tags=["ai-audit"])

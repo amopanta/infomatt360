@@ -15,7 +15,7 @@ from app.core.config import settings
 from app.db.session import SessionLocal
 from app.models.installation import InstallationState
 
-ALLOWED_PATH_PREFIXES = ("/api/v1/install", "/api/v1/public", "/health", "/docs", "/redoc", "/openapi.json")
+ALLOWED_PATH_PREFIXES = ("/api/v1/install", "/api/v1/health", "/api/v1/public", "/health", "/docs", "/redoc", "/openapi.json")
 
 
 class InstallGuardMiddleware(BaseHTTPMiddleware):

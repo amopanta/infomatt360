@@ -6,7 +6,7 @@ services:
     # tenga exito en produccion, cambiar a una imagen con la extension
     # preinstalada, por ejemplo postgis/postgis:16-3.4, o instalar el paquete
     # postgresql-16-postgis-3 en una imagen derivada.
-    image: postgres:16
+    image: postgis/postgis:16-3.4
     restart: unless-stopped
     environment:
       POSTGRES_DB: infomatt360
@@ -147,7 +147,7 @@ services:
       default:
         ipv4_address: 172.28.0.10
     ports:
-      - "8000:80"
+      - "127.0.0.1:18000:80"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1/api/v1/health/ready"]
       interval: 30s
@@ -209,12 +209,14 @@ services:
     build:
       context: .
       dockerfile: deploy/frontend.Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
     restart: unless-stopped
     depends_on:
       backend-lb:
         condition: service_healthy
     ports:
-      - "8080:80"
+      - "127.0.0.1:18080:80"
 
   prometheus:
     # Stack de observabilidad (auditoria tecnica externa julio 2026, docs/118).
@@ -249,7 +251,7 @@ services:
     depends_on:
       - prometheus
     ports:
-      - "3000:3000"
+      - "127.0.0.1:13000:3000"
 
 volumes:
   postgres_data:

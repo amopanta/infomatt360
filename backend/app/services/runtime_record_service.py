@@ -14,12 +14,12 @@ from datetime import datetime, timedelta
 from io import StringIO
 from uuid import uuid4
 
-from sqlalchemy import or_
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.time import utc_now
-from app.models.builder import BuilderComponent
+from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.files import FileAsset
 from app.models.bulk_import import BulkImportJob
 from app.models.participants import Participant
@@ -30,6 +30,7 @@ from app.services.ai_audit_service import ai_audit_service
 from app.services.approval_flow_service import approval_flow_service
 from app.services.builder_service import builder_service
 from app.services.metrics_service import metrics_service
+from app.services.template_availability import ensure_accepting
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +92,9 @@ class RuntimeRecordService:
         Crea primero la cabecera y luego cada valor capturado. El diseno es
         flexible para soportar campos simples y complejos sin migraciones por formulario.
         """
+        template = db.get(BuilderTemplate, payload.template_id)
+        if template is not None and template.status != "draft":
+            ensure_accepting(template)
         if payload.parent_record_id:
             parent = db.query(RuntimeRecord).filter(RuntimeRecord.id == payload.parent_record_id).first()
             if parent is None:
@@ -767,7 +771,7 @@ class RuntimeRecordService:
         rows = db.query(RuntimeRecord).filter(RuntimeRecord.template_id == template_id).order_by(RuntimeRecord.created_at.desc()).all()
         return [record_to_read(db, row) for row in rows]
 
-    def search_template_records(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, limit: int = 25, offset: int = 0, unlinked_only: bool = False) -> RuntimeRecordPage:
+    def search_template_records(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, limit: int = 25, offset: int = 0, unlinked_only: bool = False, field_filters: dict[str, str] | None = None, sort_by: str = "created_at", sort_dir: str = "desc") -> RuntimeRecordPage:
         """Consulta paginada de registros Runtime con filtros seguros para uso operativo.
 
         `unlinked_only` filtra a los registros de "base abierta" que todavia
@@ -775,8 +779,31 @@ class RuntimeRecordService:
         candidatos a promover a la base cerrada.
         """
         query = self._filtered_records_query(db, template_id, search, status, unlinked_only)
+        for field_name, field_search in (field_filters or {}).items():
+            if not field_search.strip():
+                continue
+            needle = field_search.strip()
+            escaped_needle = json.dumps(needle, ensure_ascii=True)[1:-1]
+            matching_ids = select(RuntimeRecordValue.record_id).where(
+                RuntimeRecordValue.field_name == field_name,
+                or_(
+                    RuntimeRecordValue.field_value_json.ilike(f"%{needle}%"),
+                    RuntimeRecordValue.field_value_json.ilike(f"%{escaped_needle}%"),
+                ),
+            )
+            query = query.filter(RuntimeRecord.id.in_(matching_ids))
         total = query.count()
-        rows = query.order_by(RuntimeRecord.created_at.desc()).offset(offset).limit(limit).all()
+        sort_columns = {"created_at": RuntimeRecord.created_at, "updated_at": RuntimeRecord.updated_at, "status": RuntimeRecord.status, "submitted_by": RuntimeRecord.submitted_by}
+        if sort_by.startswith("field:"):
+            field_name = sort_by[6:]
+            sort_column = select(RuntimeRecordValue.field_value_json).where(
+                RuntimeRecordValue.record_id == RuntimeRecord.id,
+                RuntimeRecordValue.field_name == field_name,
+            ).limit(1).scalar_subquery()
+        else:
+            sort_column = sort_columns.get(sort_by, RuntimeRecord.created_at)
+        direction = sort_column.asc() if sort_dir == "asc" else sort_column.desc()
+        rows = query.order_by(direction, RuntimeRecord.id.asc()).offset(offset).limit(limit).all()
         return RuntimeRecordPage(items=[record_to_read(db, row) for row in rows], total=total, limit=limit, offset=offset)
 
     def export_template_csv(self, db: Session, template_id: str, search: str | None = None, status: str | None = None) -> str:

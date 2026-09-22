@@ -24,6 +24,7 @@ import { AuthGate } from './modules/auth/AuthGate';
 import { applyFallbackBranding, loadOrganizationBranding } from './modules/branding/brandingLoader';
 import { hasAnyCurrentProjectPermission } from './modules/auth/session';
 import { BuilderApp } from './modules/builder/BuilderApp';
+import { FormsApp } from './modules/builder/FormsApp';
 import { AppShell } from './components/AppShell';
 import { DashboardApp } from './modules/dashboard/DashboardApp';
 import { MapsApp } from './modules/maps/MapsApp';
@@ -31,6 +32,8 @@ import { MessagesApp } from './modules/messages/MessagesApp';
 import { ParticipantsApp } from './modules/participants/ParticipantsApp';
 import { RecordsApp } from './modules/records/RecordsApp';
 import { ReportsApp } from './modules/reports/ReportsApp';
+import { ReportCatalogApp } from './modules/reports/ReportCatalogApp';
+import { FormReportApp } from './modules/reports/FormReportApp';
 import { EvidenceApp } from './modules/evidence/EvidenceApp';
 import { RuntimeApp } from './modules/runtime/RuntimeApp';
 import { APP_NAVIGATION_EVENT, navigateTo, resolveAppRoute } from './routeConfig';
@@ -86,7 +89,7 @@ function AppRouter() {
 function renderRoute(route: AppRoute) {
   const content = (() => {
     switch (route.key) {
-      case 'builder': return <BuilderApp />;
+      case 'builder': return window.location.pathname === '/builder/new' || window.location.pathname.startsWith('/builder/edit/') ? <BuilderApp /> : <FormsApp />;
       case 'acta': return <ActaApp />;
       case 'bulkJobs': return <BulkJobsApp />;
       case 'metrics': return <OperationalMetricsApp />;
@@ -108,7 +111,7 @@ function renderRoute(route: AppRoute) {
       case 'accountSecurity': return <AccountSecurityApp />;
       case 'participants': return <ParticipantsApp />;
       case 'records': return <RecordsApp />;
-      case 'reports': return <ReportsApp />;
+      case 'reports': return window.location.pathname.startsWith('/reports/form/') ? <FormReportApp /> : window.location.pathname.startsWith('/reports/catalog') ? <ReportCatalogApp /> : <ReportsApp />;
       case 'evidence': return <EvidenceApp />;
       case 'maps': return <MapsApp />;
       case 'messages': return <MessagesApp />;

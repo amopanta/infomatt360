@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
-import { RuntimeRenderer, themeStyle } from '../runtime/RuntimeRenderer';
 import type { RuntimeFormValue, RuntimeFormValues, RuntimeTemplate } from '../runtime/types';
 import { fetchPublicForm, submitPublicForm } from './api';
+import { PublicSurveyRenderer } from './PublicSurveyRenderer';
 
 type Status = 'loading' | 'ready' | 'submitting' | 'success' | 'error';
 
@@ -83,17 +83,5 @@ export function PublicFormApp() {
 
   if (!template) return null;
 
-  return (
-    <div className="auth-page">
-      <div className="runtime-shell" style={themeStyle(template.theme_json)}>
-        <RuntimeRenderer template={template} projectId="" values={values} onValueChange={updateValue} uploadsDisabled />
-        <div className="runtime-page-actions public-form-actions">
-          <button disabled={status === 'submitting'} onClick={() => void submit()}>
-            {status === 'submitting' ? 'Enviando…' : 'Enviar respuesta'}
-          </button>
-          {message ? <p role="alert">{message}</p> : null}
-        </div>
-      </div>
-    </div>
-  );
+  return <PublicSurveyRenderer template={template} values={values} onValueChange={updateValue} onSubmit={() => void submit()} submitting={status === 'submitting'} serverMessage={message} />;
 }

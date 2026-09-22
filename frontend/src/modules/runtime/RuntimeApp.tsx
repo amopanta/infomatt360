@@ -18,8 +18,9 @@ export function RuntimeApp() {
   const [status, setStatus] = useState('Cargando formulario...');
 
   const templateId = getTemplateIdFromPath();
+  const isPreview = new URLSearchParams(window.location.search).get('preview') === '1';
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
-  const { values, setValues, clearDraft } = useRuntimeDraft(templateId || 'sin-template');
+  const { values, setValues, clearDraft } = useRuntimeDraft(`${templateId || 'sin-template'}${isPreview ? '-vista-previa' : ''}`);
 
   useEffect(() => {
     if (!templateId) {
@@ -30,7 +31,7 @@ export function RuntimeApp() {
     fetchRuntimeTemplate(templateId)
       .then((result) => {
         setTemplate(result);
-        setStatus('Borrador local activo.');
+        setStatus(isPreview ? 'Vista previa: puedes probar las preguntas; aquí no se guarda ninguna respuesta.' : 'Borrador local activo.');
       })
       .catch((error: Error) => setStatus(error.message));
   }, [templateId]);
@@ -76,7 +77,7 @@ export function RuntimeApp() {
       <div className="runtime-themed" style={themeStyle(template.theme_json)}>
         <RuntimeRenderer template={template} projectId={projectId} values={values} onValueChange={updateValue} />
         <div className="runtime-actions">
-          <button onClick={save}>Guardar respuesta</button>
+          {!isPreview && <button onClick={save}>Guardar respuesta</button>}
           {status ? <p>{status}</p> : null}
         </div>
       </div>

@@ -1,4 +1,5 @@
 import json
+from datetime import timedelta
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -29,7 +30,7 @@ def setup_client():
         builder_user = User(id="pf-builder", full_name="Disenador", document_id="pf-builder-doc", email="pf-builder@example.com", password_hash=hash_password("Builder12345!"))
         outsider = User(id="pf-outsider", full_name="Sin permiso", document_id="pf-outsider-doc", email="pf-outsider@example.com", password_hash=hash_password("Outsider12345!"))
 
-        published = BuilderTemplate(id="pf-template-published", project_id=project.id, name="Encuesta feria comercial", status="published")
+        published = BuilderTemplate(id="pf-template-published", project_id=project.id, name="Encuesta feria comercial", description="Registro de participantes", status="published")
         draft = BuilderTemplate(id="pf-template-draft", project_id=project.id, name="Borrador", status="draft")
 
         page = BuilderPage(id="pf-page", template_id=published.id, title="Pagina 1", sort_order=1)
@@ -93,6 +94,99 @@ def test_creating_a_public_link_for_a_draft_template_is_rejected():
         Base.metadata.drop_all(bind=engine)
 
 
+def test_respondent_code_has_one_active_single_use_link():
+    engine, _sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "pf-builder@example.com", "Builder12345!")
+            payload = {"template_id": "pf-template-published", "label": "encuestado:hogar-001", "max_submissions": 1}
+            first = client.post("/api/v1/public-forms/links", headers=headers, json=payload)
+            repeated = client.post("/api/v1/public-forms/links", headers=headers, json=payload)
+            assert first.status_code == 200
+            assert first.json()["max_submissions"] == 1
+            assert repeated.status_code == 400
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_publication_requires_questions_and_unpublishing_blocks_existing_link():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "pf-builder@example.com", "Builder12345!")
+            path = "/api/v1/builder/templates/detail/pf-template-draft/status"
+            empty = client.patch(path, headers=headers, json={"status": "published"})
+            assert empty.status_code == 422
+
+            with sessions() as db:
+                db.add(BuilderComponent(template_id="pf-template-draft", component_type="TEXT", name="respuesta", label="Respuesta"))
+                db.commit()
+
+            published = client.patch(path, headers=headers, json={"status": "published"})
+            assert published.status_code == 200, published.text
+            assert published.json()["status"] == "published"
+            assert published.json()["published_at"]
+
+            created = client.post("/api/v1/public-forms/links", headers=headers, json={"template_id": "pf-template-draft"})
+            assert created.status_code == 200, created.text
+            token = created.json()["token"]
+            assert client.get(f"/api/v1/public-forms/{token}").status_code == 200
+
+            withdrawn = client.patch(path, headers=headers, json={"status": "draft"})
+            assert withdrawn.status_code == 200
+            assert client.get(f"/api/v1/public-forms/{token}").status_code == 400
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_response_window_pause_and_archive_control_public_capture():
+    engine, _sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "pf-builder@example.com", "Builder12345!")
+            template_id = "pf-template-published"
+            status_path = f"/api/v1/builder/templates/detail/{template_id}/status"
+            schedule_path = f"/api/v1/builder/templates/detail/{template_id}/schedule"
+            issued = client.post("/api/v1/public-forms/links", headers=headers, json={"template_id": template_id})
+            token = issued.json()["token"]
+            public_path = f"/api/v1/public-forms/{token}"
+            assert client.get(public_path).status_code == 200
+
+            invalid = client.patch(schedule_path, headers=headers, json={"starts_at": (utc_now() + timedelta(days=2)).isoformat(), "ends_at": (utc_now() + timedelta(days=1)).isoformat()})
+            assert invalid.status_code == 422
+
+            scheduled = client.patch(schedule_path, headers=headers, json={"starts_at": (utc_now() + timedelta(days=1)).isoformat(), "ends_at": (utc_now() + timedelta(days=2)).isoformat()})
+            assert scheduled.status_code == 200
+            assert scheduled.json()["availability"] == "scheduled"
+            assert client.get(public_path).status_code == 400
+
+            ended = client.patch(schedule_path, headers=headers, json={"starts_at": (utc_now() - timedelta(days=2)).isoformat(), "ends_at": (utc_now() - timedelta(days=1)).isoformat()})
+            assert ended.json()["availability"] == "closed"
+            assert client.get(public_path).status_code == 400
+
+            opened = client.patch(schedule_path, headers=headers, json={"starts_at": None, "ends_at": None})
+            assert opened.json()["accepting_responses"] is True
+            assert client.get(public_path).status_code == 200
+
+            paused = client.patch(status_path, headers=headers, json={"status": "paused"})
+            assert paused.json()["availability"] == "paused"
+            assert client.get(public_path).status_code == 400
+            client.patch(status_path, headers=headers, json={"status": "published"})
+            assert client.get(public_path).status_code == 200
+
+            archived = client.patch(status_path, headers=headers, json={"status": "archived"})
+            assert archived.json()["availability"] == "archived"
+            assert client.get(public_path).status_code == 400
+            assert client.patch(status_path, headers=headers, json={"status": "published"}).status_code == 422
+            restored = client.patch(status_path, headers=headers, json={"status": "draft"})
+            assert restored.json()["status"] == "draft"
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
 def test_public_form_capture_and_submission_end_to_end_without_authentication():
     """El caso principal: alguien SIN cuenta abre el enlace y envia una respuesta."""
     engine, sessions = setup_client()
@@ -107,6 +201,7 @@ def test_public_form_capture_and_submission_end_to_end_without_authentication():
             assert form.status_code == 200, form.text
             template = form.json()
             assert template["template_id"] == "pf-template-published"
+            assert template["description"] == "Registro de participantes"
             assert template["pages"][0]["sections"][0]["rows"][0]["columns"][0]["components"][0]["name"] == "nombre_completo"
 
             submitted = client.post(

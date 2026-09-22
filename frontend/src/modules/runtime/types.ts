@@ -44,6 +44,7 @@ export type RuntimePage = {
 export type RuntimeTemplate = {
   template_id: string;
   name: string;
+  description?: string | null;
   status: string;
   theme_json?: string | null;
   pages: RuntimePage[];

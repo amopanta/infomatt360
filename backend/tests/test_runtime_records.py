@@ -164,6 +164,34 @@ def test_list_filtered_record_ids_resolves_all_matching_records_without_paginati
     assert len(resolved_ids) == 3
 
 
+def test_response_grid_filters_and_sorts_across_all_records(runtime_context):
+    client, testing_session, _ = runtime_context
+    with testing_session() as db:
+        db.add(BuilderTemplate(id="template-grid-filter", project_id="project-runtime", name="Grid Filter"))
+        db.commit()
+
+    for name, city in [("Ana", "Bogotá"), ("Beto", "Cali"), ("Alicia", "Bogotá")]:
+        response = client.post("/api/v1/runtime/save", json={
+            "project_id": "project-runtime", "template_id": "template-grid-filter",
+            "values": [
+                {"field_name": "nombre", "field_value_json": json.dumps(name)},
+                {"field_name": "ciudad", "field_value_json": json.dumps(city)},
+            ],
+        })
+        assert response.status_code == 200
+
+    response = client.get("/api/v1/runtime/template/template-grid-filter/records/search", params={
+        "field_filters": json.dumps({"ciudad": "Bogotá", "nombre": "A"}),
+        "sort_by": "field:nombre", "sort_dir": "desc", "limit": 1,
+    })
+    assert response.status_code == 200
+    assert response.json()["total"] == 2
+    assert next(value["field_value_json"] for value in response.json()["items"][0]["values"] if value["field_name"] == "nombre") == '"Ana"'
+
+    invalid = client.get("/api/v1/runtime/template/template-grid-filter/records/search", params={"field_filters": "[]"})
+    assert invalid.status_code == 422
+
+
 def test_runtime_records_search_paginates_and_filters(runtime_context):
     client, testing_session, _ = runtime_context
     with testing_session() as db:

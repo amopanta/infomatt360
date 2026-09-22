@@ -72,7 +72,17 @@ export function AppShell({ title, children }: Props) {
       <aside className="app-sidebar">
         <BrandLogo />
         <nav>
-          {visibleMenu.map((item) => (
+          {visibleMenu.map((item) => item.href === '/builder' ? (
+            <details key={item.label} className="app-nav-group" open={currentPath.startsWith('/builder')}>
+              <summary>Formularios</summary>
+              <div className="app-nav-submenu">
+                <a href="/builder" className={currentPath === '/builder' ? 'active' : undefined}>Todos los formularios</a>
+                <a href="/builder/drafts" className={currentPath === '/builder/drafts' || currentPath === '/builder/new' ? 'active' : undefined}>En construcción</a>
+                <a href="/builder/active" className={currentPath === '/builder/active' ? 'active' : undefined}>Formularios activos</a>
+                <a href="/builder/archived" className={currentPath === '/builder/archived' ? 'active' : undefined}>Formularios archivados</a>
+              </div>
+            </details>
+          ) : (
             <a key={item.label} href={item.href} className={isActiveMenuItem(item.href) ? 'active' : undefined} aria-current={isActiveMenuItem(item.href) ? 'page' : undefined}>{item.label}</a>
           ))}
         </nav>

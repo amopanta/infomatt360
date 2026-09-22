@@ -13,7 +13,7 @@ from app.db.session import get_db
 from app.main import app
 from app.models.assignment import UserProjectAssignment
 from app.models.builder import BuilderTemplate
-from app.models.identity import User
+from app.models.identity import Role, User
 
 
 @pytest.fixture()
@@ -24,7 +24,8 @@ def upload_client(tmp_path, monkeypatch):
     user = User(id="upload-user", full_name="Uploader", document_id="upload-doc", email="upload@example.com")
     with sessions() as db:
         db.add_all([
-            UserProjectAssignment(user_id=user.id, project_id="upload-project", status="active"),
+            Role(id="upload-role", name="Uploader", permissions="records.write"),
+            UserProjectAssignment(user_id=user.id, project_id="upload-project", role_id="upload-role", status="active"),
             BuilderTemplate(id="upload-template", project_id="upload-project", name="Upload template"),
         ])
         db.commit()
@@ -87,6 +88,6 @@ def test_saved_record_links_uploaded_asset(upload_client):
             "values": [{"field_name": "foto", "field_value_json": '{"file_asset_id":"' + uploaded["id"] + '"}'}],
         },
     )
-    assert saved.status_code == 200
+    assert saved.status_code == 200, saved.text
     files = client.get(f'/api/v1/files/project/upload-project?record_id={saved.json()["id"]}')
     assert [item["id"] for item in files.json()] == [uploaded["id"]]

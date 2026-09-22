@@ -5,11 +5,62 @@
  */
 
 import { jsonAuthHeaders } from '../auth/session';
+import type { TemplateSummary } from '../records/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
 
 function authHeaders(): HeadersInit {
   return jsonAuthHeaders();
+}
+
+export async function fetchTemplateDetail(templateId: string): Promise<TemplateSummary> {
+  const response = await fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}`, { headers: authHeaders() });
+  if (!response.ok) throw new Error('No fue posible consultar el formulario.');
+  return response.json();
+}
+
+export async function updateTemplateProperties(templateId: string, properties: { name: string; description: string | null; themeJson: string | null }): Promise<TemplateSummary> {
+  const response = await fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}/properties`, {
+    method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ name: properties.name, description: properties.description, theme_json: properties.themeJson }),
+  });
+  if (!response.ok) { const payload = await response.json().catch(() => null); throw new Error(payload?.detail || 'No fue posible guardar las propiedades del formulario.'); }
+  return response.json();
+}
+
+export async function updateComponentProperties(componentId: string, properties: { label: string; name: string; configJson: string | null }): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/builder/components/detail/${componentId}`, {
+    method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ label: properties.label, name: properties.name, config_json: properties.configJson }),
+  });
+  if (!response.ok) { const payload = await response.json().catch(() => null); throw new Error(payload?.detail || 'No fue posible guardar la pregunta.'); }
+}
+
+export async function updateSectionTitle(sectionId: string, title: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/builder/sections/detail/${sectionId}/title`, {
+    method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ title }),
+  });
+  if (!response.ok) { const payload = await response.json().catch(() => null); throw new Error(payload?.detail || 'No fue posible guardar el grupo.'); }
+}
+
+export async function setTemplateStatus(templateId: string, status: 'draft' | 'published' | 'paused' | 'archived'): Promise<TemplateSummary> {
+  const response = await fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}/status`, {
+    method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ status }),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.detail || 'No fue posible cambiar el estado del formulario.');
+  }
+  return response.json();
+}
+
+export async function setTemplateSchedule(templateId: string, startsAt: string | null, endsAt: string | null): Promise<TemplateSummary> {
+  const response = await fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}/schedule`, {
+    method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ starts_at: startsAt, ends_at: endsAt }),
+  });
+  if (!response.ok) {
+    const payload = await response.json().catch(() => null);
+    throw new Error(payload?.detail || 'No fue posible guardar las fechas de recepción.');
+  }
+  return response.json();
 }
 
 export async function createTemplate(params: { projectId: string; name: string; description?: string; status?: string; themeJson?: string | null }) {

@@ -309,6 +309,9 @@ def search_runtime_records(
     template_id: str,
     search: str | None = Query(default=None, max_length=120),
     status_filter: str | None = Query(default=None, alias="status", max_length=30),
+    field_filters: str | None = Query(default=None, max_length=4000),
+    sort_by: str = Query(default="created_at", max_length=186),
+    sort_dir: str = Query(default="desc", pattern="^(asc|desc)$"),
     unlinked_only: bool = Query(default=False),
     limit: int = Query(default=25, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
@@ -318,7 +321,20 @@ def search_runtime_records(
     """Consulta registros Runtime con busqueda, filtro de estado, paginacion y
     filtro de "sin participante enlazado" (candidatos a promover, ver docs/99)."""
     require_template_access(db, current_user.id, template_id)
-    return runtime_record_service.search_template_records(db, template_id, search=search, status=status_filter, limit=limit, offset=offset, unlinked_only=unlinked_only)
+    import json
+
+    try:
+        parsed_filters = json.loads(field_filters) if field_filters else {}
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=422, detail="Filtros de columnas invalidos")
+    if not isinstance(parsed_filters, dict) or len(parsed_filters) > 30 or any(
+        not isinstance(key, str) or len(key) > 180 or not isinstance(value, str) or len(value) > 120
+        for key, value in parsed_filters.items()
+    ):
+        raise HTTPException(status_code=422, detail="Filtros de columnas invalidos")
+    if sort_by not in {"created_at", "updated_at", "status", "submitted_by"} and not (sort_by.startswith("field:") and 0 < len(sort_by[6:]) <= 180):
+        raise HTTPException(status_code=422, detail="Columna de ordenacion invalida")
+    return runtime_record_service.search_template_records(db, template_id, search=search, status=status_filter, limit=limit, offset=offset, unlinked_only=unlinked_only, field_filters=parsed_filters, sort_by=sort_by, sort_dir=sort_dir)
 
 
 @router.get("/template/{template_id}/records/export.csv")

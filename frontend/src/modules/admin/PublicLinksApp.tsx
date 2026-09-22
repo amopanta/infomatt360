@@ -27,7 +27,8 @@ export function PublicLinksApp() {
     fetchProjectTemplates(projectId)
       .then((rows) => {
         setTemplates(rows);
-        if (rows.length) setTemplateId(rows[0].id);
+        const requested = new URLSearchParams(window.location.search).get('template');
+        if (rows.length) setTemplateId(rows.find((row) => row.id === requested)?.id ?? rows[0].id);
       })
       .catch((error: Error) => setMessage(error.message));
   }, [projectId]);

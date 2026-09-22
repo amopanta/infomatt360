@@ -107,6 +107,34 @@ def test_builder_runtime_save_query_complete_flow(mvp_context):
     assert records.json()[0]["values"][0]["field_value_json"] == '"Ana Perez"'
 
 
+def test_existing_form_properties_can_change_without_losing_responses(mvp_context):
+    client, _ = mvp_context
+    template = client.post("/api/v1/builder/templates", json={"project_id": "project-mvp", "name": "Nombre inicial"}).json()
+    page = client.post("/api/v1/builder/pages", json={"template_id": template["id"], "title": "Datos"}).json()
+    section = client.post("/api/v1/builder/sections", json={"page_id": page["id"], "title": "Datos"}).json()
+    row = client.post("/api/v1/builder/rows", json={"section_id": section["id"]}).json()
+    column = client.post("/api/v1/builder/columns", json={"row_id": row["id"], "desktop_width": 12}).json()
+    component = client.post("/api/v1/builder/components", json={"template_id": template["id"], "column_id": column["id"], "component_type": "TEXT", "name": "nombre", "label": "Nombre"}).json()
+    saved = client.post("/api/v1/runtime/save", json={"project_id": "project-mvp", "template_id": template["id"], "values": [{"field_name": "nombre", "field_value_json": '"Ana"'}]})
+    assert saved.status_code == 200
+
+    renamed = client.patch(f"/api/v1/builder/templates/detail/{template['id']}/properties", json={"name": "Visita inicial", "description": "Formulario de campo", "theme_json": None})
+    relabeled = client.patch(f"/api/v1/builder/components/detail/{component['id']}", json={"name": "nombre", "label": "Nombre de la persona", "config_json": '{"required":true}'})
+    section_update = client.patch(f"/api/v1/builder/sections/detail/{section['id']}/title", json={"title": "Identificación"})
+    changed_key = client.patch(f"/api/v1/builder/components/detail/{component['id']}", json={"name": "otra_clave", "label": "Nombre", "config_json": None})
+    runtime = client.get(f"/api/v1/runtime/template/{template['id']}").json()
+    record = client.get(f"/api/v1/runtime/record/{saved.json()['id']}").json()
+
+    assert renamed.status_code == 200 and renamed.json()["name"] == "Visita inicial"
+    assert renamed.json()["submissions_count"] == 1
+    assert relabeled.status_code == 200
+    assert section_update.status_code == 200
+    assert changed_key.status_code == 422
+    assert runtime["pages"][0]["sections"][0]["title"] == "Identificación"
+    assert runtime["pages"][0]["sections"][0]["rows"][0]["columns"][0]["components"][0]["label"] == "Nombre de la persona"
+    assert record["values"][0]["field_name"] == "nombre"
+
+
 def test_runtime_rejects_user_without_project_access(mvp_context):
     client, active_user = mvp_context
     templates = client.get("/api/v1/builder/templates/project-mvp").json()

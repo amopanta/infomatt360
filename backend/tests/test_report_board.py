@@ -304,6 +304,46 @@ def test_named_report_rejects_cross_project_and_non_numeric_sources():
         Base.metadata.drop_all(bind=engine)
 
 
+def test_committee_report_keeps_manual_sections_and_live_form_indicators():
+    engine, _sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            builder = auth(client, "board-builder@example.com", "Builder12345!")
+            payload = {
+                "project_id": "board-project", "name": "Comité mensual", "report_kind": "committee",
+                "indicators": [
+                    {"title": "Hogares", "template_id": "board-template", "goal": 4},
+                    {"title": "Talleres", "source_mode": "manual", "manual_actual": 2, "goal": 3},
+                ],
+                "committee": {
+                    "location": "Bogotá", "audience": "Comité directivo",
+                    "activities": [{"title": "Convocatoria", "progress": 80}],
+                    "alerts": [{"title": "Cobertura", "priority": "high", "owner": "Coordinación"}],
+                    "budget": [{"component": "Talleres", "planned": 100, "spent": 80}],
+                    "previous_agreements": [{"title": "Aprobar plan", "status": "done"}],
+                    "new_agreements": [{"title": "Ampliar convocatoria", "owner": "Equipo", "due_date": "2026-10-01"}],
+                },
+            }
+            created = client.post("/api/v1/reports/catalog", headers=builder, json=payload)
+            assert created.status_code == 200, created.text
+            report_id = created.json()["id"]
+            result = client.get(f"/api/v1/reports/catalog/{report_id}", headers=builder)
+            assert result.status_code == 200, result.text
+            assert result.json()["report_kind"] == "committee"
+            assert result.json()["indicators"][0]["actual"] == 3
+            assert result.json()["indicators"][1]["actual"] == 2
+            assert result.json()["committee"]["budget"][0]["spent"] == 80
+            assert result.json()["committee"]["new_agreements"][0]["owner"] == "Equipo"
+            link = client.post(f"/api/v1/reports/catalog/{report_id}/links", headers=builder, json={}).json()
+            shared = client.get(f"/api/v1/reports/shared/{link['token']}")
+            assert shared.status_code == 200
+            assert shared.json()["committee"]["alerts"][0]["title"] == "Cobertura"
+            assert shared.json()["indicators"][0]["actual"] == 3
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
 def test_individual_form_report_summarizes_questions_without_raw_text():
     engine, _sessions = setup_client()
     try:

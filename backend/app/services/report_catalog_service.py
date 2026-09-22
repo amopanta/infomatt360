@@ -155,7 +155,7 @@ class ReportCatalogService:
 
     def resolve(self, db: Session, row: Report) -> CatalogReportResult:
         config = self.config(row)
-        return CatalogReportResult(id=row.id, name=config.name, description=config.description, generated_at=utc_now(), indicators=[self._indicator(db, config, item) for item in config.indicators])
+        return CatalogReportResult(id=row.id, name=config.name, description=config.description, report_kind=config.report_kind, committee=config.committee, generated_at=utc_now(), indicators=[self._indicator(db, config, item) for item in config.indicators])
 
     def issue_link(self, db: Session, row: Report, expires_at=None) -> ReportShareIssued:
         expiry = to_naive_utc(expires_at) if expires_at else utc_now() + timedelta(days=30)

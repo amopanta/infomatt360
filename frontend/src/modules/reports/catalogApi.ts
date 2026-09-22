@@ -15,10 +15,27 @@ export type IndicatorDefinition = {
   view_kind: 'progress' | 'table' | 'bar';
 };
 
+export type CommitteeDetails = {
+  meeting_at: string | null;
+  location: string;
+  audience: string;
+  activities: Array<{ title: string; progress: number }>;
+  alerts: Array<{ title: string; description: string; priority: 'high' | 'medium' | 'low'; owner: string; next_action: string }>;
+  budget: Array<{ component: string; planned: number; spent: number }>;
+  previous_agreements: Array<{ title: string; owner: string; due_date: string; status: 'new' | 'pending' | 'in_progress' | 'done' }>;
+  new_agreements: Array<{ title: string; owner: string; due_date: string; status: 'new' | 'pending' | 'in_progress' | 'done' }>;
+};
+
+export function blankCommittee(): CommitteeDetails {
+  return { meeting_at: null, location: '', audience: '', activities: [], alerts: [], budget: [], previous_agreements: [], new_agreements: [] };
+}
+
 export type CatalogReportConfig = {
   project_id: string;
   name: string;
   description: string;
+  report_kind: 'indicators' | 'committee';
+  committee: CommitteeDetails;
   starts_at: string | null;
   ends_at: string | null;
   indicators: IndicatorDefinition[];
@@ -26,7 +43,7 @@ export type CatalogReportConfig = {
 
 export type CatalogReport = CatalogReportConfig & { id: string; created_at: string };
 export type IndicatorResult = { title: string; actual: number; goal: number; progress_percent: number | null; unit: string; view_kind: 'progress' | 'table' | 'bar'; municipalities: Array<{ municipality: string; value: number }> };
-export type CatalogResult = { id: string; name: string; description: string; generated_at: string; indicators: IndicatorResult[] };
+export type CatalogResult = { id: string; name: string; description: string; report_kind: 'indicators' | 'committee'; committee: CommitteeDetails; generated_at: string; indicators: IndicatorResult[] };
 export type ReportLink = { id: string; expires_at: string | null; status: string };
 export type IssuedLink = { id: string; token: string; expires_at: string };
 export type FormReport = {

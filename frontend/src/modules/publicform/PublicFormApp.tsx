@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import type { RuntimeFormValue, RuntimeFormValues, RuntimeTemplate } from '../runtime/types';
 import { resolveFormValues } from '../runtime/formLogic';
+import { usePullData } from '../runtime/pullData';
 import { fetchPublicForm, submitPublicForm } from './api';
 import { PublicSurveyRenderer } from './PublicSurveyRenderer';
 
@@ -19,6 +20,11 @@ export function PublicFormApp() {
   const [values, setValues] = useState<RuntimeFormValues>({});
   const [status, setStatus] = useState<Status>('loading');
   const [message, setMessage] = useState('');
+  const { pulls, error: pullError, ready: pullsReady } = usePullData(template, values, token);
+
+  useEffect(() => {
+    if (template) setValues((current) => resolveFormValues(template, current, pulls));
+  }, [pulls, template]);
 
   useEffect(() => {
     if (!token) {
@@ -39,14 +45,15 @@ export function PublicFormApp() {
   }, [token]);
 
   function updateValue(fieldName: string, value: RuntimeFormValue) {
-    setValues((current) => template ? resolveFormValues(template, { ...current, [fieldName]: value }) : { ...current, [fieldName]: value });
+    setValues((current) => template ? resolveFormValues(template, { ...current, [fieldName]: value }, pulls) : { ...current, [fieldName]: value });
   }
 
   async function submit() {
     setStatus('submitting');
     setMessage('');
     try {
-      await submitPublicForm(token, template ? resolveFormValues(template, values) : values);
+      if (pullError || !pullsReady) throw new Error(pullError || 'Espera a que termine la consulta del CSV.');
+      await submitPublicForm(token, template ? resolveFormValues(template, values, pulls) : values);
       setStatus('success');
     } catch (error) {
       setStatus('ready');

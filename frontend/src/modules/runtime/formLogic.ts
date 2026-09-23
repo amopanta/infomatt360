@@ -28,7 +28,7 @@ function scalar(value: unknown): value is RuntimeFormValue {
   return value === null || ['string', 'number', 'boolean'].includes(typeof value);
 }
 
-export function resolveFormValues(template: RuntimeTemplate, input: RuntimeFormValues): RuntimeFormValues {
+export function resolveFormValues(template: RuntimeTemplate, input: RuntimeFormValues, pulls: Record<string, string> = {}): RuntimeFormValues {
   const values = { ...input };
   const components = allComponents(template);
   for (const component of components) {
@@ -36,7 +36,7 @@ export function resolveFormValues(template: RuntimeTemplate, input: RuntimeFormV
     if (values[component.name] !== undefined || config.default === undefined || config.default === '') continue;
     let value: unknown = config.default;
     if (typeof value === 'string' && (value.includes('${') || /^(?:today|now|true|false)\(/.test(value))) {
-      try { value = evaluateXlsExpression(value, values); } catch { continue; }
+      try { value = evaluateXlsExpression(value, values, {}, null, pulls); } catch { continue; }
     }
     if (typeof value === 'string' && ['NUMBER', 'INTEGER', 'DECIMAL', 'CURRENCY', 'PERCENTAGE'].includes(component.type.toUpperCase()) && Number.isFinite(Number(value))) value = Number(value);
     if (scalar(value)) values[component.name] = value;
@@ -47,7 +47,7 @@ export function resolveFormValues(template: RuntimeTemplate, input: RuntimeFormV
       const calculation = parseFieldConfig(component.config_json).calculation;
       if (!calculation) continue;
       try {
-        const result = evaluateXlsExpression(calculation, values);
+        const result = evaluateXlsExpression(calculation, values, {}, null, pulls);
         if (scalar(result) && values[component.name] !== result) { values[component.name] = result; changed = true; }
       } catch { /* Preview warns about expressions outside the supported subset. */ }
     }

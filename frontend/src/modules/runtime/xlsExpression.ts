@@ -33,7 +33,7 @@ function compare(left: unknown, right: unknown): number {
   return String(left ?? '').localeCompare(String(right ?? ''));
 }
 
-export function evaluateXlsExpression(expression: string, values: RuntimeFormValues, option: Record<string, unknown> = {}, current: unknown = null): unknown {
+export function evaluateXlsExpression(expression: string, values: RuntimeFormValues, option: Record<string, unknown> = {}, current: unknown = null, pulls: Record<string, string> = {}): unknown {
   const tokens = tokenize(expression);
   let position = 0;
   function parse(minimum = 0): unknown {
@@ -65,6 +65,7 @@ export function evaluateXlsExpression(expression: string, values: RuntimeFormVal
           case 'true': left = true; break;
           case 'false': left = false; break;
           case 'not': left = !Boolean(args[0]); break;
+          case 'pulldata': left = pulls[JSON.stringify(args.map((value) => String(value ?? '')))] ?? ''; break;
           default: throw new Error(`Función XLSForm no compatible: ${token.value}`);
         }
       } else if (token.value === 'true' || token.value === 'false') left = token.value === 'true';

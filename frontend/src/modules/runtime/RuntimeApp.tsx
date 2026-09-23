@@ -5,6 +5,7 @@ import { enqueueRecord } from '../offline/offlineSync';
 import { fetchRuntimeTemplate, saveRuntimeRecord, toRuntimeValueList } from './api';
 import { RuntimeRenderer, themeStyle } from './RuntimeRenderer';
 import { resolveFormValues, validateFormValues } from './formLogic';
+import { usePullData } from './pullData';
 import { useRuntimeDraft } from './useRuntimeDraft';
 import type { RuntimeFormValue, RuntimeTemplate } from './types';
 
@@ -22,6 +23,11 @@ export function RuntimeApp() {
   const isPreview = new URLSearchParams(window.location.search).get('preview') === '1';
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const { values, setValues, clearDraft } = useRuntimeDraft(`${templateId || 'sin-template'}${isPreview ? '-vista-previa' : ''}`);
+  const { pulls, error: pullError, ready: pullsReady } = usePullData(template, values);
+
+  useEffect(() => {
+    if (template) setValues((current) => resolveFormValues(template, current, pulls));
+  }, [pulls, template]);
 
   useEffect(() => {
     if (!templateId) {
@@ -39,7 +45,7 @@ export function RuntimeApp() {
   }, [templateId]);
 
   function updateValue(fieldName: string, value: RuntimeFormValue) {
-    setValues((current) => template ? resolveFormValues(template, { ...current, [fieldName]: value }) : { ...current, [fieldName]: value });
+    setValues((current) => template ? resolveFormValues(template, { ...current, [fieldName]: value }, pulls) : { ...current, [fieldName]: value });
   }
 
   async function save() {
@@ -49,7 +55,8 @@ export function RuntimeApp() {
     }
 
     try {
-      const resolved = resolveFormValues(template, values);
+      if (pullError || !pullsReady) { setStatus(pullError || 'Espera a que termine la consulta del CSV.'); return; }
+      const resolved = resolveFormValues(template, values, pulls);
       const invalid = validateFormValues(template, resolved);
       if (invalid) { setStatus(invalid); return; }
       await saveRuntimeRecord({ projectId, templateId: template.template_id, values: resolved });
@@ -60,7 +67,7 @@ export function RuntimeApp() {
       // (validacion, permisos, etc.) no se debe encolar porque volveria a
       // fallar igual al sincronizar.
       if (error instanceof TypeError) {
-        await enqueueRecord({ projectId, templateId: template.template_id, values: toRuntimeValueList(resolveFormValues(template, values)) });
+        await enqueueRecord({ projectId, templateId: template.template_id, values: toRuntimeValueList(resolveFormValues(template, values, pulls)) });
         clearDraft();
         setStatus('Sin conexion: la respuesta quedo guardada localmente. Sincronizala desde el boton de la barra superior cuando vuelva la red.');
         return;
@@ -83,7 +90,7 @@ export function RuntimeApp() {
         <RuntimeRenderer template={template} projectId={projectId} values={values} onValueChange={updateValue} />
         <div className="runtime-actions">
           {!isPreview && <button onClick={save}>Guardar respuesta</button>}
-          {status ? <p>{status}</p> : null}
+          {status ? <p>{status}</p> : null}{pullError && <p role="alert">{pullError}</p>}
         </div>
       </div>
     </AppShell>

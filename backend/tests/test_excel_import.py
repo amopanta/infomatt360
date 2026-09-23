@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -15,6 +15,23 @@ from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.identity import Project, Role, User
 from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
+from app.services.excel_import_service import excel_import_service
+
+
+def test_entity_templates_have_headers_and_one_example_row():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    with sessionmaker(bind=engine)() as db:
+        db.add(BuilderTemplate(id="form", project_id="project", name="Visita"))
+        db.add(BuilderComponent(template_id="form", component_type="TEXT", name="observacion", label="Observación", config_json='{"required": true}'))
+        db.commit()
+        for entity in ["participants", "users", "assignments", "records"]:
+            content = excel_import_service.build_template(db, "project", entity, "form" if entity == "records" else None)
+            sheet = load_workbook(BytesIO(content)).active
+            assert sheet.max_row == 2
+            assert all(cell.value for cell in sheet[1])
+            assert all(cell.comment for cell in sheet[1])
+        assert load_workbook(BytesIO(excel_import_service.build_template(db, "project", "records", "form"))).active["A1"].value == "observacion"
 
 
 def _build_xlsx(headers: list[str], rows: list[list[object]]) -> bytes:

@@ -40,6 +40,13 @@ def get_template_detail(template_id: str, db: Session = Depends(get_db), current
     return builder_service.get_template(db, template_id)
 
 
+@router.post("/templates/detail/{template_id}/duplicate", response_model=BuilderTemplateRead)
+def duplicate_template(template_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> BuilderTemplateRead:
+    template = require_template_access(db, current_user.id, template_id)
+    require_project_permission(db, current_user.id, template.project_id, BUILDER_WRITE)
+    return builder_service.duplicate_template(db, template_id, current_user.id)
+
+
 @router.patch("/templates/detail/{template_id}/status", response_model=BuilderTemplateRead)
 def update_template_status(template_id: str, payload: BuilderTemplateStatusUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> BuilderTemplateRead:
     template = require_template_access(db, current_user.id, template_id)

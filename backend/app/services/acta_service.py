@@ -215,10 +215,10 @@ class ActaService:
                 )
                 body_parts.append(f'<table style="width:100%;border-collapse:collapse" border="1" cellpadding="6">{rows_html}</table>')
             elif block.type == "signature":
-                body_parts.append(f'<div class="acta-signature-line" style="margin-top:40px">____________________<br>{html.escape(block.label)}</div>')
+                body_parts.append(f'<div class="acta-signature-line" style="margin-top:18px">____________________<br>{html.escape(block.label)}</div>')
 
         body = "\n".join(body_parts)
-        return f'<html><head><meta charset="utf-8"><style>body {{ font-family: Helvetica, Arial, sans-serif; margin: 32px; }} table td {{ padding: 4px; }}</style></head><body>{body}</body></html>'
+        return f'<html><head><meta charset="utf-8"><style>body {{ font-family: Helvetica, Arial, sans-serif; margin: 20px; }} h1,h2,h3 {{ margin: 8px 0 5px; }} table {{ margin: 6px 0; }} table td {{ padding: 3px; }} .acta-signature-line {{ page-break-inside: avoid; }}</style></head><body>{body}</body></html>'
 
     def render_pdf_from_record(self, db: Session, template: ActaTemplate, record_id: str) -> bytes:
         return _html_to_pdf_bytes(self.render_html_from_blocks(db, template, record_id))

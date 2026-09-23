@@ -6,6 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.core.time import to_naive_utc, utc_now
 from app.models.builder import BuilderComponent, BuilderTemplate, BuilderVersion
+from app.models.builder_layout import BuilderPage, BuilderSection, BuilderRow, BuilderColumn
+from app.models.form_lookup import FormLookup
 from app.models.identity import User
 from app.models.runtime_record import RuntimeRecord
 from app.schemas.builder import BuilderComponentCreate, BuilderComponentPropertiesUpdate, BuilderComponentRead, BuilderTemplateCreate, BuilderTemplatePropertiesUpdate, BuilderTemplateRead, BuilderVersionCreate, BuilderVersionRead, ParticipantSource
@@ -54,6 +56,44 @@ class BuilderService:
         db.refresh(row)
         owner = db.get(User, user_id) if user_id else None
         return template_to_read(row, owner.full_name if owner else None)
+
+    def duplicate_template(self, db: Session, template_id: str, user_id: str) -> BuilderTemplateRead:
+        """Copy form structure and Pull files into a new draft; never copy answers."""
+        source = db.get(BuilderTemplate, template_id)
+        if source is None:
+            raise HTTPException(status_code=404, detail="Formulario no encontrado")
+
+        def copy_row(model, original, **overrides):
+            fields = {column.name: getattr(original, column.name) for column in model.__table__.columns if column.name not in {"id", "created_at", "updated_at"}}
+            fields.update(overrides)
+            item = model(**fields)
+            db.add(item)
+            db.flush()
+            return item
+
+        try:
+            clone = BuilderTemplate(project_id=source.project_id, name=f"Copia de {source.name}"[:180], description=source.description, status="draft", theme_json=source.theme_json, participant_source_json=source.participant_source_json, created_by=user_id, updated_at=utc_now())
+            db.add(clone)
+            db.flush()
+            columns: dict[str, str] = {}
+            for page in db.query(BuilderPage).filter_by(template_id=source.id).order_by(BuilderPage.sort_order).all():
+                new_page = copy_row(BuilderPage, page, template_id=clone.id)
+                for section in db.query(BuilderSection).filter_by(page_id=page.id).order_by(BuilderSection.sort_order).all():
+                    new_section = copy_row(BuilderSection, section, page_id=new_page.id)
+                    for row in db.query(BuilderRow).filter_by(section_id=section.id).order_by(BuilderRow.sort_order).all():
+                        new_row = copy_row(BuilderRow, row, section_id=new_section.id)
+                        for column in db.query(BuilderColumn).filter_by(row_id=row.id).order_by(BuilderColumn.sort_order).all():
+                            new_column = copy_row(BuilderColumn, column, row_id=new_row.id)
+                            columns[column.id] = new_column.id
+            for component in db.query(BuilderComponent).filter_by(template_id=source.id).order_by(BuilderComponent.sort_order).all():
+                copy_row(BuilderComponent, component, template_id=clone.id, column_id=columns.get(component.column_id) if component.column_id else None)
+            for lookup in db.query(FormLookup).filter_by(template_id=source.id).all():
+                copy_row(FormLookup, lookup, template_id=clone.id)
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        return self.get_template(db, clone.id)
 
     def list_templates(self, db: Session, project_id: str) -> list[BuilderTemplateRead]:
         rows = db.query(BuilderTemplate).filter(BuilderTemplate.project_id == project_id).order_by(BuilderTemplate.created_at.desc()).all()

@@ -456,14 +456,14 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .desktop-sync-status span[role="status"] { color: var(--text-muted); font-size: 12px; max-width: 220px; }
 
 .runtime-themed { padding: 1px 0 28px; background: color-mix(in srgb, var(--form-background, #ffffff) 78%, var(--page-bg)); }
-.runtime-shell { max-width: 1040px; margin: 32px auto; padding: 28px; background: var(--form-background, #ffffff); border: 2px solid color-mix(in srgb, var(--form-primary, var(--brand-primary)) 22%, var(--brand-primary-soft)); border-top: 8px solid var(--form-primary, var(--brand-primary)); border-radius: var(--form-radius, 18px); box-shadow: 0 14px 40px rgba(10, 37, 64, 0.08); }
+.runtime-shell { max-width: 1040px; margin: 16px auto; padding: 20px; background: var(--form-background, #ffffff); border: 2px solid color-mix(in srgb, var(--form-primary, var(--brand-primary)) 22%, var(--brand-primary-soft)); border-top: 8px solid var(--form-primary, var(--brand-primary)); border-radius: var(--form-radius, 18px); box-shadow: 0 14px 40px rgba(10, 37, 64, 0.08); }
 .runtime-shell h1 { margin-top: 0; color: var(--form-primary, var(--text)); }
-.runtime-page { margin-top: 24px; }
-.runtime-section { margin-top: 18px; padding: var(--space-3); border: 1px solid color-mix(in srgb, var(--form-primary, var(--brand-primary)) 18%, #e3e8ef); border-left: 6px solid var(--form-primary, var(--brand-primary)); border-radius: var(--form-radius, 14px); background: linear-gradient(180deg, #ffffff, color-mix(in srgb, var(--form-background, #ffffff) 88%, var(--surface-muted))); }
+.runtime-page { margin-top: 12px; }
+.runtime-section { margin-top: 8px; padding: 14px; border: 1px solid color-mix(in srgb, var(--form-primary, var(--brand-primary)) 18%, #e3e8ef); border-left: 6px solid var(--form-primary, var(--brand-primary)); border-radius: var(--form-radius, 14px); background: linear-gradient(180deg, #ffffff, color-mix(in srgb, var(--form-background, #ffffff) 88%, var(--surface-muted))); }
 .runtime-section h3 { margin-top: 0; color: var(--form-primary, var(--brand-primary)); }
-.runtime-row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; margin-top: 12px; }
+.runtime-row { display: grid; grid-template-columns: repeat(12, 1fr); gap: 12px; margin-top: 5px; }
 .runtime-column { grid-column: span var(--desktop-span, 12); }
-.runtime-field-group { display: flex; flex-direction: column; gap: 7px; margin-bottom: 14px; color: var(--text); font-weight: 700; }
+.runtime-field-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 9px; color: var(--text); font-weight: 700; }
 .runtime-question-label { display: inline-flex; align-items: center; gap: 10px; }
 .runtime-question-label.after { justify-content: space-between; }
 .runtime-question-media { display: inline-grid; place-items: center; flex: 0 0 auto; overflow: hidden; border-radius: var(--radius-md); background: var(--info-soft); color: var(--form-primary, var(--brand-primary)); line-height: 1; }
@@ -1110,6 +1110,13 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .forms-tabs button { padding: 16px 18px; border: 0; border-bottom: 3px solid transparent; background: transparent; color: #49617c; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .forms-tabs button.active { border-bottom-color: #26a4ba; color: #153a56; }
 .forms-detail-grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 18px; }
+.forms-admin-actions { display: flex; flex-wrap: wrap; gap: 9px; }
+.forms-admin-actions a, .forms-admin-actions button { display: inline-flex; align-items: center; border: 1px solid #bdd5e5; border-radius: 6px; padding: 9px 13px; background: #eff7fb; color: #176187; font: inherit; font-weight: 700; text-decoration: none; cursor: pointer; }
+.forms-detail-panel .forms-admin-actions button { background: #eff7fb; color: #176187; border: 1px solid #bdd5e5; padding: 9px 13px; }
+.forms-pull-choice { display: block; margin: 7px 0; }
+.record-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.record-detail-actions a, .record-detail-actions button { padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; background: white; color: var(--brand-primary); text-decoration: none; font: inherit; cursor: pointer; }
+.record-detail-actions a[aria-disabled="true"] { opacity: .45; pointer-events: none; }
 .forms-detail-panel h2 { margin: 0 0 16px; font-size: 18px; }
 .forms-detail-panel > p { color: #5e6f86; }
 .forms-detail-panel button { border: 0; padding: 10px 15px; border-radius: 6px; background: #17698b; color: white; font: inherit; font-weight: 700; cursor: pointer; }

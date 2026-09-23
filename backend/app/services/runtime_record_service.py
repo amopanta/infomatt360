@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.time import utc_now
 from app.models.builder import BuilderComponent, BuilderTemplate
+from app.models.audit import AuditLog
 from app.models.files import FileAsset
 from app.models.bulk_import import BulkImportJob
 from app.models.participants import Participant
@@ -719,8 +720,64 @@ class RuntimeRecordService:
         row = db.query(RuntimeRecord).filter(RuntimeRecord.id == record_id).first()
         return record_to_read(db, row) if row else None
 
+    def duplicate_record(self, db: Session, record_id: str, user_id: str) -> RuntimeRecordRead:
+        """Make a separate draft, including independent asset rows for file evidence."""
+        source = db.get(RuntimeRecord, record_id)
+        if source is None:
+            raise ValueError("Registro no encontrado")
+        values = db.query(RuntimeRecordValue).filter_by(record_id=record_id).all()
+        now = utc_now()
+        clone = RuntimeRecord(
+            project_id=source.project_id, template_id=source.template_id, version_id=source.version_id,
+            participant_id=source.participant_id, status="draft", submitted_by=user_id,
+            approval_flow_id=source.approval_flow_id, approval_flow_version=source.approval_flow_version,
+            approval_flow_snapshot_json=source.approval_flow_snapshot_json, duplicate_flag="manual",
+            created_at=now, updated_at=now,
+        )
+        try:
+            db.add(clone)
+            db.flush()
+            asset_map: dict[str, str] = {}
+            for value in values:
+                for asset_id in self._file_asset_ids(json.loads(value.field_value_json)):
+                    if asset_id in asset_map:
+                        continue
+                    asset = db.get(FileAsset, asset_id)
+                    if asset is None or asset.project_id != source.project_id:
+                        raise ValueError(f"Evidencia no disponible: {asset_id}")
+                    copied = FileAsset(
+                        project_id=asset.project_id, participant_id=asset.participant_id, record_id=clone.id,
+                        asset_type=asset.asset_type, original_name=asset.original_name,
+                        storage_provider=asset.storage_provider, storage_path=asset.storage_path,
+                        mime_type=asset.mime_type, size_bytes=asset.size_bytes, checksum=asset.checksum,
+                        ocr_text=asset.ocr_text, metadata_json=asset.metadata_json, created_by=user_id,
+                    )
+                    db.add(copied)
+                    db.flush()
+                    asset_map[asset_id] = copied.id
+
+            def remap(value):
+                if isinstance(value, dict):
+                    return {key: asset_map.get(item, item) if key == "file_asset_id" and isinstance(item, str) else remap(item) for key, item in value.items()}
+                if isinstance(value, list):
+                    return [remap(item) for item in value]
+                return value
+
+            copied_values = []
+            for value in values:
+                raw = json.dumps(remap(json.loads(value.field_value_json)), ensure_ascii=False)
+                db.add(RuntimeRecordValue(record_id=clone.id, component_id=value.component_id, field_name=value.field_name, field_value_json=raw))
+                copied_values.append(RuntimeValueCreate(component_id=value.component_id, field_name=value.field_name, field_value_json=raw))
+            clone.content_hash = _compute_content_hash(clone.project_id, clone.template_id, copied_values)
+            db.add(AuditLog(project_id=clone.project_id, user_id=user_id, module="records", action="duplicate", entity_type="runtime_record", entity_id=clone.id, before_json=json.dumps({"source_record_id": source.id})))
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        return record_to_read(db, clone)
+
     def correct_field(self, db: Session, record_id: str, payload: RuntimeRecordFieldCorrection, user_id: str | None) -> RuntimeRecordRead:
-        """Corrige el valor de un campo de un registro devuelto ("returned").
+        """Edit an open record with optimistic locking and a before/after audit log.
 
         Es el unico camino de escritura sobre un `RuntimeRecordValue` ya
         existente en todo el sistema -- `save_record` siempre crea filas
@@ -737,8 +794,8 @@ class RuntimeRecordService:
         record = db.query(RuntimeRecord).filter(RuntimeRecord.id == record_id).first()
         if record is None:
             raise ValueError("Registro no encontrado")
-        if record.status != "returned":
-            raise ValueError(f"Solo se puede corregir un registro en estado 'returned' (estado actual: '{record.status}')")
+        if record.status not in {"draft", "submitted", "returned", "corrected"}:
+            raise ValueError(f"El registro en estado '{record.status}' no admite edición; solicita una devolución para corregirlo")
         if record.lock_version != payload.expected_lock_version:
             raise ValueError(
                 "El registro fue modificado por otro usuario despues de que se cargo el formulario de correccion; "
@@ -761,10 +818,21 @@ class RuntimeRecordService:
         if value_row is None:
             db.add(RuntimeRecordValue(record_id=record_id, field_name=payload.field_name, field_value_json=payload.field_value_json))
         else:
+            previous_value = value_row.field_value_json
             value_row.field_value_json = payload.field_value_json
+
+        db.add(AuditLog(
+            project_id=record.project_id, user_id=user_id, module="records", action="edit_field",
+            entity_type="runtime_record", entity_id=record.id,
+            before_json=json.dumps({"field": payload.field_name, "value": json.loads(previous_value) if value_row is not None else None}, ensure_ascii=False),
+            after_json=json.dumps({"field": payload.field_name, "value": parsed_value}, ensure_ascii=False),
+        ))
 
         record.lock_version += 1
         record.updated_at = utc_now()
+        db.flush()
+        current_values = db.query(RuntimeRecordValue).filter_by(record_id=record.id).all()
+        record.content_hash = _compute_content_hash(record.project_id, record.template_id, current_values)
         db.commit()
         db.refresh(record)
         return record_to_read(db, record)

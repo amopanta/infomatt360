@@ -33,11 +33,14 @@ class BuilderTemplateRead(BuilderTemplateCreate):
 
 
 class ParticipantSource(BaseModel):
-    mode: Literal["all", "list", "filter", "form"] = "all"
+    mode: Literal["all", "list", "filter", "form", "pull"] = "all"
     participant_ids: list[str] = Field(default_factory=list)
     municipality: str | None = None
     previous_template_id: str | None = None
     required_status: str = "submitted"
+    pull_name: str | None = None
+    pull_key_column: str | None = None
+    participant_key_field: Literal["external_code", "document_id"] = "external_code"
 
     @model_validator(mode="after")
     def validate_source(self):
@@ -47,6 +50,8 @@ class ParticipantSource(BaseModel):
             raise ValueError("Indica el municipio")
         if self.mode == "form" and not self.previous_template_id:
             raise ValueError("Selecciona el formulario anterior")
+        if self.mode == "pull" and (not self.pull_name or not self.pull_key_column):
+            raise ValueError("Selecciona un grupo Pull y su columna de relación")
         return self
 
 

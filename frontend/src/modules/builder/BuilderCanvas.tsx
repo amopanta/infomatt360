@@ -61,7 +61,7 @@ export function BuilderCanvas({
       <div className="builder-toolbar">
         <div>
           <h2>Lienzo del formulario</h2>
-          <p>Construye por grupos: cada bloque equivale a una seccion de captura como en KoboToolbox/LimeSurvey.</p>
+          <p>Construye por grupos: cada bloque organiza una sección de captura de InfoMatt360.</p>
         </div>
         <div className="builder-actions">
           <button type="button" onClick={onPreview}>Vista previa</button>

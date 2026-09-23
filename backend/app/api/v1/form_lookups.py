@@ -1,6 +1,6 @@
 """Manage and query KoBo-compatible pulldata CSVs."""
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -53,6 +53,38 @@ async def upload_lookup(template_id: str, upload: UploadFile = File(...), db: Se
     require_project_permission(db, user.id, template.project_id, BUILDER_WRITE)
     content = await upload.read(5 * 1024 * 1024 + 1)
     return info(put_lookup(db, template.project_id, template_id, upload.filename or "", content))
+
+
+@router.post("/projects/{project_id}/assign", response_model=list[LookupInfo])
+async def assign_lookup_to_forms(
+    project_id: str,
+    upload: UploadFile = File(...),
+    template_ids: str = Form(...),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Attach one CSV to several forms atomically without changing their records."""
+    import json
+
+    require_project_permission(db, user.id, project_id, BUILDER_WRITE)
+    try:
+        ids = json.loads(template_ids)
+    except (ValueError, TypeError) as exc:
+        raise HTTPException(status_code=422, detail="Selecciona los formularios de destino") from exc
+    if not isinstance(ids, list) or not ids or len(ids) > 100 or len(ids) != len(set(ids)) or not all(isinstance(value, str) for value in ids):
+        raise HTTPException(status_code=422, detail="Selecciona entre 1 y 100 formularios distintos")
+    for template_id in ids:
+        template = require_template_access(db, user.id, template_id)
+        if template.project_id != project_id:
+            raise HTTPException(status_code=422, detail="Todos los formularios deben pertenecer al proyecto")
+    content = await upload.read(5 * 1024 * 1024 + 1)
+    try:
+        items = [put_lookup(db, project_id, template_id, upload.filename or "", content, commit=False) for template_id in ids]
+        db.commit()
+        return [info(item) for item in items]
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.post("/templates/{template_id}/value", response_model=LookupResult)

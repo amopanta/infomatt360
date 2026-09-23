@@ -69,7 +69,7 @@ def parse_csv(content: bytes) -> tuple[list[str], list[dict[str, str]]]:
     return columns, rows
 
 
-def put_lookup(db: Session, project_id: str, template_id: str, filename: str, content: bytes) -> FormLookup:
+def put_lookup(db: Session, project_id: str, template_id: str, filename: str, content: bytes, *, commit: bool = True) -> FormLookup:
     name = normalize_name(filename)
     columns, rows = parse_csv(content)
     item = db.query(FormLookup).filter(FormLookup.template_id == template_id, FormLookup.name == name).first()
@@ -81,8 +81,9 @@ def put_lookup(db: Session, project_id: str, template_id: str, filename: str, co
     item.row_count = len(rows)
     item.checksum = hashlib.sha256(content).hexdigest()
     item.updated_at = utc_now()
-    db.commit()
-    db.refresh(item)
+    if commit:
+        db.commit()
+        db.refresh(item)
     return item
 
 

@@ -1,7 +1,7 @@
 export type RecordValue = { id: string; field_name: string; field_value_json: string };
 export type RuntimeRecord = { id: string; template_id: string; status: string; submitted_by?: string | null; approval_flow_id?: string | null; approval_flow_version?: string | null; participant_id?: string | null; lock_version: number; created_at: string; updated_at: string; values: RecordValue[] };
 export type RuntimeRecordPage = { items: RuntimeRecord[]; total: number; limit: number; offset: number };
-export type TemplateSummary = { id: string; project_id: string; name: string; description?: string | null; theme_json?: string | null; status: string; created_at?: string | null; updated_at?: string | null; published_at?: string | null; starts_at?: string | null; ends_at?: string | null; availability?: string; accepting_responses?: boolean; owner_name?: string | null; submissions_count?: number; participant_source?: { mode: 'all' | 'list' | 'filter' | 'form'; participant_ids: string[]; municipality?: string | null; previous_template_id?: string | null; required_status: string } | null };
+export type TemplateSummary = { id: string; project_id: string; name: string; description?: string | null; theme_json?: string | null; status: string; created_at?: string | null; updated_at?: string | null; published_at?: string | null; starts_at?: string | null; ends_at?: string | null; availability?: string; accepting_responses?: boolean; owner_name?: string | null; submissions_count?: number; participant_source?: { mode: 'all' | 'list' | 'filter' | 'form' | 'pull'; participant_ids: string[]; municipality?: string | null; previous_template_id?: string | null; required_status: string; pull_name?: string | null; pull_key_column?: string | null; participant_key_field?: 'external_code' | 'document_id' } | null };
 export type ReviewAction = { id: string; project_id: string; record_id: string; from_status?: string | null; to_status: string; action: string; notes?: string | null; rejected_field_name?: string | null; user_id: string; approval_flow_id?: string | null; approval_flow_version?: number | null; created_at?: string | null };
 export type ReviewNextAction = { label: string; to_status: string; action: string; required_permission?: string | null; source: string };
 export type ReviewApprovalProgress = {
@@ -83,6 +83,22 @@ export async function fetchRecord(recordId: string): Promise<RuntimeRecord> {
   const response = await fetch(`${API_BASE_URL}/runtime/record/${recordId}`, { headers: headers() });
   if (!response.ok) throw new Error('No fue posible consultar el registro.');
   return response.json();
+}
+
+export async function duplicateRecord(recordId: string): Promise<RuntimeRecord> {
+  const response = await fetch(`${API_BASE_URL}/runtime/record/${recordId}/duplicate`, { method: 'POST', headers: jsonHeaders() });
+  if (!response.ok) { const body = await response.json().catch(() => null); throw new Error(body?.detail || 'No fue posible duplicar el registro.'); }
+  return response.json();
+}
+
+export async function downloadRecord(recordId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/runtime/record/${recordId}/export.json`, { headers: headers() });
+  if (!response.ok) throw new Error('No fue posible descargar el registro.');
+  const url = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement('a');
+  anchor.href = url; anchor.download = `registro-${recordId}.json`;
+  document.body.appendChild(anchor); anchor.click(); anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export async function searchTemplateRecords(params: { templateId: string; search?: string; status?: string; limit?: number; offset?: number; unlinkedOnly?: boolean; fieldFilters?: Record<string, string>; sortBy?: string; sortDir?: 'asc' | 'desc' }): Promise<RuntimeRecordPage> {

@@ -19,6 +19,12 @@ export async function fetchTemplateDetail(templateId: string): Promise<TemplateS
   return response.json();
 }
 
+export async function duplicateTemplate(templateId: string): Promise<TemplateSummary> {
+  const response = await fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}/duplicate`, { method: 'POST', headers: authHeaders() });
+  if (!response.ok) { const payload = await response.json().catch(() => null); throw new Error(payload?.detail || 'No fue posible duplicar el formulario.'); }
+  return response.json();
+}
+
 export type ParticipantSource = NonNullable<TemplateSummary['participant_source']>;
 
 export async function setParticipantSource(templateId: string, source: ParticipantSource): Promise<TemplateSummary> {

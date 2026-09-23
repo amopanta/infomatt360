@@ -363,7 +363,7 @@ export function BuilderApp() {
           <div className="builder-structure-panel">
             <div className="builder-panel-title">
               <strong>Grupos y secciones</strong>
-              <p>Similar a Kobo/LimeSurvey: divide el formulario por bloques de captura.</p>
+              <p>Divide el formulario en grupos compactos de captura.</p>
             </div>
             <div className="builder-structure-list">
               {sections.map((section, index) => (

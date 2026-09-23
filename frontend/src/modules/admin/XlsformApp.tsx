@@ -10,7 +10,7 @@ import type { FormVersionSummary, XlsformPreview } from './xlsformApi';
 export function XlsformApp() {
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
-  const [exportTemplateId, setExportTemplateId] = useState('');
+  const [exportTemplateId, setExportTemplateId] = useState(new URLSearchParams(window.location.search).get('export') ?? '');
   const [replaceTemplateId, setReplaceTemplateId] = useState(new URLSearchParams(window.location.search).get('replace') ?? '');
   const [message, setMessage] = useState('');
   const [importing, setImporting] = useState(false);
@@ -114,7 +114,7 @@ export function XlsformApp() {
           <header>
             <div>
               <h2>Importar formulario (XLSForm, SurveyMonkey o LimeSurvey)</h2>
-              <p>Sube un archivo .xlsx para crear una plantilla nueva del constructor. Detecta automaticamente el formato: XLSForm/ODK/KoboToolbox (hojas "survey"/"choices"), o el formato SurveyMonkey/LimeSurvey de la plantilla de referencia (ver docs/81, docs/93 y docs/94).</p>
+              <p>Sube un archivo .xlsx para crear una plantilla nueva del constructor. InfoMatt360 reconoce XLSForm con hojas "survey" y "choices", además de hojas estructuradas de otras fuentes.</p>
             </div>
           </header>
           <div className="ai-analyze-inline">
@@ -136,7 +136,7 @@ export function XlsformApp() {
           {preview && <article className="ds-map-card"><h3>Comparación antes de aplicar</h3><p>{preview.added.length} nuevas · {preview.removed.length} eliminadas · {preview.modified.length} modificadas</p>{preview.added.length > 0 && <p><strong>Nuevas:</strong> {preview.added.join(', ')}</p>}{preview.removed.length > 0 && <p><strong>Se retiran de la versión activa:</strong> {preview.removed.join(', ')}</p>}{preview.modified.map((item) => <p key={item.name}><strong>{item.name}:</strong> {item.changes.join(', ')}</p>)}{preview.errors.map((error, index) => <p role="alert" key={index}>{error}</p>)}{preview.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</article>}
           <small>La plantilla maestra trae un campo de ejemplo por cada tipo soportado (texto, numericos, seleccion, medios, GPS, repetibles, condicionales, validaciones, etc.) para usar como base y crear formularios rapidamente en Excel.</small>
           {replaceTemplateId ? (
-            <small>Al reemplazar, el formulario conserva su mismo enlace y sus registros ya capturados; la estructura anterior queda respaldada automáticamente y se puede volver a ejecutar (como el redeploy de KoboToolbox).</small>
+            <small>Al reemplazar, el formulario conserva su enlace y sus registros. La estructura anterior queda guardada en el historial de versiones.</small>
           ) : null}
           {warnings.length ? (
             <article className="ds-map-card">
@@ -153,7 +153,7 @@ export function XlsformApp() {
           <header>
             <div>
               <h2>Exportar a XLSForm</h2>
-              <p>Descarga cualquier formulario del proyecto (diseñado a mano o importado) como un archivo .xlsx compatible con KoboToolbox/ODK (ver docs/93).</p>
+              <p>Descarga cualquier formulario del proyecto, diseñado a mano o importado, como archivo XLSForm .xlsx.</p>
             </div>
           </header>
           <div className="ai-analyze-inline">

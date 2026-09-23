@@ -7,7 +7,7 @@ export function BuilderPalette({ onAddField }: { onAddField?: (item: BuilderPale
   return (
     <aside className="builder-palette">
       <h3>Banco de preguntas</h3>
-      <p className="builder-help">Tipo KoboToolbox: elige un componente y se agrega al grupo activo.</p>
+      <p className="builder-help">Elige un componente para agregarlo al grupo activo.</p>
       {categories.map((category) => (
         <section key={category} className="builder-palette-group">
           <h4>{category}</h4>

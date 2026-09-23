@@ -32,7 +32,7 @@ export const FIELD_CATALOG: BuilderPaletteItem[] = [
   { category: 'GIS', type: 'GPS', label: 'Punto GPS', description: 'Coordenada geografica' },
   { category: 'GIS', type: 'GEOTRACE', label: 'Linea o ruta', description: 'Trayecto de multiples puntos' },
   { category: 'GIS', type: 'GEOSHAPE', label: 'Poligono o area', description: 'Delimitacion geografica' },
-  { category: 'Estructuras', type: 'REPEAT', label: 'Tabla repetida', description: 'Subformulario dinamico (grupo embebido, estilo Kobo/ODK)' },
+  { category: 'Estructuras', type: 'REPEAT', label: 'Tabla repetida', description: 'Subformulario dinámico dentro del grupo' },
   { category: 'Estructuras', type: 'LINKED_SUBFORM', label: 'Subformulario enlazado', description: 'Filas hijas como registros propios (estilo ActivityInfo)' },
   { category: 'Estructuras', type: 'MATRIX', label: 'Matriz', description: 'Escala o cuadricula estatica' },
   { category: 'Estructuras', type: 'PARENT_CHILD', label: 'Padre - hijo', description: 'Selector que enlaza con un registro de otra plantilla' },

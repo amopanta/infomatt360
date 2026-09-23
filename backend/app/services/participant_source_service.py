@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.builder import BuilderTemplate
 from app.models.participants import Participant
+from app.models.form_lookup import FormLookup
 from app.models.runtime_record import RuntimeRecord
 from app.schemas.builder import ParticipantSource
 
@@ -34,6 +35,10 @@ def validate_source(db: Session, template: BuilderTemplate, source: ParticipantS
         previous = db.get(BuilderTemplate, source.previous_template_id)
         if previous is None or previous.project_id != template.project_id or previous.id == template.id:
             raise HTTPException(status_code=422, detail="Selecciona otro formulario del mismo proyecto")
+    if source.mode == "pull":
+        lookup = db.query(FormLookup).filter(FormLookup.template_id == template.id, FormLookup.name == source.pull_name).first()
+        if lookup is None or source.pull_key_column not in json.loads(lookup.columns_json):
+            raise HTTPException(status_code=422, detail="El grupo Pull o la columna de relación no existe en este formulario")
 
 
 def eligible_participants(db: Session, template: BuilderTemplate) -> list[Participant]:
@@ -54,6 +59,12 @@ def eligible_participants(db: Session, template: BuilderTemplate) -> list[Partic
         ).distinct().all()
         allowed = {participant_id for (participant_id,) in found}
         return [item for item in rows if item.id in allowed]
+    if source.mode == "pull":
+        lookup = db.query(FormLookup).filter(FormLookup.template_id == template.id, FormLookup.name == source.pull_name).first()
+        if lookup is None:
+            return []
+        allowed = {str(item.get(source.pull_key_column, "")).strip() for item in json.loads(lookup.rows_json)}
+        return [item for item in rows if str(getattr(item, source.participant_key_field) or "").strip() in allowed]
     return rows
 
 

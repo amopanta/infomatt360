@@ -13,6 +13,7 @@ from app.models.assignment import UserProjectAssignment
 from app.models.builder import BuilderTemplate
 from app.models.identity import Project, Role, User
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
+from app.models.audit import AuditLog
 
 
 def setup_client():
@@ -29,10 +30,11 @@ def setup_client():
 
         returned_record = RuntimeRecord(id="corr-record-returned", project_id=project.id, template_id=template.id, status="returned", submitted_by=writer.id, lock_version=1)
         submitted_record = RuntimeRecord(id="corr-record-submitted", project_id=project.id, template_id=template.id, status="submitted", submitted_by=writer.id, lock_version=1)
+        approved_record = RuntimeRecord(id="corr-record-approved", project_id=project.id, template_id=template.id, status="approved", submitted_by=writer.id, lock_version=1)
 
         db.add_all([
             project, writer_role, outsider_role, writer, outsider, template,
-            returned_record, submitted_record,
+            returned_record, submitted_record, approved_record,
             RuntimeRecordValue(record_id=returned_record.id, field_name="foto_entrega", field_value_json=json.dumps("blurry.jpg")),
             UserProjectAssignment(user_id=writer.id, project_id=project.id, role_id=writer_role.id, status="active"),
             UserProjectAssignment(user_id=outsider.id, project_id=project.id, role_id=outsider_role.id, status="active"),
@@ -74,6 +76,9 @@ def test_correction_updates_existing_value_and_increments_lock_version():
                 assert record.lock_version == 2
                 value = db.query(RuntimeRecordValue).filter(RuntimeRecordValue.record_id == record.id, RuntimeRecordValue.field_name == "foto_entrega").one()
                 assert json.loads(value.field_value_json) == "sharp.jpg"
+                audit = db.query(AuditLog).filter_by(entity_id=record.id, action="edit_field").one()
+                assert json.loads(audit.before_json)["value"] == "blurry.jpg"
+                assert json.loads(audit.after_json)["value"] == "sharp.jpg"
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
@@ -130,7 +135,7 @@ def test_correction_rejects_stale_lock_version_conflict():
         Base.metadata.drop_all(bind=engine)
 
 
-def test_correction_rejects_records_not_in_returned_status():
+def test_edit_allows_submitted_and_rejects_approved():
     engine, _sessions = setup_client()
     try:
         with TestClient(app) as client:
@@ -140,8 +145,14 @@ def test_correction_rejects_records_not_in_returned_status():
                 headers=headers,
                 json={"field_name": "algun_campo", "field_value_json": json.dumps("x"), "expected_lock_version": 1},
             )
-            assert response.status_code == 400
-            assert "returned" in response.json()["detail"]
+            assert response.status_code == 200
+            approved = client.patch(
+                "/api/v1/runtime/record/corr-record-approved/correction",
+                headers=headers,
+                json={"field_name": "algun_campo", "field_value_json": json.dumps("x"), "expected_lock_version": 1},
+            )
+            assert approved.status_code == 400
+            assert "no admite edición" in approved.json()["detail"]
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
@@ -174,6 +185,28 @@ def test_correction_returns_404_for_unknown_record():
                 json={"field_name": "foto_entrega", "field_value_json": json.dumps("x"), "expected_lock_version": 1},
             )
             assert response.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_duplicate_creates_separate_draft_and_export_keeps_original():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "corr-writer@example.com", "Writer12345!")
+            response = client.post("/api/v1/runtime/record/corr-record-returned/duplicate", headers=headers)
+            assert response.status_code == 200, response.text
+            copy = response.json()
+            assert copy["id"] != "corr-record-returned"
+            assert copy["status"] == "draft"
+            assert {item["field_name"]: item["field_value_json"] for item in copy["values"]} == {"foto_entrega": json.dumps("blurry.jpg")}
+            exported = client.get(f"/api/v1/runtime/record/{copy['id']}/export.json", headers=headers)
+            assert exported.status_code == 200
+            assert exported.json()["values"]["foto_entrega"] == "blurry.jpg"
+            with sessions() as db:
+                assert db.get(RuntimeRecord, "corr-record-returned").status == "returned"
+                assert db.query(AuditLog).filter_by(entity_id=copy["id"], action="duplicate").count() == 1
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

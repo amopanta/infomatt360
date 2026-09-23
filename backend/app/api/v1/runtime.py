@@ -255,6 +255,31 @@ def get_runtime_record(record_id: str, db: Session = Depends(get_db), current_us
     return record
 
 
+@router.post("/record/{record_id}/duplicate", response_model=RuntimeRecordRead)
+def duplicate_runtime_record(record_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> RuntimeRecordRead:
+    record = runtime_record_service.get_record(db, record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+    require_project_permission(db, current_user.id, record.project_id, RECORDS_WRITE)
+    try:
+        return runtime_record_service.duplicate_record(db, record_id, current_user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/record/{record_id}/export.json")
+def export_runtime_record_json(record_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Response:
+    record = runtime_record_service.get_record(db, record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+    if not assignment_service.user_has_project_access(db, current_user.id, record.project_id):
+        raise HTTPException(status_code=403, detail="Sin acceso al proyecto")
+    import json
+    payload = record.model_dump(mode="json")
+    payload["values"] = {value.field_name: json.loads(value.field_value_json) for value in record.values}
+    return Response(content=json.dumps(payload, ensure_ascii=False, indent=2).encode("utf-8"), media_type="application/json", headers={"Content-Disposition": f'attachment; filename="registro-{record_id}.json"'})
+
+
 @router.get("/record/{record_id}/children/{field_name}", response_model=list[RuntimeRecordRead])
 def list_runtime_record_children(record_id: str, field_name: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[RuntimeRecordRead]:
     """Lista las filas hijas reales de un campo LINKED_SUBFORM (ver docs/97).

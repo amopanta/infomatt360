@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
-import { applyReviewAction, correctRecordField, downloadTemplateRecords, fetchProjectTemplates, fetchRecord, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, promoteRecordToParticipant, searchTemplateRecords } from './api';
+import { applyReviewAction, correctRecordField, downloadRecord, downloadTemplateRecords, duplicateRecord, fetchProjectTemplates, fetchRecord, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, promoteRecordToParticipant, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
 import { fetchActaTemplates, printActaBatch, printActaFromRecord, renderActaBatch, renderActaFromRecord } from '../acta/api';
 import type { ActaTemplateSummary } from '../acta/types';
@@ -417,9 +417,7 @@ function TemplateList() {
   );
 }
 
-/** Solo se ofrece edicion en linea para valores simples (texto/numero/booleano).
- * Fotos, firmas, GPS u otros campos complejos se corrigen recapturando desde
- * el formulario, no con un input de texto generico. */
+/** Los valores compuestos se editan como JSON para preservar su estructura. */
 function isEditableScalar(raw: string): boolean {
   try {
     const value = JSON.parse(raw);
@@ -443,7 +441,7 @@ function CorrectableField({
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
   const [saving, setSaving] = useState(false);
-  const canEditHere = record.status === 'returned';
+  const canEditHere = ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && hasAnyCurrentProjectPermission(['records.write']);
 
   function startEditing() {
     let parsed: unknown = null;
@@ -452,7 +450,7 @@ function CorrectableField({
     } catch {
       parsed = null;
     }
-    setDraft(parsed === null || parsed === undefined ? '' : String(parsed));
+    setDraft(parsed === null || parsed === undefined ? '' : isEditableScalar(value.field_value_json) ? String(parsed) : JSON.stringify(parsed, null, 2));
     setEditing(true);
   }
 
@@ -462,7 +460,7 @@ function CorrectableField({
       const updated = await correctRecordField({
         recordId: record.id,
         fieldName: value.field_name,
-        fieldValueJson: JSON.stringify(draft),
+        fieldValueJson: JSON.stringify((() => { const old = JSON.parse(value.field_value_json); if (!isEditableScalar(value.field_value_json)) { try { return JSON.parse(draft); } catch { throw new Error('Introduce un JSON válido para este campo.'); } } if (typeof old === 'number') { const numeric = Number(draft); if (!Number.isFinite(numeric)) throw new Error('Introduce un número válido.'); return numeric; } if (typeof old === 'boolean') return draft.toLowerCase() === 'true' || draft.toLowerCase() === 'sí'; return draft; })()),
         expectedLockVersion: record.lock_version,
       });
       onCorrected(updated);
@@ -483,18 +481,14 @@ function CorrectableField({
     return (
       <dd>
         {formatValue(value.field_value_json, true)}
-        {isEditableScalar(value.field_value_json) ? (
-          <button className="record-field-edit-button" onClick={startEditing}>Corregir</button>
-        ) : (
-          <small className="record-field-uneditable"> (recaptura este campo desde el formulario original)</small>
-        )}
+        <button className="record-field-edit-button" onClick={startEditing}>Editar</button>
       </dd>
     );
   }
 
   return (
     <dd>
-      <input value={draft} onChange={(event) => setDraft(event.target.value)} disabled={saving} />
+      {isEditableScalar(value.field_value_json) ? <input value={draft} onChange={(event) => setDraft(event.target.value)} disabled={saving} /> : <textarea rows={5} value={draft} onChange={(event) => setDraft(event.target.value)} disabled={saving} aria-label={`Valor JSON de ${value.field_name}`} />}
       <button disabled={saving} onClick={() => void submitCorrection()}>{saving ? 'Guardando…' : 'Guardar corrección'}</button>
       <button disabled={saving} onClick={() => setEditing(false)}>Cancelar</button>
     </dd>
@@ -707,14 +701,25 @@ function DeepLinkedRecordCard({
   highlightField,
   onRecordUpdated,
   onMessage,
+  previousId,
+  nextId,
 }: {
   projectId: string;
   record: RuntimeRecord;
   highlightField: string;
   onRecordUpdated: (record: RuntimeRecord) => void;
   onMessage: (value: string) => void;
+  previousId?: string;
+  nextId?: string;
 }) {
   const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    fetchRuntimeTemplate(record.template_id)
+      .then((template) => setFieldLabels(Object.fromEntries(flattenComponents(template).map((field) => [field.name, field.label || field.name]))))
+      .catch(() => setFieldLabels({}));
+  }, [record.template_id]);
 
   useEffect(() => {
     if (!highlightField) return;
@@ -723,6 +728,13 @@ function DeepLinkedRecordCard({
 
   return (
     <section className="record-deep-link-card">
+      <div className="record-detail-actions">
+        <a href={`/records/${record.template_id}`}>← Grilla</a>
+        <a aria-disabled={!previousId} href={previousId ? `/records/${record.template_id}?recordId=${previousId}` : undefined}>Anterior</a>
+        <a aria-disabled={!nextId} href={nextId ? `/records/${record.template_id}?recordId=${nextId}` : undefined}>Siguiente</a>
+        <button type="button" onClick={() => void downloadRecord(record.id).catch((error: Error) => onMessage(error.message))}>Descargar JSON</button>
+        {hasAnyCurrentProjectPermission(['records.write']) && <button type="button" onClick={() => void duplicateRecord(record.id).then((copy) => { window.location.href = `/records/${record.template_id}?recordId=${copy.id}`; }).catch((error: Error) => onMessage(error.message))}>Duplicar como borrador</button>}
+      </div>
       <header>
         <strong>Registro señalado para corrección</strong>
         <span className={`record-status ${record.status}`}>{record.status}</span>
@@ -734,7 +746,7 @@ function DeepLinkedRecordCard({
             ref={(node) => { fieldRefs.current[value.field_name] = node; }}
             className={value.field_name === highlightField ? 'record-field-highlighted' : undefined}
           >
-            <dt>{value.field_name}</dt>
+            <dt>{fieldLabels[value.field_name] || value.field_name}</dt>
             <CorrectableField record={record} value={value} onCorrected={onRecordUpdated} onMessage={onMessage} />
           </div>
         ))}
@@ -840,6 +852,7 @@ function RecordTable({ templateId }: { templateId: string }) {
   const pageStart = total ? offset + 1 : 0;
   const pageEnd = Math.min(offset + records.length, total);
   const pageIds = useMemo(() => records.map((record) => record.id), [records]);
+  const openIndex = deepLinkedRecord ? pageIds.indexOf(deepLinkedRecord.id) : -1;
   const pageFullySelected = isPageFullySelected(selectedIds, pageIds);
 
   async function exportCsv() {
@@ -874,7 +887,7 @@ function RecordTable({ templateId }: { templateId: string }) {
     <AppShell title="Registros del formulario">
       <main className="records-shell">
         {deepLinkedRecord ? (
-          <DeepLinkedRecordCard projectId={projectId} record={deepLinkedRecord} highlightField={deepLink.campo} onRecordUpdated={setDeepLinkedRecord} onMessage={setMessage} />
+          <DeepLinkedRecordCard projectId={projectId} record={deepLinkedRecord} highlightField={deepLink.campo} onRecordUpdated={setDeepLinkedRecord} onMessage={setMessage} previousId={openIndex > 0 ? pageIds[openIndex - 1] : undefined} nextId={openIndex >= 0 ? pageIds[openIndex + 1] : undefined} />
         ) : deepLinkError ? (
           <p role="alert">{deepLinkError}</p>
         ) : null}

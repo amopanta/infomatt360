@@ -9,6 +9,7 @@ from app.db.base import Base
 from app.models.builder import BuilderTemplate
 from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord
+from app.models.form_lookup import FormLookup
 from app.schemas.builder import ParticipantSource
 from app.services.participant_source_service import eligible_participants, ensure_eligible, validate_source
 
@@ -32,3 +33,18 @@ def test_previous_form_requires_matching_participant_and_status():
             ensure_eligible(db, after, "p2")
         with pytest.raises(ValueError, match="requiere"):
             ensure_eligible(db, after, None)
+
+
+def test_pull_group_matches_participant_external_code():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    with sessionmaker(bind=engine)() as db:
+        form = BuilderTemplate(id="form-pull", project_id="project", name="Visita")
+        db.add_all([form, Participant(id="p1", project_id="project", full_name="Uno", external_code="001"), Participant(id="p2", project_id="project", full_name="Dos", external_code="002"), FormLookup(project_id="project", template_id=form.id, name="familias", columns_json='["codigo", "nombre"]', rows_json='[{"codigo":"001","nombre":"Uno"}]', row_count=1, checksum="abc")])
+        db.commit()
+        source = ParticipantSource(mode="pull", pull_name="familias", pull_key_column="codigo")
+        validate_source(db, form, source)
+        form.participant_source_json = source.model_dump_json()
+        assert [person.id for person in eligible_participants(db, form)] == ["p1"]
+        with pytest.raises(ValueError, match="no cumple"):
+            ensure_eligible(db, form, "p2")

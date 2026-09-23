@@ -5,7 +5,14 @@ from pydantic import BaseModel, Field, model_validator
 from app.core.time import to_naive_utc
 
 
+class IndicatorSource(BaseModel):
+    template_id: str = Field(min_length=1)
+    key_field: str | None = None
+    required_status: str | None = None
+
+
 class IndicatorDefinition(BaseModel):
+    code: str = Field(default="", max_length=40)
     title: str = Field(min_length=1, max_length=180)
     source_mode: Literal["automatic", "manual"] = "automatic"
     template_id: str | None = None
@@ -16,12 +23,20 @@ class IndicatorDefinition(BaseModel):
     unit: str = Field(default="", max_length=30)
     municipality_field: str | None = None
     view_kind: Literal["progress", "table", "bar"] = "progress"
+    sources: list[IndicatorSource] = Field(default_factory=list, max_length=20)
+    combination: Literal["single", "sum", "union", "intersection", "all"] = "single"
 
     @model_validator(mode="after")
     def check_source(self):
         if self.source_mode == "manual":
             if self.manual_actual is None:
                 raise ValueError("Indica el avance actual del indicador manual")
+            return self
+        if self.sources:
+            if self.combination == "single" and len(self.sources) != 1:
+                raise ValueError("Selecciona cómo combinar los formularios")
+            if self.combination in {"union", "intersection", "all"} and any(not source.key_field for source in self.sources):
+                raise ValueError("Selecciona la llave de relación de cada formulario")
             return self
         if not self.template_id:
             raise ValueError("Selecciona el formulario del indicador automático")
@@ -75,10 +90,13 @@ class CatalogReportConfig(BaseModel):
     committee: CommitteeDetails = Field(default_factory=CommitteeDetails)
     starts_at: datetime | None = None
     ends_at: datetime | None = None
-    indicators: list[IndicatorDefinition] = Field(min_length=1, max_length=30)
+    indicators: list[IndicatorDefinition] = Field(default_factory=list, max_length=30)
+    indicator_ids: list[str] = Field(default_factory=list, max_length=30)
 
     @model_validator(mode="after")
     def check_dates(self):
+        if not self.indicators and not self.indicator_ids:
+            raise ValueError("Agrega al menos un indicador")
         if self.starts_at and self.ends_at and to_naive_utc(self.starts_at) > to_naive_utc(self.ends_at):
             raise ValueError("La fecha inicial debe ser anterior a la final")
         return self
@@ -95,6 +113,7 @@ class MunicipalityMetric(BaseModel):
 
 
 class IndicatorResult(BaseModel):
+    code: str = ""
     title: str
     actual: float
     goal: float
@@ -128,3 +147,16 @@ class ReportShareRead(BaseModel):
     id: str
     expires_at: datetime | None
     status: str
+
+
+class LibraryIndicatorCreate(BaseModel):
+    project_id: str
+    definition: IndicatorDefinition
+
+
+class LibraryIndicatorRead(BaseModel):
+    id: str
+    project_id: str
+    definition: IndicatorDefinition
+    created_at: datetime
+    updated_at: datetime

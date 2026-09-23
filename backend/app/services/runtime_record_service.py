@@ -31,6 +31,7 @@ from app.services.approval_flow_service import approval_flow_service
 from app.services.builder_service import builder_service
 from app.services.metrics_service import metrics_service
 from app.services.template_availability import ensure_accepting
+from app.services.participant_source_service import ensure_eligible
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,8 @@ class RuntimeRecordService:
 
         self._assign_serial_numbers(db, payload.template_id, payload.values)
         participant_id = self._resolve_participant(db, payload)
+        if template is not None:
+            ensure_eligible(db, template, participant_id)
 
         approval_flow_id, approval_flow_version, approval_flow_snapshot_json = approval_flow_service.snapshot_for_record(db, payload.project_id, payload.template_id)
         content_hash = _compute_content_hash(payload.project_id, payload.template_id, payload.values)

@@ -13,7 +13,9 @@ from datetime import datetime
 from io import BytesIO
 
 from fastapi import HTTPException, status
-from openpyxl import load_workbook
+from openpyxl import Workbook, load_workbook
+from openpyxl.comments import Comment
+from openpyxl.styles import Font, PatternFill
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -23,7 +25,7 @@ from app.models.excel_import import ExcelImportJob
 from app.models.identity import Role
 from app.models.runtime_record import RuntimeRecord
 from app.schemas.assignment import AssignmentCreate
-from app.schemas.excel_import import ExcelImportJobRead, ExcelImportTargetField
+from app.schemas.excel_import import ExcelImportJobRead, ExcelImportTargetField, ExcelImportValidationRead
 from app.schemas.identity import UserCreate
 from app.schemas.participants import ParticipantCreate
 from app.schemas.runtime_record import RuntimeRecordCreate, RuntimeValueCreate
@@ -148,6 +150,80 @@ def _to_read(db: Session, row: ExcelImportJob) -> ExcelImportJobRead:
 
 
 class ExcelImportService:
+    def build_template(self, db: Session, project_id: str, entity_type: str, template_id: str | None = None) -> bytes:
+        if entity_type not in {"participants", "users", "assignments", "records"}:
+            raise HTTPException(status_code=422, detail="Tipo de entidad no válido")
+        if entity_type == "records":
+            template = db.query(BuilderTemplate).filter(BuilderTemplate.id == template_id, BuilderTemplate.project_id == project_id).first()
+            if template is None:
+                raise HTTPException(status_code=422, detail="Selecciona un formulario del proyecto")
+            components = _template_simple_components(db, template_id)
+            columns = [(row.name, bool(json.loads(row.config_json or "{}").get("required")), row.component_type) for row in components]
+            columns += [(META_STATUS_FIELD, False, "STATUS"), (META_CREATED_AT_FIELD, False, "DATE")]
+        else:
+            names = {"participants": ["document_id", "full_name", "external_code", "participant_type"], "users": ["document_id", "full_name", "email", "phone"], "assignments": ["email", "role_name", "status"]}[entity_type]
+            columns = [(name, name in REQUIRED_FIELDS[entity_type], "TEXT") for name in names]
+        examples = {"document_id": "123456789", "full_name": "Persona de ejemplo", "external_code": "COD-001", "participant_type": "beneficiario", "email": "persona@ejemplo.com", "phone": "3001234567", "role_name": "Encuestador", "status": "active", META_STATUS_FIELD: "submitted", META_CREATED_AT_FIELD: "2026-01-01"}
+        book = Workbook()
+        sheet = book.active
+        sheet.title = "datos"
+        sheet.append([name for name, _, _ in columns])
+        sheet.append([examples.get(name, "1" if field_type in RECORD_NUMERIC_FIELD_TYPES else "Ejemplo") for name, _, field_type in columns])
+        sheet.freeze_panes = "A2"
+        for index, (name, required, field_type) in enumerate(columns, 1):
+            cell = sheet.cell(1, index)
+            cell.font = Font(color="FFFFFF", bold=True)
+            cell.fill = PatternFill("solid", fgColor="0D9488" if required else "3B82F6")
+            cell.comment = Comment(f"{'Obligatorio' if required else 'Opcional'} · tipo: {field_type}", "InfoMatt360")
+            sheet.column_dimensions[cell.column_letter].width = min(36, max(18, len(name) + 4))
+        output = BytesIO()
+        book.save(output)
+        return output.getvalue()
+
+    def validate_job(self, db: Session, job_id: str) -> ExcelImportValidationRead:
+        row = self._get_or_404(db, job_id)
+        if row.status != "mapped":
+            raise HTTPException(status_code=409, detail="Confirma primero el mapeo de columnas")
+        mapping = json.loads(row.column_mapping_json or "{}")
+        data_rows = json.loads(row.rows_json or "[]")
+        errors: list[dict[str, object]] = []
+        target_names = list(mapping.values())
+        if len(set(target_names)) != len(target_names):
+            errors.append({"row": 1, "error": "Dos columnas apuntan al mismo campo destino"})
+        required = REQUIRED_FIELDS.get(row.entity_type, set())
+        unmapped = required - set(target_names)
+        if unmapped:
+            errors.append({"row": 1, "error": f"Campos obligatorios sin mapear: {', '.join(sorted(unmapped))}"})
+        components = {component.name: component for component in _template_simple_components(db, row.template_id)} if row.entity_type == "records" and row.template_id else {}
+        seen_keys: set[str] = set()
+        invalid_rows: set[int] = set()
+        for number, data_row in enumerate(data_rows, 2):
+            mapped = {target: str(data_row.get(source) or "").strip() for source, target in mapping.items()}
+            row_errors = []
+            for field in required:
+                if not mapped.get(field): row_errors.append(f"Falta {field}")
+            if row.entity_type == "records":
+                if not any(mapped.get(name) for name in components): row_errors.append("No hay datos del formulario")
+                for name, component in components.items():
+                    if not mapped.get(name): continue
+                    try: self._coerce_field_value(component.component_type, mapped[name])
+                    except (ValueError, HTTPException) as exc: row_errors.append(f"{name}: {exc}")
+                if mapped.get(META_STATUS_FIELD) and mapped[META_STATUS_FIELD].lower() not in RECORD_VALID_STATUSES:
+                    row_errors.append("Estado de registro no válido")
+                if mapped.get(META_CREATED_AT_FIELD):
+                    try: self._parse_historical_date(mapped[META_CREATED_AT_FIELD])
+                    except (ValueError, HTTPException): row_errors.append("Fecha histórica no válida")
+            if row.entity_type in {"users", "assignments"} and mapped.get("email") and "@" not in mapped["email"]:
+                row_errors.append("Correo no válido")
+            unique_key = mapped.get("document_id") if row.entity_type in {"participants", "users"} else mapped.get("email") if row.entity_type == "assignments" else None
+            if unique_key:
+                if unique_key.casefold() in seen_keys: row_errors.append("Identificador repetido en el archivo")
+                seen_keys.add(unique_key.casefold())
+            if row_errors:
+                invalid_rows.add(number)
+                errors.append({"row": number, "error": "; ".join(row_errors)})
+        return ExcelImportValidationRead(total_rows=len(data_rows), valid_rows=len(data_rows) - len(invalid_rows) if not unmapped and len(set(target_names)) == len(target_names) else 0, errors=errors)
+
     def upload_and_preview(self, db: Session, project_id: str, entity_type: str, filename: str, content: bytes, user_id: str, template_id: str | None = None) -> ExcelImportJobRead:
         if entity_type not in {*ENTITY_ALIASES.keys(), "records"}:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Tipo de entidad no soportado para carga Excel")

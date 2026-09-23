@@ -1,4 +1,7 @@
 import json
+from io import BytesIO
+
+from openpyxl import Workbook
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -339,6 +342,80 @@ def test_committee_report_keeps_manual_sections_and_live_form_indicators():
             assert shared.status_code == 200
             assert shared.json()["committee"]["alerts"][0]["title"] == "Cobertura"
             assert shared.json()["indicators"][0]["actual"] == 3
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_multi_form_indicators_deduplicate_and_intersect_participant_keys():
+    engine, sessions = setup_client()
+    try:
+        with sessions() as db:
+            db.add(BuilderTemplate(id="board-followup", project_id="board-project", name="Seguimiento", status="published"))
+            db.add(BuilderComponent(template_id="board-followup", component_type="TEXT", name="codigo", label="Código"))
+            for index, key in enumerate(("Hogar board-record-1", "Hogar board-record-3", "Nuevo hogar")):
+                record_id = f"followup-{index}"
+                db.add(RuntimeRecord(id=record_id, project_id="board-project", template_id="board-followup", status="approved"))
+                db.add(RuntimeRecordValue(record_id=record_id, field_name="codigo", field_value_json=json.dumps(key)))
+            db.commit()
+        with TestClient(app) as client:
+            builder = auth(client, "board-builder@example.com", "Builder12345!")
+            source = [{"template_id": "board-template", "key_field": "nombre"}, {"template_id": "board-followup", "key_field": "codigo"}]
+            payload = {"project_id": "board-project", "name": "Cruce", "indicators": [
+                {"code": "IND-001", "title": "Unión", "sources": source, "combination": "union", "goal": 4},
+                {"title": "Intersección", "sources": source, "combination": "intersection", "goal": 4},
+                {"title": "Suma", "sources": source, "combination": "sum", "goal": 6},
+                {"title": "Todos aprobados", "sources": [{**source[0], "required_status": "approved"}, source[1]], "combination": "all", "goal": 2},
+            ]}
+            created = client.post("/api/v1/reports/catalog", headers=builder, json=payload)
+            assert created.status_code == 200, created.text
+            result = client.get(f"/api/v1/reports/catalog/{created.json()['id']}", headers=builder)
+            assert result.status_code == 200, result.text
+            values = [row["actual"] for row in result.json()["indicators"]]
+            assert values == [4, 2, 6, 1]
+            assert result.json()["indicators"][0]["progress_percent"] == 100
+            payload["indicators"][0]["sources"][1]["template_id"] = "board-other-template"
+            assert client.post("/api/v1/reports/catalog", headers=builder, json=payload).status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_indicator_library_excel_preview_import_and_live_report_reference():
+    engine, _sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            builder = auth(client, "board-builder@example.com", "Builder12345!")
+            basic = auth(client, "board-basic@example.com", "Basic12345!")
+            direct = client.post("/api/v1/reports/indicators", headers=builder, json={"project_id": "board-project", "definition": {"code": "IND-001", "title": "Hogares", "template_id": "board-template", "goal": 4}})
+            assert direct.status_code == 200, direct.text
+            indicator_id = direct.json()["id"]
+            report = client.post("/api/v1/reports/catalog", headers=builder, json={"project_id": "board-project", "name": "Biblioteca", "indicator_ids": [indicator_id]})
+            assert report.status_code == 200, report.text
+            report_id = report.json()["id"]
+            assert client.get(f"/api/v1/reports/catalog/{report_id}", headers=basic).json()["indicators"][0]["actual"] == 3
+            changed = client.put(f"/api/v1/reports/indicators/{indicator_id}", headers=builder, json={"project_id": "board-project", "definition": {"code": "IND-001", "title": "Hogares", "source_mode": "manual", "manual_actual": 9, "goal": 10}})
+            assert changed.status_code == 200, changed.text
+            assert client.get(f"/api/v1/reports/catalog/{report_id}", headers=basic).json()["indicators"][0]["actual"] == 9
+            assert client.post("/api/v1/reports/indicators", headers=basic, json={"project_id": "board-project", "definition": {"code": "IND-X", "title": "No", "source_mode": "manual", "manual_actual": 1, "goal": 2}}).status_code == 403
+
+            book = Workbook()
+            sheet = book.active
+            sheet.append(["Código", "Indicador", "Meta", "Unidad", "Formularios asociados", "Campo de cálculo", "Operación", "Estado requerido", "Avance manual"])
+            sheet.append(["IND-002", "Visitas aprobadas", 5, "Hogares", "Caracterizacion", "Nombre", "conteo único", "approved", None])
+            sheet.append(["IND-003", "Talleres", 10, "Talleres", None, None, None, None, 4])
+            output = BytesIO()
+            book.save(output)
+            files = {"upload": ("indicadores.xlsx", output.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}
+            preview = client.post("/api/v1/reports/indicators-import/preview", headers=builder, data={"project_id": "board-project"}, files=files)
+            assert preview.status_code == 200, preview.text
+            assert not preview.json()["errors"]
+            assert len(preview.json()["indicators"]) == 2
+            assert len(client.get("/api/v1/reports/indicators/project/board-project", headers=basic).json()) == 1
+            imported = client.post("/api/v1/reports/indicators-import/apply", headers=builder, data={"project_id": "board-project"}, files=files)
+            assert imported.status_code == 200, imported.text
+            assert len(imported.json()) == 2
+            assert len(client.get("/api/v1/reports/indicators/project/board-project", headers=basic).json()) == 3
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

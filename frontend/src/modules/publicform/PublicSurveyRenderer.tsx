@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { RuntimeField } from '../runtime/RuntimeField';
 import { parseFieldConfig } from '../runtime/fieldConfig';
+import { isFieldVisible, validateFormValues } from '../runtime/formLogic';
 import { themeStyle } from '../runtime/RuntimeRenderer';
 import type { RuntimeComponent, RuntimeFormValue, RuntimeFormValues, RuntimeSection, RuntimeTemplate } from '../runtime/types';
 
@@ -10,25 +11,12 @@ function components(section: RuntimeSection): RuntimeComponent[] {
   return section.rows.flatMap((row) => row.columns.flatMap((column) => column.components));
 }
 
-function visible(component: RuntimeComponent, values: RuntimeFormValues): boolean {
-  const relevant = parseFieldConfig(component.config_json).relevant;
-  if (!relevant?.field) return true;
-  const value = values[relevant.field];
-  const source = Array.isArray(value) ? value.map(String).join(',') : String(value ?? '');
-  switch (relevant.operator) {
-    case 'not_equals': return source !== (relevant.value ?? '');
-    case 'not_empty': return source !== '';
-    case 'empty': return source === '';
-    default: return source === (relevant.value ?? '');
-  }
-}
-
 function missingRequired(step: Step, values: RuntimeFormValues): string | null {
   for (const component of components(step.section)) {
     const config = parseFieldConfig(component.config_json);
-    if (!config.required || !visible(component, values)) continue;
+    if (!config.required || !isFieldVisible(component, values)) continue;
     const value = values[component.name];
-    if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return component.label;
+    if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) return config.required_message || `Completa «${component.label}».`;
   }
   return null;
 }
@@ -51,7 +39,7 @@ export function PublicSurveyRenderer({ template, values, onValueChange, onSubmit
   function navigate(next: number) {
     if (next > stepIndex && current) {
       const missing = missingRequired(current, values);
-      if (missing) { setValidationMessage(`Completa «${missing}» antes de continuar.`); return; }
+      if (missing) { setValidationMessage(missing); return; }
     }
     setValidationMessage('');
     setMenuOpen(false);
@@ -62,8 +50,10 @@ export function PublicSurveyRenderer({ template, values, onValueChange, onSubmit
   function finish() {
     for (let index = 0; index < steps.length; index += 1) {
       const missing = missingRequired(steps[index], values);
-      if (missing) { setStepIndex(index + 1); setValidationMessage(`Completa «${missing}» antes de enviar.`); return; }
+      if (missing) { setStepIndex(index + 1); setValidationMessage(missing); return; }
     }
+    const invalid = validateFormValues(template, values);
+    if (invalid) { setValidationMessage(invalid); return; }
     setValidationMessage('');
     onSubmit();
   }

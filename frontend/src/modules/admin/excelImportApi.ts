@@ -28,6 +28,7 @@ export type ExcelImportJob = {
   created_at: string;
   completed_at?: string | null;
 };
+export type ExcelImportValidation = { total_rows: number; valid_rows: number; errors: Array<{ row: number; error: string }> };
 
 import { authorizationHeader } from '../auth/session';
 
@@ -76,4 +77,19 @@ export async function approveExcelImport(jobId: string): Promise<ExcelImportJob>
 export async function fetchExcelImportJobs(projectId: string): Promise<ExcelImportJob[]> {
   const response = await fetch(`${API_BASE_URL}/excel-import/project/${projectId}`, { headers: authHeaders() });
   return parseOrThrow(response, 'No fue posible consultar los lotes de carga.');
+}
+
+export async function validateExcelImport(jobId: string): Promise<ExcelImportValidation> {
+  const response = await fetch(`${API_BASE_URL}/excel-import/${jobId}/validate`, { headers: authHeaders() });
+  return parseOrThrow(response, 'No fue posible validar el archivo.');
+}
+
+export async function downloadExcelImportTemplate(projectId: string, entityType: string, templateId?: string): Promise<void> {
+  const query = new URLSearchParams({ project_id: projectId, entity_type: entityType });
+  if (templateId) query.set('template_id', templateId);
+  const response = await fetch(`${API_BASE_URL}/excel-import/template?${query}`, { headers: authHeaders() });
+  if (!response.ok) throw new Error('No fue posible descargar la plantilla.');
+  const url = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement('a'); anchor.href = url; anchor.download = `plantilla_${entityType}.xlsx`; anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

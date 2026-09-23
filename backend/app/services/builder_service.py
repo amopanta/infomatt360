@@ -1,3 +1,5 @@
+import json
+
 from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -6,14 +8,15 @@ from app.core.time import to_naive_utc, utc_now
 from app.models.builder import BuilderComponent, BuilderTemplate, BuilderVersion
 from app.models.identity import User
 from app.models.runtime_record import RuntimeRecord
-from app.schemas.builder import BuilderComponentCreate, BuilderComponentPropertiesUpdate, BuilderComponentRead, BuilderTemplateCreate, BuilderTemplatePropertiesUpdate, BuilderTemplateRead, BuilderVersionCreate, BuilderVersionRead
+from app.schemas.builder import BuilderComponentCreate, BuilderComponentPropertiesUpdate, BuilderComponentRead, BuilderTemplateCreate, BuilderTemplatePropertiesUpdate, BuilderTemplateRead, BuilderVersionCreate, BuilderVersionRead, ParticipantSource
+from app.services.participant_source_service import validate_source
 from app.services.template_availability import availability
 
 
 def template_to_read(row: BuilderTemplate, owner_name: str | None = None, submissions_count: int = 0) -> BuilderTemplateRead:
     """Convierte el modelo ORM de plantilla a esquema de salida."""
     state = availability(row)
-    return BuilderTemplateRead(id=row.id, project_id=row.project_id, name=row.name, description=row.description, status=row.status, theme_json=row.theme_json, created_at=row.created_at, updated_at=row.updated_at or row.created_at, published_at=row.published_at, owner_name=owner_name, submissions_count=submissions_count, starts_at=row.starts_at, ends_at=row.ends_at, availability=state, accepting_responses=state == "accepting")
+    return BuilderTemplateRead(id=row.id, project_id=row.project_id, name=row.name, description=row.description, status=row.status, theme_json=row.theme_json, created_at=row.created_at, updated_at=row.updated_at or row.created_at, published_at=row.published_at, owner_name=owner_name, submissions_count=submissions_count, starts_at=row.starts_at, ends_at=row.ends_at, availability=state, accepting_responses=state == "accepting", participant_source=ParticipantSource.model_validate_json(row.participant_source_json) if row.participant_source_json else None)
 
 
 def component_to_read(row: BuilderComponent) -> BuilderComponentRead:
@@ -110,6 +113,16 @@ class BuilderService:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="La fecha de finalizacion debe ser posterior al inicio")
         row.starts_at = start
         row.ends_at = end
+        row.updated_at = utc_now()
+        db.commit()
+        return self.get_template(db, template_id)
+
+    def set_participant_source(self, db: Session, template_id: str, source: ParticipantSource) -> BuilderTemplateRead:
+        row = db.get(BuilderTemplate, template_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Formulario no encontrado")
+        validate_source(db, row, source)
+        row.participant_source_json = source.model_dump_json()
         row.updated_at = utc_now()
         db.commit()
         return self.get_template(db, template_id)

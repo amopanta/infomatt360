@@ -4,18 +4,21 @@ import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
 import { fetchProjectTemplates } from '../records/api';
 import type { TemplateSummary } from '../records/api';
-import { downloadMasterTemplate, exportXlsform, importXlsform } from './xlsformApi';
+import { downloadMasterTemplate, exportXlsform, importXlsform, listFormVersions, previewXlsform, restoreFormVersion } from './xlsformApi';
+import type { FormVersionSummary, XlsformPreview } from './xlsformApi';
 
 export function XlsformApp() {
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [exportTemplateId, setExportTemplateId] = useState('');
-  const [replaceTemplateId, setReplaceTemplateId] = useState('');
+  const [replaceTemplateId, setReplaceTemplateId] = useState(new URLSearchParams(window.location.search).get('replace') ?? '');
   const [message, setMessage] = useState('');
   const [importing, setImporting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [downloadingMaster, setDownloadingMaster] = useState(false);
   const [warnings, setWarnings] = useState<string[]>([]);
+  const [preview, setPreview] = useState<XlsformPreview | null>(null);
+  const [versions, setVersions] = useState<FormVersionSummary[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function loadTemplates() {
@@ -29,6 +32,16 @@ export function XlsformApp() {
   }
 
   useEffect(() => { void loadTemplates(); }, [projectId]);
+  useEffect(() => { if (replaceTemplateId) listFormVersions(replaceTemplateId).then(setVersions).catch((error: Error) => setMessage(error.message)); else setVersions([]); }, [replaceTemplateId]);
+
+  async function submitPreview() {
+    const file = fileInputRef.current?.files?.[0];
+    if (!file) { setMessage('Selecciona un archivo .xlsx.'); return; }
+    setImporting(true); setMessage(''); setPreview(null);
+    try { const result = await previewXlsform(projectId, file, replaceTemplateId || undefined); setPreview(result); setMessage(result.errors.length ? 'Corrige los errores antes de aplicar.' : 'Validación completada. Revisa los cambios antes de aplicar.'); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo validar el XLSForm.'); }
+    finally { setImporting(false); }
+  }
 
   async function submitImport() {
     const file = fileInputRef.current?.files?.[0];
@@ -36,23 +49,34 @@ export function XlsformApp() {
       setMessage('Selecciona un archivo .xlsx antes de importar.');
       return;
     }
+    if (replaceTemplateId && (!preview || preview.errors.length)) { setMessage('Valida y compara el XLSForm antes de reemplazar.'); return; }
     setImporting(true);
     setWarnings([]);
     try {
-      const result = await importXlsform(projectId, file, replaceTemplateId || undefined);
+      const result = await importXlsform(projectId, file, replaceTemplateId || undefined, preview ?? undefined);
       setMessage(
         result.replaced
           ? `Plantilla reemplazada en el mismo lugar (${result.imported_fields} campo(s)). La estructura anterior quedó respaldada.`
           : `Plantilla importada (${result.imported_fields} campo(s)).`,
       );
       setWarnings(result.warnings);
+      setPreview(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
       await loadTemplates();
+      if (replaceTemplateId) setVersions(await listFormVersions(replaceTemplateId));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'No fue posible importar el archivo XLSForm.');
     } finally {
       setImporting(false);
     }
+  }
+
+  async function restore(versionId: string) {
+    if (!replaceTemplateId || !window.confirm('¿Restaurar esta estructura? La versión actual se guardará en el historial y los registros se conservarán.')) return;
+    setImporting(true); setMessage('');
+    try { await restoreFormVersion(replaceTemplateId, versionId); setVersions(await listFormVersions(replaceTemplateId)); setPreview(null); setMessage('Versión restaurada. El ID del formulario y sus respuestas permanecen.'); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo restaurar.'); }
+    finally { setImporting(false); }
   }
 
   async function submitDownloadMasterTemplate() {
@@ -94,20 +118,22 @@ export function XlsformApp() {
             </div>
           </header>
           <div className="ai-analyze-inline">
-            <input ref={fileInputRef} type="file" accept=".xlsx" />
+            <input ref={fileInputRef} type="file" accept=".xlsx" onChange={() => setPreview(null)} />
             <label>Destino
-              <select value={replaceTemplateId} onChange={(event) => setReplaceTemplateId(event.target.value)}>
+              <select value={replaceTemplateId} onChange={(event) => { setReplaceTemplateId(event.target.value); setPreview(null); }}>
                 <option value="">Crear plantilla nueva</option>
                 {templates.map((template) => <option key={template.id} value={template.id}>Reemplazar: {template.name} ({template.status})</option>)}
               </select>
             </label>
-            <button className="primary" disabled={importing} onClick={() => void submitImport()}>
+            <button disabled={importing} onClick={() => void submitPreview()}>Validar y comparar XLSForm</button>
+            <button className="primary" disabled={importing || (replaceTemplateId !== '' && (!preview || !!preview.errors.length))} onClick={() => void submitImport()}>
               {importing ? 'Importando…' : replaceTemplateId ? 'Reemplazar en el mismo lugar' : 'Importar'}
             </button>
             <button disabled={downloadingMaster} onClick={() => void submitDownloadMasterTemplate()}>
               {downloadingMaster ? 'Generando…' : 'Descargar plantilla maestra'}
             </button>
           </div>
+          {preview && <article className="ds-map-card"><h3>Comparación antes de aplicar</h3><p>{preview.added.length} nuevas · {preview.removed.length} eliminadas · {preview.modified.length} modificadas</p>{preview.added.length > 0 && <p><strong>Nuevas:</strong> {preview.added.join(', ')}</p>}{preview.removed.length > 0 && <p><strong>Se retiran de la versión activa:</strong> {preview.removed.join(', ')}</p>}{preview.modified.map((item) => <p key={item.name}><strong>{item.name}:</strong> {item.changes.join(', ')}</p>)}{preview.errors.map((error, index) => <p role="alert" key={index}>{error}</p>)}{preview.warnings.map((warning, index) => <p key={index}>{warning}</p>)}</article>}
           <small>La plantilla maestra trae un campo de ejemplo por cada tipo soportado (texto, numericos, seleccion, medios, GPS, repetibles, condicionales, validaciones, etc.) para usar como base y crear formularios rapidamente en Excel.</small>
           {replaceTemplateId ? (
             <small>Al reemplazar, el formulario conserva su mismo enlace y sus registros ya capturados; la estructura anterior queda respaldada automáticamente y se puede volver a ejecutar (como el redeploy de KoboToolbox).</small>
@@ -120,6 +146,7 @@ export function XlsformApp() {
               </ul>
             </article>
           ) : null}
+          {replaceTemplateId && <article className="ds-map-card"><h3>Historial de versiones</h3>{versions.length ? versions.map((version) => <div key={version.id} className="forms-version-row"><span>v{version.version_number} · {version.question_count} preguntas · {new Date(version.created_at).toLocaleString('es-CO')}</span><button type="button" disabled={importing} onClick={() => void restore(version.id)}>Restaurar versión</button></div>) : <p>Aún no hay versiones anteriores.</p>}</article>}
         </section>
 
         <section className="audit-panel">

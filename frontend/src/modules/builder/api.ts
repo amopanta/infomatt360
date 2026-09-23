@@ -19,6 +19,22 @@ export async function fetchTemplateDetail(templateId: string): Promise<TemplateS
   return response.json();
 }
 
+export type ParticipantSource = NonNullable<TemplateSummary['participant_source']>;
+
+export async function setParticipantSource(templateId: string, source: ParticipantSource): Promise<TemplateSummary> {
+  const response = await fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}/participant-source`, {
+    method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ source }),
+  });
+  if (!response.ok) { const payload = await response.json().catch(() => null); throw new Error(payload?.detail || 'No fue posible guardar la fuente de participantes.'); }
+  return response.json();
+}
+
+export async function fetchEligibleParticipants(templateId: string): Promise<Array<{ id: string; full_name: string; external_code?: string | null }>> {
+  const response = await fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}/eligible-participants`, { headers: authHeaders() });
+  if (!response.ok) throw new Error('No fue posible consultar participantes elegibles.');
+  return response.json();
+}
+
 export async function updateTemplateProperties(templateId: string, properties: { name: string; description: string | null; themeJson: string | null }): Promise<TemplateSummary> {
   const response = await fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}/properties`, {
     method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ name: properties.name, description: properties.description, theme_json: properties.themeJson }),

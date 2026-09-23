@@ -178,10 +178,14 @@ class XlsformImportService:
 
         hint_col = _find_column(survey_headers, "hint")
         required_col = _find_column(survey_headers, "required")
+        required_message_col = _find_column(survey_headers, "required_message")
         relevant_col = _find_column(survey_headers, "relevant")
         constraint_col = _find_column(survey_headers, "constraint")
         constraint_message_col = _find_column(survey_headers, "constraint_message")
         appearance_col = _find_column(survey_headers, "appearance")
+        calculation_col = _find_column(survey_headers, "calculation")
+        choice_filter_col = _find_column(survey_headers, "choice_filter")
+        default_col = _find_column(survey_headers, "default")
         parameters_col = _find_column(survey_headers, "parameters")
 
         list_col = _find_column(choices_headers, "list_name")
@@ -192,10 +196,14 @@ class XlsformImportService:
             list_name = _cell(row, list_col)
             if not list_name:
                 continue
-            choices_by_list.setdefault(list_name, []).append({
+            choice = {
                 "value": _cell(row, choice_name_col),
                 "label": _cell(row, choice_label_col) or _cell(row, choice_name_col),
-            })
+            }
+            for index, header in enumerate(choices_headers):
+                if header and header not in {"list_name", "name", "label"}:
+                    choice[header] = _cell(row, index)
+            choices_by_list.setdefault(list_name, []).append(choice)
 
         template_id, is_replace = prepare_target_template(db, project_id, filename, replace_template_id)
         page = builder_layout_service.create_page(db, BuilderPageCreate(template_id=template_id, title="Importado de XLSForm", sort_order=0))
@@ -205,6 +213,8 @@ class XlsformImportService:
         imported_fields = 0
         sort_order = 0
         repeat_stack: list[dict[str, object]] = []
+        group_stack: list[tuple[str, str, str, str]] = []
+        current_section_id = section.id
 
         for row in survey_rows:
             raw_type = _cell(row, type_col)
@@ -216,8 +226,17 @@ class XlsformImportService:
             field_label = _cell(row, label_col) or field_name
 
             if base_type in ("begin_group", "begin group"):
+                parent_title = " / ".join(group[1] for group in group_stack)
+                if not repeat_stack:
+                    title = " / ".join(filter(None, [parent_title, field_label]))
+                    group_section = builder_layout_service.create_section(db, BuilderSectionCreate(page_id=page.id, title=title, sort_order=sort_order + 1))
+                    current_section_id = group_section.id
+                group_stack.append((field_name, field_label, _cell(row, relevant_col), current_section_id))
                 continue
             if base_type in ("end_group", "end group"):
+                if group_stack:
+                    group_stack.pop()
+                current_section_id = group_stack[-1][3] if group_stack else section.id
                 continue
             if base_type in ("begin_repeat", "begin repeat"):
                 repeat_stack.append({"name": field_name, "label": field_label, "fields": []})
@@ -229,7 +248,7 @@ class XlsformImportService:
                 repeat = repeat_stack.pop()
                 config = {"fields": repeat["fields"]}
                 create_field_component(
-                    db, template_id, section.id, sort_order,
+                    db, template_id, current_section_id, sort_order,
                     component_type="REPEAT", name=str(repeat["name"]) or f"repeat_{sort_order}",
                     label=str(repeat["label"]) or "Repetible", config=config,
                 )
@@ -246,15 +265,23 @@ class XlsformImportService:
             if warning:
                 warnings.append(f"Campo '{field_name}': {warning}")
 
+            relevant_value = _cell(row, relevant_col)
+            group_relevants = [group[2] for group in group_stack if group[2]]
+            if group_relevants:
+                relevant_value = " and ".join(f"({value})" for value in [*group_relevants, relevant_value] if value)
             config, common_warnings = self._apply_common_columns(
                 config, mapped_type,
                 hint=_cell(row, hint_col),
                 required=_cell(row, required_col),
-                relevant=_cell(row, relevant_col),
+                required_message=_cell(row, required_message_col),
+                relevant=relevant_value,
                 constraint=_cell(row, constraint_col),
                 constraint_message=_cell(row, constraint_message_col),
                 appearance=_cell(row, appearance_col),
                 parameters=_cell(row, parameters_col),
+                calculation=_cell(row, calculation_col),
+                choice_filter=_cell(row, choice_filter_col),
+                default=_cell(row, default_col),
             )
             warnings.extend(f"Campo '{field_name}': {message}" for message in common_warnings)
 
@@ -262,7 +289,7 @@ class XlsformImportService:
                 repeat_stack[-1]["fields"].append({"name": field_name, "label": field_label, "component_type": mapped_type, "config": config})
                 continue
 
-            create_field_component(db, template_id, section.id, sort_order, component_type=mapped_type, name=field_name, label=field_label, config=config)
+            create_field_component(db, template_id, current_section_id, sort_order, component_type=mapped_type, name=field_name, label=field_label, config=config)
             sort_order += 1
             imported_fields += 1
 
@@ -291,8 +318,9 @@ class XlsformImportService:
 
     def _apply_common_columns(
         self, config: dict | None, mapped_type: str, *,
-        hint: str, required: str, relevant: str, constraint: str,
+        hint: str, required: str, required_message: str, relevant: str, constraint: str,
         constraint_message: str, appearance: str, parameters: str,
+        calculation: str, choice_filter: str, default: str,
     ) -> tuple[dict | None, list[str]]:
         """Traduce las columnas comunes de XLSForm a las claves de config_json
         que ya usa/entiende el constructor visual (placeholder, required,
@@ -309,8 +337,16 @@ class XlsformImportService:
             updates["placeholder"] = hint
         if required:
             updates["required"] = _parse_required(required)
+        if required_message:
+            updates["required_message"] = required_message
         if appearance:
             updates["appearance"] = appearance
+        if calculation:
+            updates["calculation"] = calculation
+        if choice_filter:
+            updates["choice_filter"] = choice_filter
+        if default:
+            updates["default"] = default
 
         if relevant:
             updates["relevant_expression"] = relevant

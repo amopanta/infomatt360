@@ -12,6 +12,14 @@ export type RuntimeFieldConfig = {
   choices?: unknown[];
   placeholder?: string;
   required?: boolean;
+  required_message?: string;
+  relevant_expression?: string;
+  constraint_expression?: string;
+  constraint_message?: string;
+  calculation?: string;
+  choice_filter?: string;
+  default?: string | number | boolean;
+  appearance?: string;
   min?: number;
   max?: number;
   step?: number;

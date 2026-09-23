@@ -4,6 +4,7 @@ import { PROJECT_KEY } from '../auth/session';
 import { enqueueRecord } from '../offline/offlineSync';
 import { fetchRuntimeTemplate, saveRuntimeRecord, toRuntimeValueList } from './api';
 import { RuntimeRenderer, themeStyle } from './RuntimeRenderer';
+import { resolveFormValues, validateFormValues } from './formLogic';
 import { useRuntimeDraft } from './useRuntimeDraft';
 import type { RuntimeFormValue, RuntimeTemplate } from './types';
 
@@ -31,13 +32,14 @@ export function RuntimeApp() {
     fetchRuntimeTemplate(templateId)
       .then((result) => {
         setTemplate(result);
+        setValues((current) => resolveFormValues(result, current));
         setStatus(isPreview ? 'Vista previa: puedes probar las preguntas; aquí no se guarda ninguna respuesta.' : 'Borrador local activo.');
       })
       .catch((error: Error) => setStatus(error.message));
   }, [templateId]);
 
   function updateValue(fieldName: string, value: RuntimeFormValue) {
-    setValues((current) => ({ ...current, [fieldName]: value }));
+    setValues((current) => template ? resolveFormValues(template, { ...current, [fieldName]: value }) : { ...current, [fieldName]: value });
   }
 
   async function save() {
@@ -47,7 +49,10 @@ export function RuntimeApp() {
     }
 
     try {
-      await saveRuntimeRecord({ projectId, templateId: template.template_id, values });
+      const resolved = resolveFormValues(template, values);
+      const invalid = validateFormValues(template, resolved);
+      if (invalid) { setStatus(invalid); return; }
+      await saveRuntimeRecord({ projectId, templateId: template.template_id, values: resolved });
       clearDraft();
       setStatus('Respuesta guardada correctamente. Borrador local limpiado.');
     } catch (error) {
@@ -55,7 +60,7 @@ export function RuntimeApp() {
       // (validacion, permisos, etc.) no se debe encolar porque volveria a
       // fallar igual al sincronizar.
       if (error instanceof TypeError) {
-        await enqueueRecord({ projectId, templateId: template.template_id, values: toRuntimeValueList(values) });
+        await enqueueRecord({ projectId, templateId: template.template_id, values: toRuntimeValueList(resolveFormValues(template, values)) });
         clearDraft();
         setStatus('Sin conexion: la respuesta quedo guardada localmente. Sincronizala desde el boton de la barra superior cuando vuelva la red.');
         return;

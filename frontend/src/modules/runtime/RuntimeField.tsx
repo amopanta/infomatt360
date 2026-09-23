@@ -4,6 +4,8 @@ import { RuntimeSignature } from './RuntimeSignature';
 import { RuntimeGeoField } from './RuntimeGeoField';
 import { searchLinkableRecords, uploadRuntimeFile } from './api';
 import { normalizeOptions, parseFieldConfig, parseNumberInput } from './fieldConfig';
+import { isFieldVisible } from './formLogic';
+import { evaluateXlsExpression } from './xlsExpression';
 import type { RepeatItem, RuntimeComponent, RuntimeFileValue, RuntimeFormValue, RuntimeFormValues, RuntimeScalarValue } from './types';
 import type { RuntimeGeoValue } from './geoEngine';
 
@@ -20,26 +22,6 @@ type Props = {
 
 function isEmptyValue(value: RuntimeFormValue | undefined) {
   return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
-}
-
-function conditionMatches(config: ReturnType<typeof parseFieldConfig>, values: RuntimeFormValues) {
-  const relevant = config.relevant;
-  if (!relevant?.field) return true;
-  const sourceValue = values[relevant.field];
-  const sourceText = Array.isArray(sourceValue) ? sourceValue.map(String).join(',') : String(sourceValue ?? '');
-  const expected = relevant.value ?? '';
-
-  switch (relevant.operator ?? 'equals') {
-    case 'not_equals':
-      return sourceText !== expected;
-    case 'not_empty':
-      return !isEmptyValue(sourceValue);
-    case 'empty':
-      return isEmptyValue(sourceValue);
-    case 'equals':
-    default:
-      return sourceText === expected;
-  }
 }
 
 function RuntimeQuestionLabel({ label, config }: { label: string; config: ReturnType<typeof parseFieldConfig> }) {
@@ -126,7 +108,7 @@ export function RuntimeField(props: Props) {
   const config = parseFieldConfig(component.config_json);
   const fieldId = `runtime-field-${component.id}`;
 
-  if (!conditionMatches(config, values)) return null;
+  if (!isFieldVisible(component, values)) return null;
 
   if (type === 'REPEAT') {
     const configuredCount = config.count_field ? values[config.count_field] : config.count;
@@ -144,6 +126,8 @@ export function RuntimeField(props: Props) {
   }
 
   if (type === 'HIDDEN') return null;
+
+  if (config.calculation) return <label className="runtime-field-group" htmlFor={fieldId}><RuntimeQuestionLabel label={component.label} config={config} /><input id={fieldId} className="runtime-field" value={String(value ?? '')} readOnly /><small>Calculado automáticamente</small></label>;
 
   if (type === 'LINKED_SUBFORM') {
     return (
@@ -253,7 +237,13 @@ export function RuntimeField(props: Props) {
     );
   }
 
-  let options = normalizeOptions(config);
+  let options = config.choice_filter && Array.isArray(config.options)
+    ? normalizeOptions({ options: config.options.filter((option) => {
+      if (typeof option !== 'object' || option === null || Array.isArray(option)) return false;
+      try { return Boolean(evaluateXlsExpression(config.choice_filter!, values, option as Record<string, unknown>)); }
+      catch { return true; }
+    }) })
+    : normalizeOptions(config);
   if (type === 'LIKERT_5' && options.length === 0) options = Array.from({ length: 5 }, (_, index) => ({ label: String(index + 1), value: String(index + 1) }));
   if (type === 'LIKERT_7' && options.length === 0) options = Array.from({ length: 7 }, (_, index) => ({ label: String(index + 1), value: String(index + 1) }));
   if (type === 'SELECT' || type === 'DROPDOWN' || type === 'REFERENCE' || type === 'LOOKUP' || type.startsWith('LIKERT_')) {

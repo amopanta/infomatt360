@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.time import to_naive_utc, utc_now
 from app.models.builder import BuilderComponent, BuilderTemplate
-from app.models.reports import Report, ReportLink
+from app.models.reports import Report, ReportIndicator, ReportLink
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
 from app.schemas.report_catalog import (
     CatalogReportConfig,
@@ -44,8 +44,26 @@ class ReportCatalogService:
         return CatalogReportRead(id=row.id, created_at=row.created_at, **self.config(row).model_dump())
 
     def validate(self, db: Session, config: CatalogReportConfig) -> None:
+        if len(set(config.indicator_ids)) != len(config.indicator_ids):
+            raise HTTPException(status_code=422, detail="Hay indicadores repetidos")
+        for indicator_id in config.indicator_ids:
+            linked = db.query(ReportIndicator).filter(ReportIndicator.id == indicator_id, ReportIndicator.project_id == config.project_id).first()
+            if linked is None:
+                raise HTTPException(status_code=422, detail="Un indicador asociado no pertenece al proyecto")
         for item in config.indicators:
             if item.source_mode == "manual":
+                continue
+            if item.sources:
+                seen_templates: set[str] = set()
+                for source in item.sources:
+                    if source.template_id in seen_templates:
+                        raise HTTPException(status_code=422, detail=f"El formulario de «{item.title}» está repetido")
+                    seen_templates.add(source.template_id)
+                    template = db.query(BuilderTemplate).filter(BuilderTemplate.id == source.template_id, BuilderTemplate.project_id == config.project_id).first()
+                    if template is None:
+                        raise HTTPException(status_code=422, detail=f"Un formulario de «{item.title}» no pertenece al proyecto")
+                    if source.key_field and not db.query(BuilderComponent).filter(BuilderComponent.template_id == source.template_id, BuilderComponent.name == source.key_field).first():
+                        raise HTTPException(status_code=422, detail=f"La llave «{source.key_field}» no existe en «{template.name}»")
                 continue
             template = db.query(BuilderTemplate).filter(BuilderTemplate.id == item.template_id, BuilderTemplate.project_id == config.project_id).first()
             if template is None:
@@ -91,7 +109,9 @@ class ReportCatalogService:
     def _indicator(self, db: Session, config: CatalogReportConfig, item: IndicatorDefinition) -> IndicatorResult:
         if item.source_mode == "manual":
             actual = item.manual_actual or 0.0
-            return IndicatorResult(title=item.title, actual=actual, goal=item.goal, progress_percent=round(actual / item.goal * 100, 1) if item.goal else None, unit=item.unit, municipalities=[], view_kind=item.view_kind)
+            return IndicatorResult(code=item.code, title=item.title, actual=actual, goal=item.goal, progress_percent=round(actual / item.goal * 100, 1) if item.goal else None, unit=item.unit, municipalities=[], view_kind=item.view_kind)
+        if item.sources:
+            return self._multi_indicator(db, config, item)
         query = db.query(RuntimeRecord.id).filter(RuntimeRecord.project_id == config.project_id, RuntimeRecord.template_id == item.template_id, RuntimeRecord.status != "draft")
         if config.starts_at:
             query = query.filter(RuntimeRecord.created_at >= to_naive_utc(config.starts_at))
@@ -151,11 +171,62 @@ class ReportCatalogService:
                 amount = sum(amounts)
             municipalities.append(MunicipalityMetric(municipality=label, value=round(amount, 2)))
         municipalities.sort(key=lambda row: (-row.value, row.municipality))
-        return IndicatorResult(title=item.title, actual=round(actual, 2), goal=item.goal, progress_percent=round(actual / item.goal * 100, 1) if item.goal else None, unit=item.unit, municipalities=municipalities, view_kind=item.view_kind)
+        return IndicatorResult(code=item.code, title=item.title, actual=round(actual, 2), goal=item.goal, progress_percent=round(actual / item.goal * 100, 1) if item.goal else None, unit=item.unit, municipalities=municipalities, view_kind=item.view_kind)
+
+    def _multi_indicator(self, db: Session, config: CatalogReportConfig, item: IndicatorDefinition) -> IndicatorResult:
+        """Combine participant keys across forms without double counting.
+
+        `sum` adds each form's distinct keys (or records when no key is set).
+        `union` counts a key once across all forms. `intersection` and `all`
+        require that the key appear in every selected form. Each source may
+        require a particular record status before that form counts.
+        """
+        source_sets: list[set[str]] = []
+        for source in item.sources:
+            query = db.query(RuntimeRecord.id).filter(
+                RuntimeRecord.project_id == config.project_id,
+                RuntimeRecord.template_id == source.template_id,
+                RuntimeRecord.status == source.required_status if source.required_status else RuntimeRecord.status != "draft",
+            )
+            if config.starts_at:
+                query = query.filter(RuntimeRecord.created_at >= to_naive_utc(config.starts_at))
+            if config.ends_at:
+                query = query.filter(RuntimeRecord.created_at <= to_naive_utc(config.ends_at))
+            record_ids = [record_id for (record_id,) in query.all()]
+            if not source.key_field:
+                source_sets.append(set(record_ids))
+                continue
+            keys: set[str] = set()
+            for offset in range(0, len(record_ids), 500):
+                rows = db.query(RuntimeRecordValue.field_value_json).filter(
+                    RuntimeRecordValue.record_id.in_(record_ids[offset:offset + 500]),
+                    RuntimeRecordValue.field_name == source.key_field,
+                ).all()
+                for (raw,) in rows:
+                    value = self._decoded(raw)
+                    if self._has_value(value):
+                        key = str(value).strip().casefold()
+                        if key:
+                            keys.add(key)
+            source_sets.append(keys)
+        if item.combination == "sum":
+            actual = float(sum(len(keys) for keys in source_sets))
+        elif item.combination in {"intersection", "all"}:
+            actual = float(len(set.intersection(*source_sets))) if source_sets else 0.0
+        else:
+            actual = float(len(set.union(*source_sets))) if source_sets else 0.0
+        return IndicatorResult(
+            code=item.code, title=item.title, actual=actual, goal=item.goal,
+            progress_percent=round(actual / item.goal * 100, 2) if item.goal else None,
+            unit=item.unit, municipalities=[], view_kind=item.view_kind,
+        )
 
     def resolve(self, db: Session, row: Report) -> CatalogReportResult:
         config = self.config(row)
-        return CatalogReportResult(id=row.id, name=config.name, description=config.description, report_kind=config.report_kind, committee=config.committee, generated_at=utc_now(), indicators=[self._indicator(db, config, item) for item in config.indicators])
+        linked_rows = db.query(ReportIndicator).filter(ReportIndicator.id.in_(config.indicator_ids), ReportIndicator.project_id == config.project_id).all() if config.indicator_ids else []
+        linked = {item.id: IndicatorDefinition.model_validate_json(item.definition_json) for item in linked_rows}
+        definitions = [linked[item_id] for item_id in config.indicator_ids if item_id in linked] + config.indicators
+        return CatalogReportResult(id=row.id, name=config.name, description=config.description, report_kind=config.report_kind, committee=config.committee, generated_at=utc_now(), indicators=[self._indicator(db, config, item) for item in definitions])
 
     def issue_link(self, db: Session, row: Report, expires_at=None) -> ReportShareIssued:
         expiry = to_naive_utc(expires_at) if expires_at else utc_now() + timedelta(days=30)

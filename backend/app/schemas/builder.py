@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Literal
 
 from app.core.field_types import normalize_field_type
 
@@ -26,6 +29,29 @@ class BuilderTemplateRead(BuilderTemplateCreate):
     ends_at: datetime | None = None
     availability: str = "draft"
     accepting_responses: bool = False
+    participant_source: ParticipantSource | None = None
+
+
+class ParticipantSource(BaseModel):
+    mode: Literal["all", "list", "filter", "form"] = "all"
+    participant_ids: list[str] = Field(default_factory=list)
+    municipality: str | None = None
+    previous_template_id: str | None = None
+    required_status: str = "submitted"
+
+    @model_validator(mode="after")
+    def validate_source(self):
+        if self.mode == "list" and not self.participant_ids:
+            raise ValueError("Selecciona al menos un participante")
+        if self.mode == "filter" and not self.municipality:
+            raise ValueError("Indica el municipio")
+        if self.mode == "form" and not self.previous_template_id:
+            raise ValueError("Selecciona el formulario anterior")
+        return self
+
+
+class ParticipantSourceUpdate(BaseModel):
+    source: ParticipantSource
 
 
 class BuilderTemplateStatusUpdate(BaseModel):

@@ -4,6 +4,8 @@ export type XlsformImportResult = {
   warnings: string[];
   replaced: boolean;
 };
+export type XlsformPreview = { format: string; filename: string; file_sha256: string; target_sha256: string | null; added: string[]; removed: string[]; modified: Array<{ name: string; changes: string[] }>; warnings: string[]; errors: string[] };
+export type FormVersionSummary = { id: string; version_number: number; status: string; created_at: string; question_count: number };
 
 import { authorizationHeader } from '../auth/session';
 
@@ -17,13 +19,29 @@ async function parseOrThrow<T>(response: Response, fallbackMessage: string): Pro
   return response.json();
 }
 
-export async function importXlsform(projectId: string, file: File, replaceTemplateId?: string): Promise<XlsformImportResult> {
+export async function importXlsform(projectId: string, file: File, replaceTemplateId?: string, preview?: XlsformPreview): Promise<XlsformImportResult> {
   const body = new FormData();
   body.append('project_id', projectId);
   body.append('upload', file);
   if (replaceTemplateId) body.append('replace_template_id', replaceTemplateId);
+  if (preview) { body.append('expected_file_sha256', preview.file_sha256); if (preview.target_sha256) body.append('expected_target_sha256', preview.target_sha256); }
   const response = await fetch(`${API_BASE_URL}/xlsform/import`, { method: 'POST', headers: authorizationHeader(), body });
   return parseOrThrow(response, 'No fue posible importar el archivo XLSForm.');
+}
+
+export async function previewXlsform(projectId: string, file: File, replaceTemplateId?: string): Promise<XlsformPreview> {
+  const body = new FormData(); body.append('project_id', projectId); body.append('upload', file);
+  if (replaceTemplateId) body.append('replace_template_id', replaceTemplateId);
+  const response = await fetch(`${API_BASE_URL}/xlsform/preview`, { method: 'POST', headers: authorizationHeader(), body });
+  return parseOrThrow(response, 'No se pudo validar el XLSForm.');
+}
+
+export function listFormVersions(templateId: string): Promise<FormVersionSummary[]> {
+  return fetch(`${API_BASE_URL}/xlsform/versions/${templateId}`, { headers: authorizationHeader() }).then((response) => parseOrThrow(response, 'No se pudo consultar el historial.'));
+}
+
+export function restoreFormVersion(templateId: string, versionId: string): Promise<FormVersionSummary> {
+  return fetch(`${API_BASE_URL}/xlsform/versions/${templateId}/${versionId}/restore`, { method: 'POST', headers: authorizationHeader() }).then((response) => parseOrThrow(response, 'No se pudo restaurar la versión.'));
 }
 
 async function downloadBlob(url: string, filename: string, fallbackMessage: string): Promise<void> {

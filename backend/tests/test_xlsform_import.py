@@ -283,3 +283,38 @@ def test_xlsform_import_rejects_file_without_survey_sheet():
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
+
+
+def test_xlsform_import_keeps_dependencies_calculations_defaults_and_choice_metadata():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "xlsform-builder@example.com", "Builder12345!")
+            book = Workbook()
+            survey = book.active
+            survey.title = "survey"
+            survey.append(["type", "name", "label", "required", "required_message", "relevant", "constraint", "constraint_message", "calculation", "choice_filter", "default", "appearance"])
+            survey.append(["begin_group", "grupo", "Datos del hogar", None, None, "${consentimiento} = 'si'", None, None, None, None, None, None])
+            survey.append(["text", "codigo", "Código", "yes", "Indica el código", None, None, None, None, None, "ABC", "compact"])
+            survey.append(["select_one municipios", "municipio", "Municipio", None, None, None, None, None, None, "departamento = ${departamento}", None, None])
+            survey.append(["calculate", "doble", "Doble", None, None, None, None, None, "${edad} * 2", None, None, None])
+            survey.append(["end_group", "grupo", None])
+            choices = book.create_sheet("choices")
+            choices.append(["list_name", "name", "label", "departamento"])
+            choices.append(["municipios", "bog", "Bogotá", "Cundinamarca"])
+            output = BytesIO()
+            book.save(output)
+            imported = client.post("/api/v1/xlsform/import", headers=headers, data={"project_id": "xlsform-project"}, files={"upload": ("logica.xlsx", output.getvalue())})
+            assert imported.status_code == 200, imported.text
+            with sessions() as db:
+                components = {row.name: json.loads(row.config_json or "{}") for row in db.query(BuilderComponent).filter(BuilderComponent.template_id == imported.json()["template_id"])}
+                assert components["codigo"]["required_message"] == "Indica el código"
+                assert components["codigo"]["default"] == "ABC"
+                assert components["codigo"]["appearance"] == "compact"
+                assert components["codigo"]["relevant_expression"] == "(${consentimiento} = 'si')"
+                assert components["municipio"]["choice_filter"] == "departamento = ${departamento}"
+                assert components["municipio"]["options"][0]["departamento"] == "Cundinamarca"
+                assert components["doble"]["calculation"] == "${edad} * 2"
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)

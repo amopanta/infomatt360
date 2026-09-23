@@ -8,7 +8,9 @@ from app.core.permissions import BUILDER_WRITE
 from app.db.session import get_db
 from app.models.identity import User
 from app.models.builder import BuilderComponent
-from app.schemas.builder import BuilderComponentCreate, BuilderComponentPropertiesUpdate, BuilderComponentRead, BuilderTemplateCreate, BuilderTemplatePropertiesUpdate, BuilderTemplateRead, BuilderTemplateScheduleUpdate, BuilderTemplateStatusUpdate, BuilderVersionCreate, BuilderVersionRead
+from app.schemas.builder import BuilderComponentCreate, BuilderComponentPropertiesUpdate, BuilderComponentRead, BuilderTemplateCreate, BuilderTemplatePropertiesUpdate, BuilderTemplateRead, BuilderTemplateScheduleUpdate, BuilderTemplateStatusUpdate, BuilderVersionCreate, BuilderVersionRead, ParticipantSourceUpdate
+from app.services.participant_source_service import eligible_participants
+from app.schemas.participants import ParticipantRead
 from app.services.assignment_service import assignment_service
 from app.services.builder_service import builder_service
 
@@ -57,6 +59,19 @@ def update_template_schedule(template_id: str, payload: BuilderTemplateScheduleU
     template = require_template_access(db, current_user.id, template_id)
     require_project_permission(db, current_user.id, template.project_id, BUILDER_WRITE)
     return builder_service.set_template_schedule(db, template_id, payload.starts_at, payload.ends_at)
+
+
+@router.patch("/templates/detail/{template_id}/participant-source", response_model=BuilderTemplateRead)
+def update_participant_source(template_id: str, payload: ParticipantSourceUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> BuilderTemplateRead:
+    template = require_template_access(db, current_user.id, template_id)
+    require_project_permission(db, current_user.id, template.project_id, BUILDER_WRITE)
+    return builder_service.set_participant_source(db, template_id, payload.source)
+
+
+@router.get("/templates/detail/{template_id}/eligible-participants", response_model=list[ParticipantRead])
+def get_eligible_participants(template_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[ParticipantRead]:
+    template = require_template_access(db, current_user.id, template_id)
+    return [ParticipantRead.model_validate(item, from_attributes=True) for item in eligible_participants(db, template)]
 
 
 @router.post("/components", response_model=BuilderComponentRead)

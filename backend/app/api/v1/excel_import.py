@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -6,11 +6,27 @@ from app.api.permissions import require_project_permission
 from app.core.permissions import IDENTITY_USERS_MANAGE
 from app.db.session import get_db
 from app.models.identity import User
-from app.schemas.excel_import import ExcelImportJobRead, ExcelImportMappingUpdate
+from app.schemas.excel_import import ExcelImportJobRead, ExcelImportMappingUpdate, ExcelImportValidationRead
 from app.services.assignment_service import assignment_service
 from app.services.excel_import_service import excel_import_service
 
 router = APIRouter()
+
+
+@router.get("/template", summary="Descargar plantilla de carga según tipo de entidad")
+def download_excel_template(project_id: str, entity_type: str, template_id: str | None = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Response:
+    require_project_permission(db, current_user.id, project_id, IDENTITY_USERS_MANAGE)
+    content = excel_import_service.build_template(db, project_id, entity_type, template_id)
+    return Response(content=content, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": f'attachment; filename="plantilla_{entity_type}.xlsx"'})
+
+
+@router.get("/{job_id}/validate", response_model=ExcelImportValidationRead, summary="Validar todas las filas sin importar")
+def validate_excel_import(job_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ExcelImportValidationRead:
+    job = excel_import_service.get_job(db, job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail="Lote no encontrado")
+    require_project_permission(db, current_user.id, job.project_id, IDENTITY_USERS_MANAGE)
+    return excel_import_service.validate_job(db, job_id)
 
 
 @router.post("/upload", response_model=ExcelImportJobRead, summary="Subir Excel y generar previsualizacion")

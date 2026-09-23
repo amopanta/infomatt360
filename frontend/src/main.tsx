@@ -34,6 +34,7 @@ import { RecordsApp } from './modules/records/RecordsApp';
 import { ReportsApp } from './modules/reports/ReportsApp';
 import { ReportCatalogApp } from './modules/reports/ReportCatalogApp';
 import { FormReportApp } from './modules/reports/FormReportApp';
+import { IndicatorLibraryApp } from './modules/reports/IndicatorLibraryApp';
 import { EvidenceApp } from './modules/evidence/EvidenceApp';
 import { RuntimeApp } from './modules/runtime/RuntimeApp';
 import { APP_NAVIGATION_EVENT, navigateTo, resolveAppRoute } from './routeConfig';
@@ -111,7 +112,7 @@ function renderRoute(route: AppRoute) {
       case 'accountSecurity': return <AccountSecurityApp />;
       case 'participants': return <ParticipantsApp />;
       case 'records': return <RecordsApp />;
-      case 'reports': return window.location.pathname.startsWith('/reports/form/') ? <FormReportApp /> : window.location.pathname.startsWith('/reports/catalog') ? <ReportCatalogApp /> : <ReportsApp />;
+      case 'reports': return window.location.pathname.startsWith('/reports/form/') ? <FormReportApp /> : window.location.pathname.startsWith('/reports/indicators') ? <IndicatorLibraryApp /> : window.location.pathname.startsWith('/reports/catalog') ? <ReportCatalogApp /> : <ReportsApp />;
       case 'evidence': return <EvidenceApp />;
       case 'maps': return <MapsApp />;
       case 'messages': return <MessagesApp />;

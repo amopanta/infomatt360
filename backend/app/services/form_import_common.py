@@ -22,6 +22,8 @@ from app.schemas.builder import BuilderComponentCreate, BuilderTemplateCreate
 from app.schemas.builder_layout import BuilderColumnCreate, BuilderRowCreate
 from app.services.builder_layout_service import builder_layout_service
 from app.services.builder_service import builder_service
+from app.core.time import utc_now
+from app.schemas.runtime import RuntimeTemplate
 
 
 def create_field_component(
@@ -69,7 +71,7 @@ def _snapshot_template_version(db: Session, template_id: str) -> None:
     db.commit()
 
 
-def _wipe_template_layout(db: Session, template_id: str) -> None:
+def _wipe_template_layout(db: Session, template_id: str, *, commit: bool = True) -> None:
     """Borra paginas/secciones/filas/columnas/componentes de una plantilla,
     dejando la fila de `BuilderTemplate` intacta (mismo id, mismo nombre,
     mismo tema visual) para que el reemplazo ocurra en el mismo lugar."""
@@ -84,7 +86,44 @@ def _wipe_template_layout(db: Session, template_id: str) -> None:
             db.query(BuilderRow).filter(BuilderRow.section_id == section.id).delete()
         db.query(BuilderSection).filter(BuilderSection.page_id == page.id).delete()
     db.query(BuilderPage).filter(BuilderPage.template_id == template_id).delete()
-    db.commit()
+    if commit:
+        db.commit()
+    else:
+        db.flush()
+
+
+def restore_template_version(db: Session, template_id: str, version_id: str) -> None:
+    """Restore a saved form structure in place, preserving the template ID.
+
+    Current structure is saved first. The actual replacement happens in one
+    transaction, so a failed reconstruction rolls back without an empty form.
+    Response rows and project assignments are never touched.
+    """
+    template = db.query(BuilderTemplate).filter(BuilderTemplate.id == template_id).first()
+    version = db.query(BuilderVersion).filter(BuilderVersion.id == version_id, BuilderVersion.template_id == template_id).first()
+    if template is None or version is None:
+        raise HTTPException(status_code=404, detail="Versión no encontrada")
+    snapshot = RuntimeTemplate.model_validate_json(version.schema_json)
+    if snapshot.template_id != template_id:
+        raise HTTPException(status_code=422, detail="La versión no corresponde a este formulario")
+    _snapshot_template_version(db, template_id)
+    try:
+        _wipe_template_layout(db, template_id, commit=False)
+        for page_index, page in enumerate(snapshot.pages):
+            db.add(BuilderPage(id=page.id, template_id=template_id, title=page.title, description=page.description, sort_order=page_index))
+            for section_index, section in enumerate(page.sections):
+                db.add(BuilderSection(id=section.id, page_id=page.id, title=section.title, description=section.description, sort_order=section_index))
+                for row_index, row in enumerate(section.rows):
+                    db.add(BuilderRow(id=row.id, section_id=section.id, sort_order=row_index))
+                    for column_index, column in enumerate(row.columns):
+                        db.add(BuilderColumn(id=column.id, row_id=row.id, desktop_width=column.desktop_width, tablet_width=column.tablet_width, mobile_width=column.mobile_width, sort_order=column_index))
+                        for component_index, component in enumerate(column.components):
+                            db.add(BuilderComponent(id=component.id, template_id=template_id, column_id=column.id, component_type=component.type, name=component.name, label=component.label, config_json=component.config_json, rules_json=component.rules_json, sort_order=component_index))
+        template.updated_at = utc_now()
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def prepare_target_template(db: Session, project_id: str, filename: str, replace_template_id: str | None) -> tuple[str, bool]:

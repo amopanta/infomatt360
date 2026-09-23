@@ -93,6 +93,45 @@ def test_import_without_replace_template_id_still_creates_a_new_template():
         Base.metadata.drop_all(bind=engine)
 
 
+def test_preview_replace_and_restore_previous_version_without_losing_records():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "replace-builder@example.com", "Builder12345!")
+            first = _build_xlsform([["text", "nombre", "Nombre"], ["integer", "edad", "Edad"]])
+            created = client.post("/api/v1/xlsform/import", headers=headers, data={"project_id": "replace-project"}, files={"upload": ("v1.xlsx", first)})
+            assert created.status_code == 200, created.text
+            template_id = created.json()["template_id"]
+            with sessions() as db:
+                db.add(RuntimeRecord(id="historic-one", project_id="replace-project", template_id=template_id, status="submitted"))
+                db.commit()
+            second = _build_xlsform([["text", "nombre", "Nombre actualizado"], ["text", "correo", "Correo"]])
+            preview = client.post("/api/v1/xlsform/preview", headers=headers, data={"project_id": "replace-project", "replace_template_id": template_id}, files={"upload": ("v2.xlsx", second)})
+            assert preview.status_code == 200, preview.text
+            diff = preview.json()
+            assert diff["added"] == ["correo"]
+            assert diff["removed"] == ["edad"]
+            assert diff["modified"][0]["name"] == "nombre"
+            with sessions() as db:
+                assert {row.name for row in db.query(BuilderComponent).filter(BuilderComponent.template_id == template_id)} == {"nombre", "edad"}
+            replaced = client.post("/api/v1/xlsform/import", headers=headers, data={"project_id": "replace-project", "replace_template_id": template_id, "expected_file_sha256": diff["file_sha256"], "expected_target_sha256": diff["target_sha256"]}, files={"upload": ("v2.xlsx", second)})
+            assert replaced.status_code == 200, replaced.text
+            stale = client.post("/api/v1/xlsform/import", headers=headers, data={"project_id": "replace-project", "replace_template_id": template_id, "expected_file_sha256": diff["file_sha256"], "expected_target_sha256": diff["target_sha256"]}, files={"upload": ("v2.xlsx", second)})
+            assert stale.status_code == 409
+            versions = client.get(f"/api/v1/xlsform/versions/{template_id}", headers=headers)
+            assert versions.status_code == 200
+            assert versions.json()[0]["question_count"] == 2
+            restored = client.post(f"/api/v1/xlsform/versions/{template_id}/{versions.json()[0]['id']}/restore", headers=headers)
+            assert restored.status_code == 200, restored.text
+            with sessions() as db:
+                assert {row.name for row in db.query(BuilderComponent).filter(BuilderComponent.template_id == template_id)} == {"nombre", "edad"}
+                assert db.query(RuntimeRecord).filter(RuntimeRecord.id == "historic-one").one().template_id == template_id
+                assert db.query(BuilderVersion).filter(BuilderVersion.template_id == template_id).count() == 2
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
 def test_replace_keeps_same_template_id_and_swaps_fields():
     engine, sessions = setup_client()
     try:

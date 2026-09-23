@@ -80,6 +80,7 @@ export function ReportsApp() {
             <p>Indicadores y resultados del proyecto</p>
           </div>
           <div className="reports-actions">
+            <a href="/reports/indicators">Configuración de indicadores</a>
             <a href="/reports/catalog">Mis reportes e indicadores</a>
             {canEdit && !editing ? <button className="secondary" onClick={startEditing}>⚙ Personalizar y gestionar</button> : null}
           </div>

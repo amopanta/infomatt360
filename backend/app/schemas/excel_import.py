@@ -38,3 +38,9 @@ class ExcelImportJobRead(BaseModel):
 
 class ExcelImportMappingUpdate(BaseModel):
     column_mapping: dict[str, str]
+
+
+class ExcelImportValidationRead(BaseModel):
+    total_rows: int
+    valid_rows: int
+    errors: list[dict[str, object]]

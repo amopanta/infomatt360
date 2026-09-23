@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import type { RuntimeFormValue, RuntimeFormValues, RuntimeTemplate } from '../runtime/types';
+import { resolveFormValues } from '../runtime/formLogic';
 import { fetchPublicForm, submitPublicForm } from './api';
 import { PublicSurveyRenderer } from './PublicSurveyRenderer';
 
@@ -28,6 +29,7 @@ export function PublicFormApp() {
     fetchPublicForm(token)
       .then((result) => {
         setTemplate(result);
+        setValues(resolveFormValues(result, {}));
         setStatus('ready');
       })
       .catch((error: Error) => {
@@ -37,14 +39,14 @@ export function PublicFormApp() {
   }, [token]);
 
   function updateValue(fieldName: string, value: RuntimeFormValue) {
-    setValues((current) => ({ ...current, [fieldName]: value }));
+    setValues((current) => template ? resolveFormValues(template, { ...current, [fieldName]: value }) : { ...current, [fieldName]: value });
   }
 
   async function submit() {
     setStatus('submitting');
     setMessage('');
     try {
-      await submitPublicForm(token, values);
+      await submitPublicForm(token, template ? resolveFormValues(template, values) : values);
       setStatus('success');
     } catch (error) {
       setStatus('ready');

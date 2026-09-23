@@ -4,8 +4,8 @@ import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
 import { fetchProjectTemplates } from '../records/api';
 import type { TemplateSummary } from '../records/api';
-import { approveExcelImport, confirmExcelImportMapping, fetchExcelImportJobs, uploadExcelImport } from './excelImportApi';
-import type { ExcelImportJob, ExcelImportTargetField } from './excelImportApi';
+import { approveExcelImport, confirmExcelImportMapping, downloadExcelImportTemplate, fetchExcelImportJobs, uploadExcelImport, validateExcelImport } from './excelImportApi';
+import type { ExcelImportJob, ExcelImportTargetField, ExcelImportValidation } from './excelImportApi';
 
 const TARGET_FIELDS: Record<string, string[]> = {
   participants: ['document_id', 'full_name', 'external_code', 'participant_type'],
@@ -34,6 +34,7 @@ export function ExcelImportApp() {
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
   const [jobs, setJobs] = useState<ExcelImportJob[]>([]);
   const [message, setMessage] = useState('');
+  const [validation, setValidation] = useState<ExcelImportValidation | null>(null);
   const [busy, setBusy] = useState(false);
 
   async function loadJobs() {
@@ -63,6 +64,7 @@ export function ExcelImportApp() {
     try {
       const job = await uploadExcelImport({ projectId, entityType, templateId: entityType === 'records' ? templateId : undefined, file });
       setCurrentJob(job);
+      setValidation(null);
       setColumnMapping(job.column_mapping ?? {});
       setMessage(`Archivo subido: ${job.total_rows} fila(s) detectada(s).`);
       await loadJobs();
@@ -80,6 +82,7 @@ export function ExcelImportApp() {
       const mapping = Object.fromEntries(Object.entries(columnMapping).filter(([, target]) => target));
       const job = await confirmExcelImportMapping(currentJob.id, mapping);
       setCurrentJob(job);
+      setValidation(null);
       setMessage('Mapeo confirmado. El lote esta listo para aprobar e importar.');
       await loadJobs();
     } catch (error) {
@@ -91,6 +94,7 @@ export function ExcelImportApp() {
 
   async function submitApprove() {
     if (!currentJob) return;
+    if (!validation || validation.errors.length) { setMessage('Valida el archivo y corrige los errores antes de importar.'); return; }
     setBusy(true);
     try {
       const job = await approveExcelImport(currentJob.id);
@@ -102,6 +106,14 @@ export function ExcelImportApp() {
     } finally {
       setBusy(false);
     }
+  }
+
+  async function submitValidation() {
+    if (!currentJob) return;
+    setBusy(true);
+    try { const result = await validateExcelImport(currentJob.id); setValidation(result); setMessage(`${result.valid_rows} de ${result.total_rows} filas válidas. ${result.errors.length} error(es).`); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo validar.'); }
+    finally { setBusy(false); }
   }
 
   const dynamicTargetFields: ExcelImportTargetField[] | null = currentJob?.target_fields ?? null;
@@ -122,7 +134,7 @@ export function ExcelImportApp() {
           <div className="ai-analyze-inline">
             <label>
               Tipo de entidad
-              <select value={entityType} onChange={(event) => { setEntityType(event.target.value); setTemplateId(''); }}>
+              <select value={entityType} onChange={(event) => { setEntityType(event.target.value); setTemplateId(''); setValidation(null); }}>
                 <option value="participants">Participantes</option>
                 <option value="users">Usuarios</option>
                 <option value="assignments">Asignaciones (usuario-proyecto-rol)</option>
@@ -138,6 +150,7 @@ export function ExcelImportApp() {
                 </select>
               </label>
             ) : null}
+            <button type="button" disabled={busy || (entityType === 'records' && !templateId)} onClick={() => void downloadExcelImportTemplate(projectId, entityType, entityType === 'records' ? templateId : undefined).catch((error: Error) => setMessage(error.message))}>⬇ Descargar plantilla</button>
             <label>
               Archivo (.xlsx)
               <input type="file" accept=".xlsx" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
@@ -170,7 +183,7 @@ export function ExcelImportApp() {
                       <td>
                         <select
                           value={columnMapping[header] ?? ''}
-                          onChange={(event) => setColumnMapping((previous) => ({ ...previous, [header]: event.target.value }))}
+                          onChange={(event) => { setValidation(null); setColumnMapping((previous) => ({ ...previous, [header]: event.target.value })); }}
                         >
                           <option value="">(ignorar)</option>
                           {targetFieldOptions.map((field) => <option key={field.name} value={field.name}>{field.label}</option>)}
@@ -188,7 +201,7 @@ export function ExcelImportApp() {
               <button className="primary" disabled={busy} onClick={() => void submitMapping()}>Confirmar mapeo</button>
             ) : null}
             {currentJob.status === 'mapped' ? (
-              <button className="primary" disabled={busy} onClick={() => void submitApprove()}>Aprobar e importar</button>
+              <><button type="button" disabled={busy} onClick={() => void submitValidation()}>Validar archivo completo</button>{validation && <div role="status"><strong>{validation.valid_rows} de {validation.total_rows} filas válidas</strong>{validation.errors.map((error, index) => <p key={index}>Fila {error.row}: {error.error}</p>)}</div>}<button className="primary" disabled={busy || !validation || !!validation.errors.length} onClick={() => void submitApprove()}>Aprobar e importar</button></>
             ) : null}
             {currentJob.status === 'completed' || currentJob.status === 'failed' ? (
               <article className="ds-map-card">

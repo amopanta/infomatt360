@@ -432,14 +432,22 @@ function CorrectableField({
   value,
   onCorrected,
   onMessage,
+  initialEditing = false,
 }: {
   record: RuntimeRecord;
   value: { id: string; field_name: string; field_value_json: string };
   onCorrected: (record: RuntimeRecord) => void;
   onMessage: (value: string) => void;
+  initialEditing?: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState('');
+  const [editing, setEditing] = useState(initialEditing);
+  const [draft, setDraft] = useState(() => {
+    if (!initialEditing) return '';
+    try {
+      const parsed = JSON.parse(value.field_value_json);
+      return parsed == null ? '' : isEditableScalar(value.field_value_json) ? String(parsed) : JSON.stringify(parsed, null, 2);
+    } catch { return ''; }
+  });
   const [saving, setSaving] = useState(false);
   const canEditHere = ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && hasAnyCurrentProjectPermission(['records.write']);
 
@@ -703,6 +711,7 @@ function DeepLinkedRecordCard({
   onMessage,
   previousId,
   nextId,
+  editMode,
 }: {
   projectId: string;
   record: RuntimeRecord;
@@ -711,6 +720,7 @@ function DeepLinkedRecordCard({
   onMessage: (value: string) => void;
   previousId?: string;
   nextId?: string;
+  editMode: boolean;
 }) {
   const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({});
@@ -736,7 +746,7 @@ function DeepLinkedRecordCard({
         {hasAnyCurrentProjectPermission(['records.write']) && <button type="button" onClick={() => void duplicateRecord(record.id).then((copy) => { window.location.href = `/records/${record.template_id}?recordId=${copy.id}`; }).catch((error: Error) => onMessage(error.message))}>Duplicar como borrador</button>}
       </div>
       <header>
-        <strong>Registro señalado para corrección</strong>
+        <strong>{editMode ? 'Editar respuesta' : 'Respuesta completa'}</strong>
         <span className={`record-status ${record.status}`}>{record.status}</span>
       </header>
       <dl className="record-detail">
@@ -747,7 +757,7 @@ function DeepLinkedRecordCard({
             className={value.field_name === highlightField ? 'record-field-highlighted' : undefined}
           >
             <dt>{fieldLabels[value.field_name] || value.field_name}</dt>
-            <CorrectableField record={record} value={value} onCorrected={onRecordUpdated} onMessage={onMessage} />
+            <CorrectableField record={record} value={value} onCorrected={onRecordUpdated} onMessage={onMessage} initialEditing={editMode} />
           </div>
         ))}
       </dl>
@@ -771,11 +781,10 @@ function RecordTable({ templateId }: { templateId: string }) {
   const [unlinkedOnly, setUnlinkedOnly] = useState(false);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
-  const [expanded, setExpanded] = useState<string | null>(null);
   const [message, setMessage] = useState('Cargando registros...');
   const [deepLink] = useState(() => {
     const params = new URLSearchParams(window.location.search);
-    return { recordId: params.get('recordId') ?? '', campo: params.get('campo') ?? '' };
+    return { recordId: params.get('recordId') ?? '', campo: params.get('campo') ?? '', edit: params.get('edit') === '1' };
   });
   const [deepLinkedRecord, setDeepLinkedRecord] = useState<RuntimeRecord | null>(null);
   const [neighbors, setNeighbors] = useState<{ previous_id: string | null; next_id: string | null }>({ previous_id: null, next_id: null });
@@ -840,10 +849,6 @@ function RecordTable({ templateId }: { templateId: string }) {
     setOffset(0);
   }
 
-  function updateRecordInList(updated: RuntimeRecord) {
-    setRecords((current) => current.map((record) => record.id === updated.id ? updated : record));
-  }
-
   const fields = useMemo(() => {
     const names = new Set(templateFields.map((field) => field.name));
     const capturedFields = records.flatMap((record) => record.values.map((value) => value.field_name));
@@ -888,11 +893,13 @@ function RecordTable({ templateId }: { templateId: string }) {
     <AppShell title="Registros del formulario">
       <main className="records-shell">
         {deepLinkedRecord ? (
-          <DeepLinkedRecordCard projectId={projectId} record={deepLinkedRecord} highlightField={deepLink.campo} onRecordUpdated={setDeepLinkedRecord} onMessage={setMessage} previousId={neighbors.previous_id || undefined} nextId={neighbors.next_id || undefined} />
+          <DeepLinkedRecordCard projectId={projectId} record={deepLinkedRecord} highlightField={deepLink.campo} editMode={deepLink.edit} onRecordUpdated={setDeepLinkedRecord} onMessage={setMessage} previousId={neighbors.previous_id || undefined} nextId={neighbors.next_id || undefined} />
         ) : deepLinkError ? (
           <p role="alert">{deepLinkError}</p>
+        ) : deepLink.recordId ? (
+          <p role="status">Cargando respuesta...</p>
         ) : null}
-        <div className="records-toolbar">
+        {!deepLink.recordId && <><div className="records-toolbar">
           <a href="/records">Volver a formularios</a>
           <div className="records-toolbar-actions">
             <input type="search" placeholder="Buscar por campo, valor, estado o usuario" value={query} onChange={(event) => { setQuery(event.target.value); setOffset(0); }} />
@@ -929,14 +936,13 @@ function RecordTable({ templateId }: { templateId: string }) {
           <table className="records-table">
             <thead>
               <tr>
-                <th className="records-select-col">
+                <th className="records-leading-col">Acciones<br />
                   <input type="checkbox" aria-label="Seleccionar todos los de esta página" checked={pageFullySelected} onChange={togglePageSelection} disabled={pageIds.length === 0} />
                 </th>
                 <th><button type="button" className="records-sort" onClick={() => sortColumn('created_at')}>Fecha de envío {sortBy === 'created_at' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
                 <th><button type="button" className="records-sort" onClick={() => sortColumn('status')}>Validación {sortBy === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
                 <th><button type="button" className="records-sort" onClick={() => sortColumn('submitted_by')}>Capturado por {sortBy === 'submitted_by' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
                 {fields.map((field) => <th key={field.name} title={field.name}><button type="button" className="records-sort" onClick={() => sortColumn(`field:${field.name}`)}>{field.label} {sortBy === `field:${field.name}` ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>)}
-                <th>Acciones</th>
               </tr>
               <tr className="records-filter-row">
                 <th />
@@ -944,15 +950,16 @@ function RecordTable({ templateId }: { templateId: string }) {
                 <th><select aria-label="Filtrar por validación" value={status} onChange={(event) => { setStatus(event.target.value); setOffset(0); }}><option value="">Todos</option><option value="draft">Borrador</option><option value="submitted">Enviado</option><option value="under_review">En revisión</option><option value="tech_approved">Aprobado técnico</option><option value="coordinator_approved">Aprobado coordinación</option><option value="returned">Devuelto</option><option value="corrected">Corregido</option><option value="approved">Aprobado</option><option value="rejected">Rechazado</option><option value="cancelled">Cancelado</option><option value="archived">Archivado</option><option value="synced">Sincronizado</option><option value="voided">Anulado</option></select></th>
                 <th />
                 {fields.map((field) => <th key={field.name}><input type="search" aria-label={`Buscar en ${field.label}`} placeholder="Buscar" value={fieldFilters[field.name] ?? ''} onChange={(event) => updateFieldFilter(field.name, event.target.value)} /></th>)}
-                <th />
               </tr>
             </thead>
             <tbody>
               {records.map((record) => (
                 <Fragment key={record.id}>
                   <tr>
-                    <td className="records-select-col">
+                    <td className="records-leading-col">
                       <input type="checkbox" aria-label={`Seleccionar registro ${record.id}`} checked={selectAllMatchingFilter || selectedIds.has(record.id)} onChange={() => toggleRecordSelection(record.id)} />
+                      <a href={`/records/${templateId}?recordId=${record.id}`} aria-label={`Abrir registro ${record.id}`} title="Abrir respuesta completa">◉</a>
+                      {hasAnyCurrentProjectPermission(['records.write']) && ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && <a href={`/records/${templateId}?recordId=${record.id}&edit=1`} aria-label={`Editar registro ${record.id}`} title="Editar respuesta">✎</a>}
                     </td>
                     <td>{new Date(record.created_at).toLocaleString()}</td>
                     <td><span className={`record-status ${record.status}`}>{record.status}</span></td>
@@ -961,31 +968,12 @@ function RecordTable({ templateId }: { templateId: string }) {
                       const value = formatValue(record.values.find((item) => item.field_name === field.name)?.field_value_json, true);
                       return <td key={field.name} title={value}>{value}</td>;
                     })}
-                    <td className="records-row-actions"><button aria-label={`Ver registro ${record.id}`} title="Ver respuesta" onClick={() => setExpanded(expanded === record.id ? null : record.id)}>{expanded === record.id ? 'Cerrar' : 'Ver'}</button><a href={`/records/${templateId}?recordId=${record.id}`} title="Abrir ficha completa">Abrir</a></td>
                   </tr>
-                  {expanded === record.id ? (
-                    <tr>
-                      <td colSpan={fields.length + 5}>
-                        <dl className="record-detail">
-                          {record.values.map((value) => (
-                            <div key={value.id}>
-                              <dt>{value.field_name}</dt>
-                              <dd>{formatValue(value.field_value_json, true)}</dd>
-                            </div>
-                          ))}
-                        </dl>
-                        <PromoteToParticipantPanel projectId={projectId} record={record} onPromoted={updateRecordInList} onMessage={setMessage} />
-                        <LinkedSubformSection projectId={projectId} record={record} onMessage={setMessage} />
-                        <ReviewPanel projectId={projectId} record={record} onMessage={setMessage} />
-                        <GenerateActaPanel projectId={projectId} record={record} onMessage={setMessage} />
-                      </td>
-                    </tr>
-                  ) : null}
                 </Fragment>
               ))}
             </tbody>
           </table>
-        </div>
+        </div></>}
       </main>
     </AppShell>
   );

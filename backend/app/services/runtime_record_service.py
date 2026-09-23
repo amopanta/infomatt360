@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from io import StringIO
 from uuid import uuid4
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -719,6 +719,16 @@ class RuntimeRecordService:
         """Consulta una captura por identificador."""
         row = db.query(RuntimeRecord).filter(RuntimeRecord.id == record_id).first()
         return record_to_read(db, row) if row else None
+
+    def record_neighbors(self, db: Session, record_id: str) -> dict[str, str | None]:
+        """Find adjacent responses in the default newest-first record order."""
+        current = db.get(RuntimeRecord, record_id)
+        if current is None:
+            raise ValueError("Registro no encontrado")
+        base = db.query(RuntimeRecord.id).filter(RuntimeRecord.template_id == current.template_id)
+        previous = base.filter(or_(RuntimeRecord.created_at > current.created_at, and_(RuntimeRecord.created_at == current.created_at, RuntimeRecord.id < current.id))).order_by(RuntimeRecord.created_at.asc(), RuntimeRecord.id.desc()).first()
+        following = base.filter(or_(RuntimeRecord.created_at < current.created_at, and_(RuntimeRecord.created_at == current.created_at, RuntimeRecord.id > current.id))).order_by(RuntimeRecord.created_at.desc(), RuntimeRecord.id.asc()).first()
+        return {"previous_id": previous[0] if previous else None, "next_id": following[0] if following else None}
 
     def duplicate_record(self, db: Session, record_id: str, user_id: str) -> RuntimeRecordRead:
         """Make a separate draft, including independent asset rows for file evidence."""

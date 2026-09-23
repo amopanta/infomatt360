@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
-import { applyReviewAction, correctRecordField, downloadRecord, downloadTemplateRecords, duplicateRecord, fetchProjectTemplates, fetchRecord, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, promoteRecordToParticipant, searchTemplateRecords } from './api';
+import { applyReviewAction, correctRecordField, downloadRecord, downloadTemplateRecords, duplicateRecord, fetchProjectTemplates, fetchRecord, fetchRecordNeighbors, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, promoteRecordToParticipant, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
 import { fetchActaTemplates, printActaBatch, printActaFromRecord, renderActaBatch, renderActaFromRecord } from '../acta/api';
 import type { ActaTemplateSummary } from '../acta/types';
@@ -778,6 +778,7 @@ function RecordTable({ templateId }: { templateId: string }) {
     return { recordId: params.get('recordId') ?? '', campo: params.get('campo') ?? '' };
   });
   const [deepLinkedRecord, setDeepLinkedRecord] = useState<RuntimeRecord | null>(null);
+  const [neighbors, setNeighbors] = useState<{ previous_id: string | null; next_id: string | null }>({ previous_id: null, next_id: null });
   const [deepLinkError, setDeepLinkError] = useState('');
   // Seleccion para generacion masiva de actas (docs/96 item #5, docs/110):
   // selectedIds persiste a proposito entre paginas/filtros -- solo "Limpiar
@@ -809,6 +810,7 @@ function RecordTable({ templateId }: { templateId: string }) {
     fetchRecord(deepLink.recordId)
       .then(setDeepLinkedRecord)
       .catch((error: Error) => setDeepLinkError(error.message));
+    fetchRecordNeighbors(deepLink.recordId).then(setNeighbors).catch(() => setNeighbors({ previous_id: null, next_id: null }));
   }, [deepLink.recordId]);
 
   useEffect(() => {
@@ -852,7 +854,6 @@ function RecordTable({ templateId }: { templateId: string }) {
   const pageStart = total ? offset + 1 : 0;
   const pageEnd = Math.min(offset + records.length, total);
   const pageIds = useMemo(() => records.map((record) => record.id), [records]);
-  const openIndex = deepLinkedRecord ? pageIds.indexOf(deepLinkedRecord.id) : -1;
   const pageFullySelected = isPageFullySelected(selectedIds, pageIds);
 
   async function exportCsv() {
@@ -887,7 +888,7 @@ function RecordTable({ templateId }: { templateId: string }) {
     <AppShell title="Registros del formulario">
       <main className="records-shell">
         {deepLinkedRecord ? (
-          <DeepLinkedRecordCard projectId={projectId} record={deepLinkedRecord} highlightField={deepLink.campo} onRecordUpdated={setDeepLinkedRecord} onMessage={setMessage} previousId={openIndex > 0 ? pageIds[openIndex - 1] : undefined} nextId={openIndex >= 0 ? pageIds[openIndex + 1] : undefined} />
+          <DeepLinkedRecordCard projectId={projectId} record={deepLinkedRecord} highlightField={deepLink.campo} onRecordUpdated={setDeepLinkedRecord} onMessage={setMessage} previousId={neighbors.previous_id || undefined} nextId={neighbors.next_id || undefined} />
         ) : deepLinkError ? (
           <p role="alert">{deepLinkError}</p>
         ) : null}

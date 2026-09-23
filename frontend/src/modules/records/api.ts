@@ -91,6 +91,12 @@ export async function duplicateRecord(recordId: string): Promise<RuntimeRecord> 
   return response.json();
 }
 
+export async function fetchRecordNeighbors(recordId: string): Promise<{ previous_id: string | null; next_id: string | null }> {
+  const response = await fetch(`${API_BASE_URL}/runtime/record/${recordId}/neighbors`, { headers: headers() });
+  if (!response.ok) throw new Error('No fue posible consultar los registros vecinos.');
+  return response.json();
+}
+
 export async function downloadRecord(recordId: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/runtime/record/${recordId}/export.json`, { headers: headers() });
   if (!response.ok) throw new Error('No fue posible descargar el registro.');

@@ -267,6 +267,16 @@ def duplicate_runtime_record(record_id: str, db: Session = Depends(get_db), curr
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+@router.get("/record/{record_id}/neighbors")
+def runtime_record_neighbors(record_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict[str, str | None]:
+    record = runtime_record_service.get_record(db, record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+    if not assignment_service.user_has_project_access(db, current_user.id, record.project_id):
+        raise HTTPException(status_code=403, detail="Sin acceso al proyecto")
+    return runtime_record_service.record_neighbors(db, record_id)
+
+
 @router.get("/record/{record_id}/export.json")
 def export_runtime_record_json(record_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Response:
     record = runtime_record_service.get_record(db, record_id)

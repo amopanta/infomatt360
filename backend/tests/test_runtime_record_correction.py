@@ -210,3 +210,18 @@ def test_duplicate_creates_separate_draft_and_export_keeps_original():
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
+
+
+def test_direct_record_link_has_previous_and_next_neighbors():
+    engine, sessions = setup_client()
+    try:
+        with sessions() as db:
+            ordered = [row.id for row in db.query(RuntimeRecord).filter_by(template_id="corr-template").order_by(RuntimeRecord.created_at.desc(), RuntimeRecord.id.asc()).all()]
+        with TestClient(app) as client:
+            headers = auth(client, "corr-writer@example.com", "Writer12345!")
+            response = client.get(f"/api/v1/runtime/record/{ordered[1]}/neighbors", headers=headers)
+            assert response.status_code == 200, response.text
+            assert response.json() == {"previous_id": ordered[0], "next_id": ordered[2]}
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)

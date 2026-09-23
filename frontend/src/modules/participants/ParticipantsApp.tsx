@@ -40,7 +40,7 @@ function ParticipantList() {
   const filtered = participants.filter((participant) => {
     const needle = query.trim().toLowerCase();
     if (!needle) return true;
-    return [participant.full_name, participant.document_id, participant.external_code]
+    return [participant.full_name, participant.document_id, participant.external_code, participant.department, participant.municipality]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(needle));
   });
@@ -53,7 +53,7 @@ function ParticipantList() {
             <h2>Participantes</h2>
             <p>Eje central del sistema: cada participante agrupa todos los formularios capturados sobre él, sin importar el canal (web, móvil, carga masiva, API).</p>
           </div>
-          <input type="search" placeholder="Buscar por nombre, documento o código" value={query} onChange={(event) => setQuery(event.target.value)} />
+          <input type="search" placeholder="Buscar por nombre, documento, código o municipio" value={query} onChange={(event) => setQuery(event.target.value)} />
         </header>
         {message ? <p role="status">{message}</p> : null}
         <div className="records-table-wrap">
@@ -64,6 +64,8 @@ function ParticipantList() {
                 <th>Documento</th>
                 <th>Código externo</th>
                 <th>Tipo</th>
+                <th>Departamento</th>
+                <th>Municipio</th>
                 <th>Estado</th>
                 <th>Detalle</th>
               </tr>
@@ -75,6 +77,8 @@ function ParticipantList() {
                   <td>{participant.document_id || '—'}</td>
                   <td>{participant.external_code || '—'}</td>
                   <td>{participant.participant_type}</td>
+                  <td>{participant.department || '—'}</td>
+                  <td>{participant.municipality || '—'}</td>
                   <td>{participant.status}</td>
                   <td><a href={`/participants/${participant.id}`}>Ver historial</a></td>
                 </tr>
@@ -124,6 +128,8 @@ function ParticipantDetail({ participantId }: { participantId: string }) {
             <div><dt>Documento</dt><dd>{participant.document_id || '—'}</dd></div>
             <div><dt>Código externo</dt><dd>{participant.external_code || '—'}</dd></div>
             <div><dt>Tipo</dt><dd>{participant.participant_type}</dd></div>
+            <div><dt>Departamento</dt><dd>{participant.department || '—'}</dd></div>
+            <div><dt>Municipio</dt><dd>{participant.municipality || '—'}</dd></div>
             <div><dt>Estado</dt><dd>{participant.status}</dd></div>
           </dl>
         </section>

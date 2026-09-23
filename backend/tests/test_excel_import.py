@@ -1,3 +1,4 @@
+import json
 from io import BytesIO
 
 from openpyxl import Workbook, load_workbook
@@ -88,6 +89,41 @@ def auth(client: TestClient, email: str, password: str) -> dict[str, str]:
     response = client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert response.status_code == 200
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+def test_participant_template_imports_department_and_municipality():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "excel-admin@example.com", "Admin12345!")
+            template_response = client.get("/api/v1/excel-import/template", params={"project_id": "excel-project", "entity_type": "participants"}, headers=headers)
+            assert template_response.status_code == 200
+            sheet = load_workbook(BytesIO(template_response.content)).active
+            assert [cell.value for cell in sheet[1]] == ["Documento", "Nombre completo", "Código externo", "Tipo", "Departamento", "Municipio"]
+            assert sheet.max_row == 2
+            assert "Opcional" in sheet["E1"].comment.text
+            content = _build_xlsx(
+                ["Documento", "Nombre completo", "Código externo", "Tipo", "Departamento", "Municipio"],
+                [["CC-77", "María Ruiz", "P-77", "persona", "Cundinamarca", "Soacha"]],
+            )
+            uploaded = client.post("/api/v1/excel-import/upload", headers=headers, data={"project_id": "excel-project", "entity_type": "participants"}, files={"upload": ("participantes.xlsx", content)})
+            assert uploaded.status_code == 200
+            mapping = uploaded.json()["column_mapping"]
+            assert mapping["Departamento"] == "department"
+            assert mapping["Municipio"] == "municipality"
+            job_id = uploaded.json()["id"]
+            assert client.patch(f"/api/v1/excel-import/{job_id}/mapping", headers=headers, json={"column_mapping": mapping}).status_code == 200
+            assert client.get(f"/api/v1/excel-import/{job_id}/validate", headers=headers).json()["valid_rows"] == 1
+            result = client.post(f"/api/v1/excel-import/{job_id}/approve", headers=headers)
+            assert result.status_code == 200
+            assert result.json()["imported_rows"] == 1
+            participants = client.get("/api/v1/participants/project/excel-project", headers=headers).json()
+            created = next(person for person in participants if person["document_id"] == "CC-77")
+            assert (created["department"], created["municipality"]) == ("Cundinamarca", "Soacha")
+            assert json.loads(created["metadata_json"])["municipality"] == "Soacha"
+    finally:
+        app.dependency_overrides.clear()
+        engine.dispose()
 
 
 def test_excel_import_full_flow_with_auto_mapping_and_duplicate_report():

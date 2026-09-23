@@ -12,6 +12,8 @@ export type Participant = {
   status: string;
   duplicate_flag: string;
   metadata_json?: string | null;
+  department?: string | null;
+  municipality?: string | null;
 };
 
 export type ParticipantHistoryItem = {

@@ -57,6 +57,12 @@ META_CREATED_AT_FIELD = "_meta_created_at"
 
 ENTITY_ALIASES: dict[str, dict[str, str]] = {
     "participants": {
+        "document_id": "document_id",
+        "full_name": "full_name",
+        "external_code": "external_code",
+        "participant_type": "participant_type",
+        "department": "department",
+        "municipality": "municipality",
         "documento": "document_id",
         "cedula": "document_id",
         "identificacion": "document_id",
@@ -64,7 +70,10 @@ ENTITY_ALIASES: dict[str, dict[str, str]] = {
         "nombre completo": "full_name",
         "codigo": "external_code",
         "codigo externo": "external_code",
+        "código externo": "external_code",
         "tipo": "participant_type",
+        "departamento": "department",
+        "municipio": "municipality",
     },
     "users": {
         "documento": "document_id",
@@ -90,7 +99,7 @@ ENTITY_ALIASES: dict[str, dict[str, str]] = {
     },
 }
 
-PARTICIPANT_TARGET_FIELDS = {"document_id", "full_name", "external_code", "participant_type"}
+PARTICIPANT_TARGET_FIELDS = {"document_id", "full_name", "external_code", "participant_type", "department", "municipality"}
 USER_TARGET_FIELDS = {"document_id", "full_name", "email", "phone"}
 ASSIGNMENT_TARGET_FIELDS = {"email", "role_name", "status"}
 
@@ -161,9 +170,10 @@ class ExcelImportService:
             columns = [(row.name, bool(json.loads(row.config_json or "{}").get("required")), row.component_type) for row in components]
             columns += [(META_STATUS_FIELD, False, "STATUS"), (META_CREATED_AT_FIELD, False, "DATE")]
         else:
-            names = {"participants": ["document_id", "full_name", "external_code", "participant_type"], "users": ["document_id", "full_name", "email", "phone"], "assignments": ["email", "role_name", "status"]}[entity_type]
-            columns = [(name, name in REQUIRED_FIELDS[entity_type], "TEXT") for name in names]
-        examples = {"document_id": "123456789", "full_name": "Persona de ejemplo", "external_code": "COD-001", "participant_type": "beneficiario", "email": "persona@ejemplo.com", "phone": "3001234567", "role_name": "Encuestador", "status": "active", META_STATUS_FIELD: "submitted", META_CREATED_AT_FIELD: "2026-01-01"}
+            names = {"participants": ["Documento", "Nombre completo", "Código externo", "Tipo", "Departamento", "Municipio"], "users": ["document_id", "full_name", "email", "phone"], "assignments": ["email", "role_name", "status"]}[entity_type]
+            aliases = ENTITY_ALIASES[entity_type]
+            columns = [(name, aliases.get(name.lower(), name) in REQUIRED_FIELDS[entity_type], "TEXT") for name in names]
+        examples = {"document_id": "123456789", "full_name": "Persona de ejemplo", "external_code": "COD-001", "participant_type": "beneficiario", "Documento": "123456789", "Nombre completo": "Persona de ejemplo", "Código externo": "COD-001", "Tipo": "beneficiario", "Departamento": "Cundinamarca", "Municipio": "Soacha", "email": "persona@ejemplo.com", "phone": "3001234567", "role_name": "Encuestador", "status": "active", META_STATUS_FIELD: "submitted", META_CREATED_AT_FIELD: "2026-01-01"}
         book = Workbook()
         sheet = book.active
         sheet.title = "datos"

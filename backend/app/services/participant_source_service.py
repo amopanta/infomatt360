@@ -15,6 +15,16 @@ def configured_source(template: BuilderTemplate) -> ParticipantSource:
     return ParticipantSource.model_validate_json(template.participant_source_json) if template.participant_source_json else ParticipantSource()
 
 
+def participant_municipality(participant: Participant) -> str:
+    try:
+        metadata = json.loads(participant.metadata_json or "{}")
+    except ValueError:
+        return ""
+    if not isinstance(metadata, dict):
+        return ""
+    return str(metadata.get("municipality") or metadata.get("municipio") or "").strip().casefold()
+
+
 def validate_source(db: Session, template: BuilderTemplate, source: ParticipantSource) -> None:
     if source.mode == "list":
         count = db.query(Participant.id).filter(Participant.project_id == template.project_id, Participant.id.in_(source.participant_ids)).count()
@@ -34,7 +44,7 @@ def eligible_participants(db: Session, template: BuilderTemplate) -> list[Partic
         return [item for item in rows if item.id in allowed]
     if source.mode == "filter":
         wanted = (source.municipality or "").strip().casefold()
-        return [item for item in rows if str(json.loads(item.metadata_json or "{}").get("municipality", "")).strip().casefold() == wanted]
+        return [item for item in rows if participant_municipality(item) == wanted]
     if source.mode == "form":
         found = db.query(RuntimeRecord.participant_id).filter(
             RuntimeRecord.project_id == template.project_id,

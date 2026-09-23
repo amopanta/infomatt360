@@ -11,6 +11,8 @@ class ParticipantCreate(BaseModel):
     participant_type: str = "person"
     status: str = "active"
     metadata_json: str | None = None
+    department: str | None = None
+    municipality: str | None = None
 
 
 class ParticipantRead(ParticipantCreate):

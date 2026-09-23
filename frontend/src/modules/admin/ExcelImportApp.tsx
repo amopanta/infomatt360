@@ -8,7 +8,7 @@ import { approveExcelImport, confirmExcelImportMapping, downloadExcelImportTempl
 import type { ExcelImportJob, ExcelImportTargetField, ExcelImportValidation } from './excelImportApi';
 
 const TARGET_FIELDS: Record<string, string[]> = {
-  participants: ['document_id', 'full_name', 'external_code', 'participant_type'],
+  participants: ['document_id', 'full_name', 'external_code', 'participant_type', 'department', 'municipality'],
   users: ['document_id', 'full_name', 'email', 'phone'],
   assignments: ['email', 'role_name', 'status'],
 };

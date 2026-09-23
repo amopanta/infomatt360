@@ -1,3 +1,5 @@
+import json
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -8,6 +10,12 @@ from app.schemas.participants import ParticipantCreate, ParticipantHistoryItem, 
 
 
 def _to_read(row: Participant) -> ParticipantRead:
+    try:
+        metadata = json.loads(row.metadata_json or "{}")
+        if not isinstance(metadata, dict):
+            metadata = {}
+    except ValueError:
+        metadata = {}
     return ParticipantRead(
         id=row.id,
         project_id=row.project_id,
@@ -18,6 +26,8 @@ def _to_read(row: Participant) -> ParticipantRead:
         status=row.status,
         duplicate_flag=row.duplicate_flag,
         metadata_json=row.metadata_json,
+        department=metadata.get("department") or metadata.get("departamento"),
+        municipality=metadata.get("municipality") or metadata.get("municipio"),
     )
 
 
@@ -33,7 +43,20 @@ class ParticipantService:
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Ya existe un participante con este documento en el proyecto",
                 )
-        row = Participant(**payload.model_dump())
+        fields = payload.model_dump(exclude={"department", "municipality"})
+        if payload.department or payload.municipality:
+            try:
+                metadata = json.loads(payload.metadata_json or "{}")
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail="metadata_json debe ser JSON válido") from exc
+            if not isinstance(metadata, dict):
+                raise HTTPException(status_code=422, detail="metadata_json debe ser un objeto JSON")
+            if payload.department:
+                metadata["department"] = payload.department.strip()
+            if payload.municipality:
+                metadata["municipality"] = payload.municipality.strip()
+            fields["metadata_json"] = json.dumps(metadata, ensure_ascii=False)
+        row = Participant(**fields)
         db.add(row)
         db.commit()
         db.refresh(row)

@@ -26,13 +26,46 @@ def test_entity_templates_have_headers_and_one_example_row():
         db.add(BuilderTemplate(id="form", project_id="project", name="Visita"))
         db.add(BuilderComponent(template_id="form", component_type="TEXT", name="observacion", label="Observación", config_json='{"required": true}'))
         db.commit()
-        for entity in ["participants", "users", "assignments", "records"]:
+        for entity in ["participants", "participant_updates", "users", "assignments", "records"]:
             content = excel_import_service.build_template(db, "project", entity, "form" if entity == "records" else None)
             sheet = load_workbook(BytesIO(content)).active
             assert sheet.max_row == 2
             assert all(cell.value for cell in sheet[1])
             assert all(cell.comment for cell in sheet[1])
         assert load_workbook(BytesIO(excel_import_service.build_template(db, "project", "records", "form"))).active["A1"].value == "observacion"
+
+
+def test_participant_group_status_removal_and_excel_update():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            admin = auth(client, "excel-admin@example.com", "Admin12345!")
+            basic = auth(client, "excel-basic@example.com", "Basic12345!")
+            with sessions() as db:
+                person = db.get(Participant, "excel-participant-1")
+                person.metadata_json = json.dumps({"group_name": "Inicial", "municipality": "Soacha"})
+                db.commit()
+            denied = client.patch("/api/v1/participants/project/excel-project/groups/Inicial/status", headers=basic, json={"status": "inactive"})
+            assert denied.status_code == 403
+            changed = client.patch("/api/v1/participants/project/excel-project/groups/Inicial/status", headers=admin, json={"status": "inactive"})
+            assert changed.status_code == 200 and changed.json()["updated"] == 1
+            content = _build_xlsx(["Documento", "Nombre completo", "Grupo", "Estado"], [["CC-9", "Nombre actualizado", "Nuevo", "active"]])
+            uploaded = client.post("/api/v1/excel-import/upload", headers=admin, data={"project_id": "excel-project", "entity_type": "participant_updates"}, files={"upload": ("actualizar.xlsx", content)})
+            assert uploaded.status_code == 200
+            job = uploaded.json()
+            assert client.patch(f"/api/v1/excel-import/{job['id']}/mapping", headers=admin, json={"column_mapping": job["column_mapping"]}).status_code == 200
+            validated = client.get(f"/api/v1/excel-import/{job['id']}/validate", headers=admin)
+            assert validated.status_code == 200 and validated.json()["valid_rows"] == 1
+            approved = client.post(f"/api/v1/excel-import/{job['id']}/approve", headers=admin)
+            assert approved.status_code == 200 and approved.json()["imported_rows"] == 1
+            person = client.get("/api/v1/participants/excel-participant-1", headers=admin).json()
+            assert (person["full_name"], person["group_name"], person["status"], person["municipality"]) == ("Nombre actualizado", "Nuevo", "active", "Soacha")
+            removed = client.delete("/api/v1/participants/project/excel-project/groups/Nuevo", headers=admin)
+            assert removed.status_code == 200 and removed.json()["updated"] == 1
+            assert client.get("/api/v1/participants/excel-participant-1", headers=admin).json()["group_name"] is None
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
 
 
 def _build_xlsx(headers: list[str], rows: list[list[object]]) -> bytes:

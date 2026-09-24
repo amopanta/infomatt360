@@ -20,6 +20,10 @@ class ParticipantGroupUpdate(BaseModel):
     group_name: str
 
 
+class ParticipantGroupStatusUpdate(BaseModel):
+    status: str
+
+
 class ParticipantRead(ParticipantCreate):
     id: str
     duplicate_flag: str = "none"

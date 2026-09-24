@@ -9,6 +9,7 @@ import type { ExcelImportJob, ExcelImportTargetField, ExcelImportValidation } fr
 
 const TARGET_FIELDS: Record<string, string[]> = {
   participants: ['document_id', 'full_name', 'external_code', 'participant_type', 'department', 'municipality'],
+  participant_updates: ['document_id', 'full_name', 'external_code', 'participant_type', 'department', 'municipality', 'group_name', 'status'],
   users: ['document_id', 'full_name', 'email', 'phone'],
   assignments: ['email', 'role_name', 'status'],
 };
@@ -130,7 +131,7 @@ export function ExcelImportApp() {
           <header>
             <div>
               <h2>1. Subir archivo</h2>
-              <p>Excel con columnas a mapear hacia participantes, usuarios, asignaciones usuario-proyecto-rol o registros historicos de un formulario (ver docs/76, docs/103, docs/104).</p>
+              <p>Importa participantes nuevos o actualiza los existentes por documento. Antes de aplicar, revisa el mapeo y valida todas las filas.</p>
             </div>
           </header>
           <div className="ai-analyze-inline">
@@ -138,6 +139,7 @@ export function ExcelImportApp() {
               Tipo de entidad
               <select value={entityType} onChange={(event) => { setEntityType(event.target.value); setTemplateId(''); setValidation(null); }}>
                 <option value="participants">Participantes</option>
+                <option value="participant_updates">Actualizar participantes existentes</option>
                 <option value="users">Usuarios</option>
                 <option value="assignments">Asignaciones (usuario-proyecto-rol)</option>
                 <option value="records">Registros historicos de un formulario</option>
@@ -153,6 +155,7 @@ export function ExcelImportApp() {
               </label>
             ) : null}
             {entityType === 'participants' && <label>Nombre del grupo de participantes<input value={groupName} maxLength={160} placeholder="Ej. Familias de Soacha 2026" onChange={(event) => setGroupName(event.target.value)} required /><small>Todos los participantes importados en este lote quedarán en este grupo.</small></label>}
+            {entityType === 'participant_updates' && <p>Identifica cada persona por documento. Las celdas vacías conservan el dato actual. Usa active o inactive en Estado.</p>}
             <button type="button" disabled={busy || (entityType === 'records' && !templateId)} onClick={() => void downloadExcelImportTemplate(projectId, entityType, entityType === 'records' ? templateId : undefined).catch((error: Error) => setMessage(error.message))}>⬇ Descargar plantilla</button>
             <label>
               Archivo (.xlsx)

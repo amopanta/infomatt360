@@ -49,6 +49,18 @@ export async function assignParticipantGroup(participantId: string, groupName: s
   return response.json();
 }
 
+export async function deleteParticipantGroup(projectId: string, groupName: string): Promise<number> {
+  const response = await fetch(`${API_BASE_URL}/participants/project/${projectId}/groups/${encodeURIComponent(groupName)}`, { method: 'DELETE', headers: headers() });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible eliminar el grupo.');
+  return (await response.json()).updated;
+}
+
+export async function setParticipantGroupStatus(projectId: string, groupName: string, status: 'active' | 'inactive'): Promise<number> {
+  const response = await fetch(`${API_BASE_URL}/participants/project/${projectId}/groups/${encodeURIComponent(groupName)}/status`, { method: 'PATCH', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible cambiar el estado del grupo.');
+  return (await response.json()).updated;
+}
+
 export async function fetchParticipantHistory(participantId: string): Promise<ParticipantHistoryItem[]> {
   const response = await fetch(`${API_BASE_URL}/participants/${participantId}/history`, { headers: headers() });
   if (!response.ok) throw new Error('No fue posible consultar el historial del participante.');

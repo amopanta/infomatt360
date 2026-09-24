@@ -23,6 +23,7 @@ from app.core.time import utc_now
 from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.excel_import import ExcelImportJob
 from app.models.identity import Role
+from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord
 from app.schemas.assignment import AssignmentCreate
 from app.schemas.excel_import import ExcelImportJobRead, ExcelImportTargetField, ExcelImportValidationRead
@@ -75,6 +76,16 @@ ENTITY_ALIASES: dict[str, dict[str, str]] = {
         "departamento": "department",
         "municipio": "municipality",
     },
+    "participant_updates": {
+        "document_id": "document_id", "documento": "document_id", "cedula": "document_id", "identificacion": "document_id",
+        "full_name": "full_name", "nombre": "full_name", "nombre completo": "full_name",
+        "external_code": "external_code", "codigo externo": "external_code", "código externo": "external_code",
+        "participant_type": "participant_type", "tipo": "participant_type",
+        "department": "department", "departamento": "department",
+        "municipality": "municipality", "municipio": "municipality",
+        "group_name": "group_name", "grupo": "group_name", "grupo de participantes": "group_name",
+        "status": "status", "estado": "status",
+    },
     "users": {
         "documento": "document_id",
         "cedula": "document_id",
@@ -100,11 +111,13 @@ ENTITY_ALIASES: dict[str, dict[str, str]] = {
 }
 
 PARTICIPANT_TARGET_FIELDS = {"document_id", "full_name", "external_code", "participant_type", "department", "municipality"}
+PARTICIPANT_UPDATE_FIELDS = PARTICIPANT_TARGET_FIELDS | {"group_name", "status"}
 USER_TARGET_FIELDS = {"document_id", "full_name", "email", "phone"}
 ASSIGNMENT_TARGET_FIELDS = {"email", "role_name", "status"}
 
 REQUIRED_FIELDS = {
     "participants": {"full_name"},
+    "participant_updates": {"document_id"},
     "users": {"full_name", "document_id", "email"},
     "assignments": {"email", "role_name"},
 }
@@ -161,7 +174,7 @@ def _to_read(db: Session, row: ExcelImportJob) -> ExcelImportJobRead:
 
 class ExcelImportService:
     def build_template(self, db: Session, project_id: str, entity_type: str, template_id: str | None = None) -> bytes:
-        if entity_type not in {"participants", "users", "assignments", "records"}:
+        if entity_type not in {"participants", "participant_updates", "users", "assignments", "records"}:
             raise HTTPException(status_code=422, detail="Tipo de entidad no válido")
         if entity_type == "records":
             template = db.query(BuilderTemplate).filter(BuilderTemplate.id == template_id, BuilderTemplate.project_id == project_id).first()
@@ -171,10 +184,10 @@ class ExcelImportService:
             columns = [(row.name, bool(json.loads(row.config_json or "{}").get("required")), row.component_type) for row in components]
             columns += [(META_STATUS_FIELD, False, "STATUS"), (META_CREATED_AT_FIELD, False, "DATE")]
         else:
-            names = {"participants": ["Documento", "Nombre completo", "Código externo", "Tipo", "Departamento", "Municipio"], "users": ["document_id", "full_name", "email", "phone"], "assignments": ["email", "role_name", "status"]}[entity_type]
+            names = {"participants": ["Documento", "Nombre completo", "Código externo", "Tipo", "Departamento", "Municipio"], "participant_updates": ["Documento", "Nombre completo", "Código externo", "Tipo", "Departamento", "Municipio", "Grupo", "Estado"], "users": ["document_id", "full_name", "email", "phone"], "assignments": ["email", "role_name", "status"]}[entity_type]
             aliases = ENTITY_ALIASES[entity_type]
             columns = [(name, aliases.get(name.lower(), name) in REQUIRED_FIELDS[entity_type], "TEXT") for name in names]
-        examples = {"document_id": "123456789", "full_name": "Persona de ejemplo", "external_code": "COD-001", "participant_type": "beneficiario", "Documento": "123456789", "Nombre completo": "Persona de ejemplo", "Código externo": "COD-001", "Tipo": "beneficiario", "Departamento": "Cundinamarca", "Municipio": "Soacha", "email": "persona@ejemplo.com", "phone": "3001234567", "role_name": "Encuestador", "status": "active", META_STATUS_FIELD: "submitted", META_CREATED_AT_FIELD: "2026-01-01"}
+        examples = {"document_id": "123456789", "full_name": "Persona de ejemplo", "external_code": "COD-001", "participant_type": "beneficiario", "Documento": "123456789", "Nombre completo": "Persona de ejemplo", "Código externo": "COD-001", "Tipo": "beneficiario", "Departamento": "Cundinamarca", "Municipio": "Soacha", "Grupo": "Familias de Soacha", "Estado": "active", "email": "persona@ejemplo.com", "phone": "3001234567", "role_name": "Encuestador", "status": "active", META_STATUS_FIELD: "submitted", META_CREATED_AT_FIELD: "2026-01-01"}
         book = Workbook()
         sheet = book.active
         sheet.title = "datos"
@@ -226,7 +239,14 @@ class ExcelImportService:
                     except (ValueError, HTTPException): row_errors.append("Fecha histórica no válida")
             if row.entity_type in {"users", "assignments"} and mapped.get("email") and "@" not in mapped["email"]:
                 row_errors.append("Correo no válido")
-            unique_key = mapped.get("document_id") if row.entity_type in {"participants", "users"} else mapped.get("email") if row.entity_type == "assignments" else None
+            if row.entity_type == "participant_updates":
+                if not any(mapped.get(field) for field in PARTICIPANT_UPDATE_FIELDS - {"document_id"}):
+                    row_errors.append("Indica al menos un dato para actualizar")
+                if mapped.get("status") and mapped["status"].lower() not in {"active", "inactive"}:
+                    row_errors.append("Estado no válido: usa active o inactive")
+                if mapped.get("document_id") and db.query(Participant.id).filter(Participant.project_id == row.project_id, Participant.document_id == mapped["document_id"]).first() is None:
+                    row_errors.append("El participante no existe en este proyecto")
+            unique_key = mapped.get("document_id") if row.entity_type in {"participants", "participant_updates", "users"} else mapped.get("email") if row.entity_type == "assignments" else None
             if unique_key:
                 if unique_key.casefold() in seen_keys: row_errors.append("Identificador repetido en el archivo")
                 seen_keys.add(unique_key.casefold())
@@ -304,6 +324,8 @@ class ExcelImportService:
         required = REQUIRED_FIELDS.get(row.entity_type, set())
         if row.entity_type == "participants":
             target_fields = PARTICIPANT_TARGET_FIELDS
+        elif row.entity_type == "participant_updates":
+            target_fields = PARTICIPANT_UPDATE_FIELDS
         elif row.entity_type == "assignments":
             target_fields = ASSIGNMENT_TARGET_FIELDS
         elif row.entity_type == "records":
@@ -323,6 +345,8 @@ class ExcelImportService:
             try:
                 if row.entity_type == "participants":
                     participant_service.create_participant(db, ParticipantCreate(project_id=row.project_id, group_name=row.group_name, **mapped))
+                elif row.entity_type == "participant_updates":
+                    self._update_participant_row(db, row.project_id, mapped)
                 elif row.entity_type == "assignments":
                     self._import_assignment_row(db, row.project_id, mapped)
                 elif row.entity_type == "records":
@@ -347,6 +371,30 @@ class ExcelImportService:
         db.commit()
         db.refresh(row)
         return _to_read(db, row)
+
+    def _update_participant_row(self, db: Session, project_id: str, mapped: dict[str, str | None]) -> None:
+        document_id = (mapped.get("document_id") or "").strip()
+        participant = db.query(Participant).filter(Participant.project_id == project_id, Participant.document_id == document_id).first()
+        if participant is None:
+            raise HTTPException(status_code=404, detail=f"No existe un participante con documento {document_id}")
+        if not any(mapped.get(field) for field in PARTICIPANT_UPDATE_FIELDS - {"document_id"}):
+            raise HTTPException(status_code=422, detail="Indica al menos un dato para actualizar")
+        status_value = (mapped.get("status") or "").strip().lower()
+        if status_value and status_value not in {"active", "inactive"}:
+            raise HTTPException(status_code=422, detail="Estado no válido: usa active o inactive")
+        for field in ("full_name", "external_code", "participant_type"):
+            if mapped.get(field):
+                setattr(participant, field, mapped[field])
+        if status_value:
+            participant.status = status_value
+        metadata = json.loads(participant.metadata_json or "{}")
+        if not isinstance(metadata, dict):
+            metadata = {}
+        for field in ("department", "municipality", "group_name"):
+            if mapped.get(field):
+                metadata[field] = mapped[field]
+        participant.metadata_json = json.dumps(metadata, ensure_ascii=False)
+        db.commit()
 
     def _import_record_row(self, db: Session, project_id: str, template_id: str, mapped: dict[str, str | None], user_id: str) -> None:
         """Crea un RuntimeRecord historico reutilizando runtime_record_service.save_record.

@@ -33,6 +33,41 @@ def _to_read(row: Participant) -> ParticipantRead:
 
 
 class ParticipantService:
+    def delete_group(self, db: Session, project_id: str, group_name: str) -> int:
+        name = group_name.strip().casefold()
+        if not name:
+            raise HTTPException(status_code=422, detail="Selecciona un grupo")
+        changed = 0
+        for row in db.query(Participant).filter(Participant.project_id == project_id).all():
+            try:
+                metadata = json.loads(row.metadata_json or "{}")
+            except ValueError:
+                metadata = {}
+            if isinstance(metadata, dict) and str(metadata.get("group_name") or "").strip().casefold() == name:
+                metadata.pop("group_name", None)
+                row.metadata_json = json.dumps(metadata, ensure_ascii=False)
+                changed += 1
+        db.commit()
+        return changed
+
+    def set_group_status(self, db: Session, project_id: str, group_name: str, status_value: str) -> int:
+        if status_value not in {"active", "inactive"}:
+            raise HTTPException(status_code=422, detail="Estado no válido: usa active o inactive")
+        name = group_name.strip().casefold()
+        if not name:
+            raise HTTPException(status_code=422, detail="Selecciona un grupo")
+        changed = 0
+        for row in db.query(Participant).filter(Participant.project_id == project_id).all():
+            try:
+                metadata = json.loads(row.metadata_json or "{}")
+            except ValueError:
+                metadata = {}
+            if isinstance(metadata, dict) and str(metadata.get("group_name") or "").strip().casefold() == name:
+                row.status = status_value
+                changed += 1
+        db.commit()
+        return changed
+
     def create_participant(self, db: Session, payload: ParticipantCreate) -> ParticipantRead:
         if payload.document_id:
             duplicate = db.query(Participant).filter(

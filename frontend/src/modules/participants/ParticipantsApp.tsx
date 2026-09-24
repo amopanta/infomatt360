@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
-import { assignParticipantGroup, fetchParticipant, fetchParticipantHistory, fetchProjectParticipants } from './api';
+import { assignParticipantGroup, deleteParticipantGroup, fetchParticipant, fetchParticipantHistory, fetchProjectParticipants, setParticipantGroupStatus } from './api';
 import type { Participant, ParticipantHistoryItem } from './api';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -59,6 +59,25 @@ function ParticipantList() {
     } catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible asignar el grupo.'); }
   }
 
+  async function removeGroup() {
+    if (!groupFilter || !window.confirm(`¿Quitar el grupo «${groupFilter}» de ${filtered.length} participante(s)? Sus datos y respuestas se conservarán.`)) return;
+    try {
+      const count = await deleteParticipantGroup(projectId, groupFilter);
+      setParticipants(await fetchProjectParticipants(projectId));
+      setGroupFilter('');
+      setMessage(`Grupo quitado de ${count} participante(s).`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible eliminar el grupo.'); }
+  }
+
+  async function changeGroupStatus(status: 'active' | 'inactive') {
+    if (!groupFilter || !window.confirm(`¿Cambiar a ${status === 'active' ? 'activo' : 'inactivo'} el estado de todos los participantes del grupo «${groupFilter}»?`)) return;
+    try {
+      const count = await setParticipantGroupStatus(projectId, groupFilter, status);
+      setParticipants(await fetchProjectParticipants(projectId));
+      setMessage(`Estado actualizado para ${count} participante(s).`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible cambiar el estado.'); }
+  }
+
   return (
     <AppShell title="Participantes">
       <main className="participants-shell">
@@ -69,7 +88,7 @@ function ParticipantList() {
           </div>
           <input type="search" placeholder="Buscar por nombre, documento, código o municipio" value={query} onChange={(event) => setQuery(event.target.value)} />
         </header>
-        <div className="participants-group-toolbar"><label>Grupo de participantes<select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}><option value="">Todos los grupos</option>{groups.map((group) => <option key={group} value={group}>{group}</option>)}</select></label><a href="/admin/excel-import">Importar participantes desde Excel</a><span>{filtered.length} participante(s)</span></div>
+        <div className="participants-group-toolbar"><label>Grupo de participantes<select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}><option value="">Todos los grupos</option>{groups.map((group) => <option key={group} value={group}>{group}</option>)}</select></label><a href="/admin/excel-import">Importar o actualizar desde Excel</a><span>{filtered.length} participante(s)</span>{groupFilter && hasAnyCurrentProjectPermission(['identity.users.manage']) && <><button type="button" onClick={() => void changeGroupStatus('active')}>Activar grupo</button><button type="button" onClick={() => void changeGroupStatus('inactive')}>Desactivar grupo</button><button type="button" className="participants-remove-group" onClick={() => void removeGroup()}>Eliminar grupo</button></>}</div>
         {message ? <p role="status">{message}</p> : null}
         <div className="records-table-wrap">
           <table className="records-table">

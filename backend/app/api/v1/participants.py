@@ -7,11 +7,23 @@ from app.core.permissions import IDENTITY_USERS_MANAGE, RECORDS_APPROVE, RECORDS
 from app.db.session import get_db
 from app.models.identity import User
 from app.models.runtime_record import RuntimeRecord
-from app.schemas.participants import ParticipantCreate, ParticipantGroupUpdate, ParticipantHistoryItem, ParticipantPromoteRequest, ParticipantRead
+from app.schemas.participants import ParticipantCreate, ParticipantGroupStatusUpdate, ParticipantGroupUpdate, ParticipantHistoryItem, ParticipantPromoteRequest, ParticipantRead
 from app.services.assignment_service import assignment_service
 from app.services.participant_service import participant_service
 
 router = APIRouter()
+
+
+@router.delete("/project/{project_id}/groups/{group_name}", summary="Quitar un grupo sin borrar participantes")
+def delete_participant_group(project_id: str, group_name: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict[str, int]:
+    require_any_project_permission(db, current_user.id, project_id, {IDENTITY_USERS_MANAGE})
+    return {"updated": participant_service.delete_group(db, project_id, group_name)}
+
+
+@router.patch("/project/{project_id}/groups/{group_name}/status", summary="Cambiar estado de un grupo de participantes")
+def change_participant_group_status(project_id: str, group_name: str, payload: ParticipantGroupStatusUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict[str, int]:
+    require_any_project_permission(db, current_user.id, project_id, {IDENTITY_USERS_MANAGE})
+    return {"updated": participant_service.set_group_status(db, project_id, group_name, payload.status)}
 
 
 @router.post("/", response_model=ParticipantRead, summary="Crear participante")

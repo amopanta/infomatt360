@@ -726,7 +726,7 @@ function DeepLinkedRecordCard({
   );
 }
 
-function RecordTable({ templateId }: { templateId: string }) {
+export function RecordTable({ templateId, embedded = false }: { templateId: string; embedded?: boolean }) {
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [records, setRecords] = useState<RuntimeRecord[]>([]);
   const [templateFields, setTemplateFields] = useState<Array<{ name: string; label: string }>>([]);
@@ -846,9 +846,8 @@ function RecordTable({ templateId }: { templateId: string }) {
     setSelectAllMatchingFilter(false);
   }
 
-  return (
-    <AppShell title="Registros del formulario">
-      <main className="records-shell">
+  const content = (
+      <main className={`records-shell${embedded ? ' records-shell-embedded' : ''}`}>
         {deepLinkedRecord ? (
           <DeepLinkedRecordCard projectId={projectId} record={deepLinkedRecord} highlightField={deepLink.campo} editMode={deepLink.edit} onRecordUpdated={setDeepLinkedRecord} onMessage={setMessage} previousId={neighbors.previous_id || undefined} nextId={neighbors.next_id || undefined} />
         ) : deepLinkError ? (
@@ -857,7 +856,7 @@ function RecordTable({ templateId }: { templateId: string }) {
           <p role="status">Cargando respuesta...</p>
         ) : null}
         {!deepLink.recordId && <><div className="records-toolbar">
-          <a href="/records">Volver a formularios</a>
+          {!embedded && <a href="/records">Volver a formularios</a>}
           <div className="records-toolbar-actions">
             <input type="search" placeholder="Buscar por campo, valor, estado o usuario" value={query} onChange={(event) => { setQuery(event.target.value); setOffset(0); }} />
             <label className="records-unlinked-filter">
@@ -932,8 +931,8 @@ function RecordTable({ templateId }: { templateId: string }) {
           </table>
         </div></>}
       </main>
-    </AppShell>
   );
+  return embedded ? content : <AppShell title="Registros del formulario">{content}</AppShell>;
 }
 
 function formatValue(raw?: string, detailed = false): string {

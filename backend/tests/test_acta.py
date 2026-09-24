@@ -116,6 +116,24 @@ TEMPLATE_HTML = """
 """
 
 
+def test_default_record_acta_without_template():
+    engine, _ = setup_layout_client()
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "acta-basic@example.com", "Basic12345!")
+            response = client.get("/api/v1/acta-templates/records/acta-record-1/render-default", headers=headers)
+            assert response.status_code == 200
+            assert response.headers["content-type"] == "application/pdf"
+            reader = PdfReader(io.BytesIO(response.content))
+            page_text = " ".join(page.extract_text() for page in reader.pages)
+            assert "Hogar Norte" in page_text
+            assert "Nombre del hogar" in page_text
+            assert "Numero de integrantes" in page_text
+    finally:
+        app.dependency_overrides.clear()
+        engine.dispose()
+
+
 def test_acta_lifecycle_requires_builder_permission():
     engine = setup_client()
     try:

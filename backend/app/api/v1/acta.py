@@ -7,12 +7,23 @@ from app.core.config import settings
 from app.core.permissions import BUILDER_WRITE
 from app.db.session import get_db
 from app.models.identity import User
+from app.models.runtime_record import RuntimeRecord
 from app.schemas.acta import ActaLayoutTemplateCreate, ActaRenderBatchRequest, ActaRenderFromRecordRequest, ActaRenderRequest, ActaTemplateCreate, ActaTemplateRead
 from app.services.acta_service import acta_service
 from app.services.assignment_service import assignment_service
 from app.services.runtime_record_service import runtime_record_service
 
 router = APIRouter()
+
+
+@router.get("/records/{record_id}/render-default", summary="Generar acta básica de un registro")
+def render_default_record_acta(record_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Response:
+    record = db.query(RuntimeRecord).filter(RuntimeRecord.id == record_id).first()
+    if record is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado")
+    if not assignment_service.user_has_project_access(db, current_user.id, record.project_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    return _pdf_response(acta_service.render_default_record_pdf(db, record_id), f"acta-{record_id}")
 
 
 @router.post("/", response_model=ActaTemplateRead, summary="Crear plantilla de acta")

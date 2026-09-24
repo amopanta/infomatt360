@@ -4,7 +4,7 @@ import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, currentProjectPermissions, hasAnyCurrentProjectPermission } from '../auth/session';
 import { applyReviewAction, correctRecordField, downloadRecord, downloadTemplateRecords, duplicateRecord, fetchProjectTemplates, fetchRecord, fetchRecordNeighbors, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, promoteRecordToParticipant, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
-import { fetchActaTemplates, printActaBatch, printActaFromRecord, renderActaBatch, renderActaFromRecord } from '../acta/api';
+import { fetchActaTemplates, printActaBatch, printActaFromRecord, renderActaBatch, renderActaFromRecord, renderDefaultRecordActa } from '../acta/api';
 import type { ActaTemplateSummary } from '../acta/types';
 import { fetchRuntimeRecordChildren, fetchRuntimeTemplate, saveRuntimeChildRecord } from '../runtime/api';
 import type { RuntimeRecordSummary } from '../runtime/api';
@@ -61,7 +61,11 @@ function GenerateActaPanel({
 
   useEffect(() => {
     fetchActaTemplates(projectId)
-      .then((rows) => setTemplates(rows.filter((template) => template.template_id === record.template_id)))
+      .then((rows) => {
+        const matching = rows.filter((template) => template.template_id === record.template_id);
+        setTemplates(matching);
+        setSelectedTemplateId(matching[0]?.id ?? '');
+      })
       .catch(() => setTemplates([]));
   }, [projectId, record.template_id]);
 
@@ -92,9 +96,7 @@ function GenerateActaPanel({
   }
 
   if (templates.length === 0) {
-    return canManageActa ? (
-      <p className="acta-panel-empty">Este formulario aún no tiene plantillas de acta. <a href="/acta">Crear una</a>.</p>
-    ) : null;
+    return <div className="acta-panel"><button type="button" disabled={generating} onClick={() => { setGenerating(true); void renderDefaultRecordActa(record.id).then(() => onMessage('Acta básica descargada.')).catch((error: Error) => onMessage(error.message)).finally(() => setGenerating(false)); }}>{generating ? 'Generando...' : 'Descargar acta básica'}</button>{canManageActa && <a href="/acta">Crear plantilla personalizada</a>}</div>;
   }
 
   return (
@@ -658,6 +660,11 @@ function DeepLinkedRecordCard({
   previousId,
   nextId,
   editMode,
+  onClose,
+  onNavigate,
+  onEditModeChange,
+  onDuplicated,
+  onRemoved,
 }: {
   projectId: string;
   record: RuntimeRecord;
@@ -667,10 +674,16 @@ function DeepLinkedRecordCard({
   previousId?: string;
   nextId?: string;
   editMode: boolean;
+  onClose?: () => void;
+  onNavigate?: (recordId: string) => void;
+  onEditModeChange?: (editing: boolean) => void;
+  onDuplicated?: (record: RuntimeRecord) => void;
+  onRemoved?: () => void;
 }) {
   const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({});
   const [fieldQuery, setFieldQuery] = useState('');
+  const [removing, setRemoving] = useState(false);
   const visibleValues = record.values.filter((value) => {
     const term = fieldQuery.trim().toLocaleLowerCase();
     return !term || `${fieldLabels[value.field_name] || value.field_name} ${value.field_name}`.toLocaleLowerCase().includes(term);
@@ -687,17 +700,31 @@ function DeepLinkedRecordCard({
     fieldRefs.current[highlightField]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, [highlightField, record.id]);
 
+  async function removeRecord() {
+    if (!window.confirm('¿Eliminar este registro? Quedará anulado y se conservará para auditoría.')) return;
+    setRemoving(true);
+    try {
+      await applyReviewAction({ projectId, recordId: record.id, toStatus: 'voided', action: 'void', notes: 'Eliminado desde la grilla de respuestas' });
+      onMessage('Registro anulado. Se conserva para auditoría.');
+      if (onRemoved) onRemoved();
+      else onRecordUpdated(await fetchRecord(record.id));
+    } catch (error) {
+      onMessage(error instanceof Error ? error.message : 'No fue posible anular el registro.');
+    } finally { setRemoving(false); }
+  }
+
   return (
     <section className="record-deep-link-card">
       <div className="record-detail-actions">
-        <a href={`/records/${record.template_id}`}>← Grilla</a>
+        {onClose ? <button type="button" onClick={onClose}>← Grilla</button> : <a href={`/records/${record.template_id}`}>← Grilla</a>}
         {hasAnyCurrentProjectPermission(['records.write']) && ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && (editMode
-          ? <a href={`/records/${record.template_id}?recordId=${record.id}`}>Ver respuesta</a>
-          : <a href={`/records/${record.template_id}?recordId=${record.id}&edit=1`}>✎ Editar respuesta</a>)}
-        <a aria-disabled={!previousId} href={previousId ? `/records/${record.template_id}?recordId=${previousId}` : undefined}>Anterior</a>
-        <a aria-disabled={!nextId} href={nextId ? `/records/${record.template_id}?recordId=${nextId}` : undefined}>Siguiente</a>
+          ? onEditModeChange ? <button type="button" onClick={() => onEditModeChange(false)}>Ver respuesta</button> : <a href={`/records/${record.template_id}?recordId=${record.id}`}>Ver respuesta</a>
+          : onEditModeChange ? <button type="button" onClick={() => onEditModeChange(true)}>✎ Editar respuesta</button> : <a href={`/records/${record.template_id}?recordId=${record.id}&edit=1`}>✎ Editar respuesta</a>)}
+        {onNavigate ? <button type="button" disabled={!previousId} onClick={() => previousId && onNavigate(previousId)}>Anterior</button> : <a aria-disabled={!previousId} href={previousId ? `/records/${record.template_id}?recordId=${previousId}` : undefined}>Anterior</a>}
+        {onNavigate ? <button type="button" disabled={!nextId} onClick={() => nextId && onNavigate(nextId)}>Siguiente</button> : <a aria-disabled={!nextId} href={nextId ? `/records/${record.template_id}?recordId=${nextId}` : undefined}>Siguiente</a>}
         <button type="button" onClick={() => void downloadRecord(record.id).catch((error: Error) => onMessage(error.message))}>Descargar JSON</button>
-        {hasAnyCurrentProjectPermission(['records.write']) && <button type="button" onClick={() => void duplicateRecord(record.id).then((copy) => { window.location.href = `/records/${record.template_id}?recordId=${copy.id}`; }).catch((error: Error) => onMessage(error.message))}>Duplicar como borrador</button>}
+        {hasAnyCurrentProjectPermission(['records.write']) && <button type="button" onClick={() => void duplicateRecord(record.id).then((copy) => { if (onDuplicated) onDuplicated(copy); else window.location.href = `/records/${record.template_id}?recordId=${copy.id}`; }).catch((error: Error) => onMessage(error.message))}>Duplicar como borrador</button>}
+        {hasAnyCurrentProjectPermission(['records.void']) && !['draft', 'cancelled', 'voided'].includes(record.status) && <button type="button" className="record-remove-button" disabled={removing} onClick={() => void removeRecord()}>{removing ? 'Anulando...' : 'Eliminar registro'}</button>}
       </div>
       <header>
         <strong>{editMode ? 'Editar respuesta' : 'Respuesta completa'}</strong>
@@ -746,6 +773,12 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
   const [deepLinkedRecord, setDeepLinkedRecord] = useState<RuntimeRecord | null>(null);
   const [neighbors, setNeighbors] = useState<{ previous_id: string | null; next_id: string | null }>({ previous_id: null, next_id: null });
   const [deepLinkError, setDeepLinkError] = useState('');
+  const [modalId, setModalId] = useState('');
+  const [modalRecord, setModalRecord] = useState<RuntimeRecord | null>(null);
+  const [modalNeighbors, setModalNeighbors] = useState<{ previous_id: string | null; next_id: string | null }>({ previous_id: null, next_id: null });
+  const [modalEdit, setModalEdit] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [refreshVersion, setRefreshVersion] = useState(0);
   // Seleccion para generacion masiva de actas (docs/96 item #5, docs/110):
   // selectedIds persiste a proposito entre paginas/filtros -- solo "Limpiar
   // seleccion" la reinicia. selectAllMatchingFilter es mutuamente excluyente
@@ -793,7 +826,34 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
     return () => {
       active = false;
     };
-  }, [templateId, query, status, unlinkedOnly, fieldFilters, sortBy, sortDir, offset]);
+  }, [templateId, query, status, unlinkedOnly, fieldFilters, sortBy, sortDir, offset, refreshVersion]);
+
+  useEffect(() => {
+    if (!modalId) return;
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === 'Escape') setModalId(''); };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [modalId]);
+
+  async function openRecord(recordId: string, editing = false) {
+    setModalId(recordId);
+    setModalRecord(null);
+    setModalEdit(editing);
+    setModalMessage('');
+    try {
+      const record = await fetchRecord(recordId);
+      if (record.template_id !== templateId) throw new Error('El registro no pertenece a este formulario.');
+      setModalRecord(record);
+      fetchRecordNeighbors(recordId).then(setModalNeighbors).catch(() => setModalNeighbors({ previous_id: null, next_id: null }));
+    } catch (error) {
+      setModalMessage(error instanceof Error ? error.message : 'No fue posible abrir el registro.');
+    }
+  }
+
+  function updateModalRecord(updated: RuntimeRecord) {
+    setModalRecord(updated);
+    setRecords((current) => current.map((item) => item.id === updated.id ? updated : item));
+  }
 
   function sortColumn(name: string) {
     setSortDir((current) => sortBy === name && current === 'asc' ? 'desc' : 'asc');
@@ -914,8 +974,8 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
                   <tr>
                     <td className="records-leading-col">
                       <input type="checkbox" aria-label={`Seleccionar registro ${record.id}`} checked={selectAllMatchingFilter || selectedIds.has(record.id)} onChange={() => toggleRecordSelection(record.id)} />
-                      <a href={`/records/${templateId}?recordId=${record.id}`} aria-label={`Abrir registro ${record.id}`} title="Abrir respuesta completa">◉</a>
-                      {hasAnyCurrentProjectPermission(['records.write']) && ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && <a href={`/records/${templateId}?recordId=${record.id}&edit=1`} aria-label={`Editar registro ${record.id}`} title="Editar respuesta">✎</a>}
+                      <button type="button" className="record-icon-action" onClick={() => void openRecord(record.id)} aria-label={`Abrir registro ${record.id}`} title="Abrir respuesta completa">◉</button>
+                      {hasAnyCurrentProjectPermission(['records.write']) && ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && <button type="button" className="record-icon-action" onClick={() => void openRecord(record.id, true)} aria-label={`Editar registro ${record.id}`} title="Editar respuesta">✎</button>}
                     </td>
                     <td>{new Date(record.created_at).toLocaleString()}</td>
                     <td><span className={`record-status ${record.status}`}>{record.status}</span></td>
@@ -930,6 +990,7 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
             </tbody>
           </table>
         </div></>}
+        {modalId && <div className="record-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setModalId(''); }}><div className="record-modal" role="dialog" aria-modal="true" aria-label={modalEdit ? 'Editar respuesta' : 'Ver respuesta'}><button type="button" className="record-modal-close" onClick={() => setModalId('')} aria-label="Cerrar ventana">×</button>{modalMessage && <p role="status" className="records-modal-message">{modalMessage}</p>}{modalRecord ? <DeepLinkedRecordCard key={`${modalRecord.id}:${modalEdit}`} projectId={projectId} record={modalRecord} highlightField="" editMode={modalEdit} onRecordUpdated={updateModalRecord} onMessage={setModalMessage} previousId={modalNeighbors.previous_id || undefined} nextId={modalNeighbors.next_id || undefined} onClose={() => setModalId('')} onNavigate={(id) => void openRecord(id)} onEditModeChange={setModalEdit} onDuplicated={(copy) => { setRefreshVersion((value) => value + 1); void openRecord(copy.id, true); }} onRemoved={() => { setModalId(''); setRefreshVersion((value) => value + 1); }} /> : !modalMessage && <p role="status">Cargando respuesta...</p>}</div></div>}
       </main>
   );
   return embedded ? content : <AppShell title="Registros del formulario">{content}</AppShell>;

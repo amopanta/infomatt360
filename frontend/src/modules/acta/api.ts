@@ -48,6 +48,12 @@ export async function renderActaFromRecord(templateId: string, recordId: string,
   downloadBlob(await response.blob(), `${fileNameHint}.pdf`);
 }
 
+export async function renderDefaultRecordActa(recordId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/acta-templates/records/${recordId}/render-default`, { headers: authorizationHeader() });
+  if (!response.ok) throw new Error((await safeErrorDetail(response)) ?? 'No fue posible generar el acta básica.');
+  downloadBlob(await response.blob(), `acta-${recordId}.pdf`);
+}
+
 /** Imprime el acta de un registro en el cliente de escritorio (docs/96 item
  * #10): pide el mismo PDF que `renderActaFromRecord` pero via
  * `arrayBuffer()` en vez de disparar una descarga, y lo entrega a

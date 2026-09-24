@@ -93,6 +93,31 @@ def _manifest_csv(rows: list[tuple[str, str, str]]) -> str:
 
 
 class ActaService:
+    def render_default_record_pdf(self, db: Session, record_id: str) -> bytes:
+        """Acta sencilla para formularios sin plantilla de acta configurada."""
+        record = db.query(RuntimeRecord).filter(RuntimeRecord.id == record_id).first()
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado")
+        labels = {
+            component.name: component.label or component.name
+            for component in db.query(BuilderComponent).filter(BuilderComponent.template_id == record.template_id).all()
+        }
+        values = db.query(RuntimeRecordValue).filter(RuntimeRecordValue.record_id == record_id).all()
+        rows = "".join(
+            f"<tr><th>{html.escape(labels.get(item.field_name, item.field_name))}</th>"
+            f"<td>{html.escape(_decode_value_for_display(item.field_value_json))}</td></tr>"
+            for item in values
+        )
+        document = (
+            "<html><head><style>body{font-family:Helvetica,sans-serif;font-size:10pt}"
+            "h1{font-size:17pt;color:#176187}table{width:100%;border-collapse:collapse}"
+            "th,td{border-bottom:1px solid #dce5ef;padding:5px;text-align:left;vertical-align:top}"
+            "th{width:35%;color:#405775}</style></head><body>"
+            f"<h1>Acta del registro</h1><p>Registro: {html.escape(record.id)}</p>"
+            f"<p>Estado: {html.escape(record.status)}</p><table>{rows}</table></body></html>"
+        )
+        return _html_to_pdf_bytes(document)
+
     # --- Camino legado (Jinja2 crudo, sin UI) ---
 
     def create_template(self, db: Session, payload: ActaTemplateCreate) -> ActaTemplateRead:

@@ -184,6 +184,14 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .records-table tbody tr:last-child td { border-bottom: 0; }
 .records-table button { border: 0; border-radius: var(--radius-sm); padding: 3px var(--space-2); color: var(--text-inverse); background: var(--brand-primary); font-weight: 600; font-size: var(--font-size-xs); cursor: pointer; }
 .records-table button:hover { background: var(--brand-primary-strong); }
+.records-table button.record-icon-action { padding: 2px 6px; margin-left: 3px; border: 0; background: transparent; color: var(--brand-primary); font-size: 18px; line-height: 1; }
+.records-table button.record-icon-action:hover { background: var(--brand-primary-soft); }
+.record-modal-backdrop { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(19, 31, 47, .68); }
+.record-modal { position: relative; width: min(1120px, 100%); max-height: calc(100vh - 32px); overflow: hidden; padding: 44px 12px 12px; border-radius: var(--radius-lg); background: var(--surface); box-shadow: 0 20px 60px rgba(0, 0, 0, .28); }
+.record-modal-close { position: absolute; top: 8px; right: 12px; z-index: 5; border: 0; background: transparent; color: var(--text); font-size: 28px; cursor: pointer; }
+.record-modal .record-deep-link-card { max-height: calc(100vh - 100px); margin: 0; }
+.records-modal-message { margin: 0 12px 8px; }
+.record-remove-button { background: var(--danger) !important; color: #fff !important; }
 .record-status { display: inline-block; padding: 2px var(--space-2); border-radius: var(--radius-pill); color: var(--success); background: var(--success-soft); font-size: var(--font-size-xs); font-weight: 600; line-height: 1.6; }
 .record-status.synced { color: var(--info); background: var(--info-soft); }
 .record-status.voided { color: var(--danger); background: var(--danger-soft); }

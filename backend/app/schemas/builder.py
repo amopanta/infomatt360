@@ -33,9 +33,10 @@ class BuilderTemplateRead(BuilderTemplateCreate):
 
 
 class ParticipantSource(BaseModel):
-    mode: Literal["all", "list", "filter", "form", "pull"] = "all"
+    mode: Literal["all", "list", "filter", "form", "pull", "group"] = "all"
     participant_ids: list[str] = Field(default_factory=list)
     municipality: str | None = None
+    group_name: str | None = None
     previous_template_id: str | None = None
     required_status: str = "submitted"
     pull_name: str | None = None
@@ -48,6 +49,8 @@ class ParticipantSource(BaseModel):
             raise ValueError("Selecciona al menos un participante")
         if self.mode == "filter" and not self.municipality:
             raise ValueError("Indica el municipio")
+        if self.mode == "group" and not self.group_name:
+            raise ValueError("Selecciona un grupo de participantes")
         if self.mode == "form" and not self.previous_template_id:
             raise ValueError("Selecciona el formulario anterior")
         if self.mode == "pull" and (not self.pull_name or not self.pull_key_column):

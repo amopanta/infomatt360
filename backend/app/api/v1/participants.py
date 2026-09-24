@@ -3,11 +3,11 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.api.permissions import require_any_project_permission
-from app.core.permissions import RECORDS_APPROVE, RECORDS_REVIEW
+from app.core.permissions import IDENTITY_USERS_MANAGE, RECORDS_APPROVE, RECORDS_REVIEW
 from app.db.session import get_db
 from app.models.identity import User
 from app.models.runtime_record import RuntimeRecord
-from app.schemas.participants import ParticipantCreate, ParticipantHistoryItem, ParticipantPromoteRequest, ParticipantRead
+from app.schemas.participants import ParticipantCreate, ParticipantGroupUpdate, ParticipantHistoryItem, ParticipantPromoteRequest, ParticipantRead
 from app.services.assignment_service import assignment_service
 from app.services.participant_service import participant_service
 
@@ -43,6 +43,13 @@ def _require_participant(db: Session, current_user: User, participant_id: str) -
 @router.get("/{participant_id}", response_model=ParticipantRead, summary="Consultar un participante")
 def get_participant(participant_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ParticipantRead:
     return _require_participant(db, current_user, participant_id)
+
+
+@router.patch("/{participant_id}/group", response_model=ParticipantRead, summary="Asignar grupo a un participante")
+def set_participant_group(participant_id: str, payload: ParticipantGroupUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ParticipantRead:
+    participant = _require_participant(db, current_user, participant_id)
+    require_any_project_permission(db, current_user.id, participant.project_id, {IDENTITY_USERS_MANAGE})
+    return participant_service.set_group(db, participant_id, payload.group_name)
 
 
 @router.get("/{participant_id}/history", response_model=list[ParticipantHistoryItem], summary="Historial unificado del participante entre plantillas y canales")

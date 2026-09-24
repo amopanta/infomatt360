@@ -145,7 +145,7 @@ def test_excel_import_full_flow_with_auto_mapping_and_duplicate_report():
             denied = client.post(
                 "/api/v1/excel-import/upload",
                 headers=basic_headers,
-                data={"project_id": "excel-project", "entity_type": "participants"},
+                data={"project_id": "excel-project", "entity_type": "participants", "group_name": "Familias de Soacha"},
                 files={"upload": ("participantes.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
             )
             assert denied.status_code == 403
@@ -153,12 +153,13 @@ def test_excel_import_full_flow_with_auto_mapping_and_duplicate_report():
             uploaded = client.post(
                 "/api/v1/excel-import/upload",
                 headers=admin_headers,
-                data={"project_id": "excel-project", "entity_type": "participants"},
+                data={"project_id": "excel-project", "entity_type": "participants", "group_name": "Familias de Soacha"},
                 files={"upload": ("participantes.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
             )
             assert uploaded.status_code == 200
             job = uploaded.json()
             assert job["status"] == "uploaded"
+            assert job["group_name"] == "Familias de Soacha"
             assert job["total_rows"] == 3
             assert job["column_mapping"] == {"Nombre": "full_name", "Documento": "document_id"}
             assert job["preview"]["sample_rows"][0] == {"Nombre": "Ana Gomez", "Documento": "CC-1"}
@@ -185,6 +186,14 @@ def test_excel_import_full_flow_with_auto_mapping_and_duplicate_report():
                 # CC-9 viene del fixture compartido de setup_client() (participante
                 # preexistente usado por las pruebas de carga de registros).
                 assert {p.document_id for p in participants} == {"CC-1", "CC-2", "CC-9"}
+                assert {json.loads(p.metadata_json or "{}").get("group_name") for p in participants if p.document_id in {"CC-1", "CC-2"}} == {"Familias de Soacha"}
+                participant_id = next(p.id for p in participants if p.document_id == "CC-1")
+
+            denied_group_change = client.patch(f"/api/v1/participants/{participant_id}/group", headers=basic_headers, json={"group_name": "Nuevo grupo"})
+            assert denied_group_change.status_code == 403
+            changed_group = client.patch(f"/api/v1/participants/{participant_id}/group", headers=admin_headers, json={"group_name": "Nuevo grupo"})
+            assert changed_group.status_code == 200
+            assert changed_group.json()["group_name"] == "Nuevo grupo"
 
             second_approve = client.post(f"/api/v1/excel-import/{job_id}/approve", headers=admin_headers)
             assert second_approve.status_code == 409

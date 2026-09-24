@@ -13,6 +13,11 @@ class ParticipantCreate(BaseModel):
     metadata_json: str | None = None
     department: str | None = None
     municipality: str | None = None
+    group_name: str | None = None
+
+
+class ParticipantGroupUpdate(BaseModel):
+    group_name: str
 
 
 class ParticipantRead(ParticipantCreate):

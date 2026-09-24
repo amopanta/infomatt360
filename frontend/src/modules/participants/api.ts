@@ -14,6 +14,7 @@ export type Participant = {
   metadata_json?: string | null;
   department?: string | null;
   municipality?: string | null;
+  group_name?: string | null;
 };
 
 export type ParticipantHistoryItem = {
@@ -39,6 +40,12 @@ export async function fetchProjectParticipants(projectId: string): Promise<Parti
 export async function fetchParticipant(participantId: string): Promise<Participant> {
   const response = await fetch(`${API_BASE_URL}/participants/${participantId}`, { headers: headers() });
   if (!response.ok) throw new Error('No fue posible consultar el participante.');
+  return response.json();
+}
+
+export async function assignParticipantGroup(participantId: string, groupName: string): Promise<Participant> {
+  const response = await fetch(`${API_BASE_URL}/participants/${participantId}/group`, { method: 'PATCH', headers: { ...headers(), 'Content-Type': 'application/json' }, body: JSON.stringify({ group_name: groupName }) });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible asignar el grupo.');
   return response.json();
 }
 

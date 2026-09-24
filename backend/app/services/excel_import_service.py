@@ -143,6 +143,7 @@ def _to_read(db: Session, row: ExcelImportJob) -> ExcelImportJobRead:
         id=row.id,
         project_id=row.project_id,
         entity_type=row.entity_type,
+        group_name=row.group_name,
         template_id=row.template_id,
         source_filename=row.source_filename,
         status=row.status,
@@ -234,9 +235,12 @@ class ExcelImportService:
                 errors.append({"row": number, "error": "; ".join(row_errors)})
         return ExcelImportValidationRead(total_rows=len(data_rows), valid_rows=len(data_rows) - len(invalid_rows) if not unmapped and len(set(target_names)) == len(target_names) else 0, errors=errors)
 
-    def upload_and_preview(self, db: Session, project_id: str, entity_type: str, filename: str, content: bytes, user_id: str, template_id: str | None = None) -> ExcelImportJobRead:
+    def upload_and_preview(self, db: Session, project_id: str, entity_type: str, filename: str, content: bytes, user_id: str, template_id: str | None = None, group_name: str | None = None) -> ExcelImportJobRead:
         if entity_type not in {*ENTITY_ALIASES.keys(), "records"}:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Tipo de entidad no soportado para carga Excel")
+        group_name = ((group_name or "").strip() or filename.rsplit(".", 1)[0].strip()) if entity_type == "participants" else ""
+        if len(group_name) > 160:
+            raise HTTPException(status_code=422, detail="El nombre del grupo supera 160 caracteres")
         if entity_type == "records":
             if not template_id:
                 raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="template_id es obligatorio para cargar registros historicos")
@@ -265,6 +269,7 @@ class ExcelImportService:
         row = ExcelImportJob(
             project_id=project_id,
             entity_type=entity_type,
+            group_name=group_name or None,
             template_id=template_id,
             source_filename=filename,
             status="uploaded",
@@ -317,7 +322,7 @@ class ExcelImportService:
                 continue
             try:
                 if row.entity_type == "participants":
-                    participant_service.create_participant(db, ParticipantCreate(project_id=row.project_id, **mapped))
+                    participant_service.create_participant(db, ParticipantCreate(project_id=row.project_id, group_name=row.group_name, **mapped))
                 elif row.entity_type == "assignments":
                     self._import_assignment_row(db, row.project_id, mapped)
                 elif row.entity_type == "records":

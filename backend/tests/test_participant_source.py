@@ -14,6 +14,19 @@ from app.schemas.builder import ParticipantSource
 from app.services.participant_source_service import eligible_participants, ensure_eligible, validate_source
 
 
+def test_named_participant_group_limits_form_capture():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    Base.metadata.create_all(engine)
+    with sessionmaker(bind=engine)() as db:
+        form = BuilderTemplate(id="group-form", project_id="project", name="Visita")
+        db.add_all([form, Participant(id="p1", project_id="project", full_name="Uno", metadata_json='{"group_name":"Familias de Soacha"}'), Participant(id="p2", project_id="project", full_name="Dos")])
+        db.commit()
+        form.participant_source_json = ParticipantSource(mode="group", group_name="Familias de Soacha").model_dump_json()
+        assert [person.id for person in eligible_participants(db, form)] == ["p1"]
+        with pytest.raises(ValueError, match="no cumple"):
+            ensure_eligible(db, form, "p2")
+
+
 def test_previous_form_requires_matching_participant_and_status():
     engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
     Base.metadata.create_all(engine)

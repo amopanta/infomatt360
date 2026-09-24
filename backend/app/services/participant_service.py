@@ -28,6 +28,7 @@ def _to_read(row: Participant) -> ParticipantRead:
         metadata_json=row.metadata_json,
         department=metadata.get("department") or metadata.get("departamento"),
         municipality=metadata.get("municipality") or metadata.get("municipio"),
+        group_name=metadata.get("group_name"),
     )
 
 
@@ -43,8 +44,8 @@ class ParticipantService:
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Ya existe un participante con este documento en el proyecto",
                 )
-        fields = payload.model_dump(exclude={"department", "municipality"})
-        if payload.department or payload.municipality:
+        fields = payload.model_dump(exclude={"department", "municipality", "group_name"})
+        if payload.department or payload.municipality or payload.group_name:
             try:
                 metadata = json.loads(payload.metadata_json or "{}")
             except ValueError as exc:
@@ -55,9 +56,33 @@ class ParticipantService:
                 metadata["department"] = payload.department.strip()
             if payload.municipality:
                 metadata["municipality"] = payload.municipality.strip()
+            if payload.group_name:
+                metadata["group_name"] = payload.group_name.strip()
             fields["metadata_json"] = json.dumps(metadata, ensure_ascii=False)
         row = Participant(**fields)
         db.add(row)
+        db.commit()
+        db.refresh(row)
+        return _to_read(row)
+
+    def set_group(self, db: Session, participant_id: str, group_name: str) -> ParticipantRead:
+        row = db.get(Participant, participant_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Participante no encontrado")
+        try:
+            metadata = json.loads(row.metadata_json or "{}")
+        except ValueError:
+            metadata = {}
+        if not isinstance(metadata, dict):
+            metadata = {}
+        name = group_name.strip()
+        if len(name) > 160:
+            raise HTTPException(status_code=422, detail="El nombre del grupo supera 160 caracteres")
+        if name:
+            metadata["group_name"] = name
+        else:
+            metadata.pop("group_name", None)
+        row.metadata_json = json.dumps(metadata, ensure_ascii=False)
         db.commit()
         db.refresh(row)
         return _to_read(row)

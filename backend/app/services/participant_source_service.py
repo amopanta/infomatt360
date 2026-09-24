@@ -47,6 +47,17 @@ def eligible_participants(db: Session, template: BuilderTemplate) -> list[Partic
     if source.mode == "list":
         allowed = set(source.participant_ids)
         return [item for item in rows if item.id in allowed]
+    if source.mode == "group":
+        wanted = (source.group_name or "").strip().casefold()
+        result = []
+        for item in rows:
+            try:
+                metadata = json.loads(item.metadata_json or "{}")
+            except ValueError:
+                metadata = {}
+            if isinstance(metadata, dict) and str(metadata.get("group_name") or "").strip().casefold() == wanted:
+                result.append(item)
+        return result
     if source.mode == "filter":
         wanted = (source.municipality or "").strip().casefold()
         return [item for item in rows if participant_municipality(item) == wanted]

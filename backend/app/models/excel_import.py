@@ -28,6 +28,7 @@ class ExcelImportJob(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
     project_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     entity_type: Mapped[str] = mapped_column(String(30), nullable=False)
+    group_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
     # Solo se usa cuando entity_type="records": la plantilla cuyos campos
     # definen el mapeo dinamico de columnas (ver docs/104).
     template_id: Mapped[str | None] = mapped_column(String(36), nullable=True)

@@ -12,6 +12,7 @@ export type ExcelImportJob = {
   id: string;
   project_id: string;
   entity_type: string;
+  group_name?: string | null;
   template_id?: string | null;
   source_filename: string;
   status: string;
@@ -50,11 +51,12 @@ async function parseOrThrow<T>(response: Response, fallbackMessage: string): Pro
   return response.json();
 }
 
-export async function uploadExcelImport(payload: { projectId: string; entityType: string; templateId?: string; file: File }): Promise<ExcelImportJob> {
+export async function uploadExcelImport(payload: { projectId: string; entityType: string; templateId?: string; groupName?: string; file: File }): Promise<ExcelImportJob> {
   const formData = new FormData();
   formData.append('project_id', payload.projectId);
   formData.append('entity_type', payload.entityType);
   if (payload.templateId) formData.append('template_id', payload.templateId);
+  if (payload.groupName) formData.append('group_name', payload.groupName);
   formData.append('upload', payload.file);
   const response = await fetch(`${API_BASE_URL}/excel-import/upload`, { method: 'POST', headers: authHeaders(), body: formData });
   return parseOrThrow(response, 'No fue posible subir el archivo.');

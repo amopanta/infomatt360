@@ -34,13 +34,14 @@ async def upload_excel_import(
     project_id: str = Form(...),
     entity_type: str = Form(...),
     template_id: str | None = Form(None),
+    group_name: str | None = Form(None),
     upload: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> ExcelImportJobRead:
     require_project_permission(db, current_user.id, project_id, IDENTITY_USERS_MANAGE)
     content = await upload.read()
-    return excel_import_service.upload_and_preview(db, project_id, entity_type, upload.filename or "archivo.xlsx", content, current_user.id, template_id)
+    return excel_import_service.upload_and_preview(db, project_id, entity_type, upload.filename or "archivo.xlsx", content, current_user.id, template_id, group_name)
 
 
 @router.patch("/{job_id}/mapping", response_model=ExcelImportJobRead, summary="Confirmar mapeo de columnas")

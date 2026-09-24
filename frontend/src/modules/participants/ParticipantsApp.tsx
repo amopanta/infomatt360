@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
-import { PROJECT_KEY } from '../auth/session';
-import { fetchParticipant, fetchParticipantHistory, fetchProjectParticipants } from './api';
+import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
+import { assignParticipantGroup, fetchParticipant, fetchParticipantHistory, fetchProjectParticipants } from './api';
 import type { Participant, ParticipantHistoryItem } from './api';
 
 const STATUS_LABELS: Record<string, string> = {
@@ -26,6 +26,9 @@ function ParticipantList() {
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [query, setQuery] = useState('');
+  const [groupFilter, setGroupFilter] = useState('');
+  const [editingGroupId, setEditingGroupId] = useState('');
+  const [groupDraft, setGroupDraft] = useState('');
   const [message, setMessage] = useState('Cargando participantes...');
 
   useEffect(() => {
@@ -38,12 +41,23 @@ function ParticipantList() {
   }, [projectId]);
 
   const filtered = participants.filter((participant) => {
+    if (groupFilter && participant.group_name !== groupFilter) return false;
     const needle = query.trim().toLowerCase();
     if (!needle) return true;
     return [participant.full_name, participant.document_id, participant.external_code, participant.department, participant.municipality]
       .filter(Boolean)
       .some((value) => String(value).toLowerCase().includes(needle));
   });
+  const groups = Array.from(new Set(participants.map((participant) => participant.group_name).filter((name): name is string => Boolean(name)))).sort();
+
+  async function saveGroup(participantId: string) {
+    try {
+      const updated = await assignParticipantGroup(participantId, groupDraft);
+      setParticipants((rows) => rows.map((row) => row.id === participantId ? updated : row));
+      setEditingGroupId('');
+      setMessage('Grupo asignado.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible asignar el grupo.'); }
+  }
 
   return (
     <AppShell title="Participantes">
@@ -55,6 +69,7 @@ function ParticipantList() {
           </div>
           <input type="search" placeholder="Buscar por nombre, documento, código o municipio" value={query} onChange={(event) => setQuery(event.target.value)} />
         </header>
+        <div className="participants-group-toolbar"><label>Grupo de participantes<select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}><option value="">Todos los grupos</option>{groups.map((group) => <option key={group} value={group}>{group}</option>)}</select></label><a href="/admin/excel-import">Importar participantes desde Excel</a><span>{filtered.length} participante(s)</span></div>
         {message ? <p role="status">{message}</p> : null}
         <div className="records-table-wrap">
           <table className="records-table">
@@ -66,6 +81,7 @@ function ParticipantList() {
                 <th>Tipo</th>
                 <th>Departamento</th>
                 <th>Municipio</th>
+                <th>Grupo</th>
                 <th>Estado</th>
                 <th>Detalle</th>
               </tr>
@@ -79,12 +95,14 @@ function ParticipantList() {
                   <td>{participant.participant_type}</td>
                   <td>{participant.department || '—'}</td>
                   <td>{participant.municipality || '—'}</td>
+                  <td>{editingGroupId === participant.id ? <span className="participants-group-edit"><input aria-label={`Grupo de ${participant.full_name}`} list="participant-group-options" value={groupDraft} maxLength={160} onChange={(event) => setGroupDraft(event.target.value)} /><button type="button" onClick={() => void saveGroup(participant.id)}>Guardar</button><button type="button" onClick={() => setEditingGroupId('')}>Cancelar</button></span> : <span>{participant.group_name || 'Sin grupo'} {hasAnyCurrentProjectPermission(['identity.users.manage']) && <button type="button" className="participants-group-action" onClick={() => { setEditingGroupId(participant.id); setGroupDraft(participant.group_name || ''); }}>Asignar</button>}</span>}</td>
                   <td>{participant.status}</td>
                   <td><a href={`/participants/${participant.id}`}>Ver historial</a></td>
                 </tr>
               ))}
             </tbody>
           </table>
+          <datalist id="participant-group-options">{groups.map((group) => <option key={group} value={group} />)}</datalist>
         </div>
       </main>
     </AppShell>
@@ -130,6 +148,7 @@ function ParticipantDetail({ participantId }: { participantId: string }) {
             <div><dt>Tipo</dt><dd>{participant.participant_type}</dd></div>
             <div><dt>Departamento</dt><dd>{participant.department || '—'}</dd></div>
             <div><dt>Municipio</dt><dd>{participant.municipality || '—'}</dd></div>
+            <div><dt>Grupo</dt><dd>{participant.group_name || 'Sin grupo'}</dd></div>
             <div><dt>Estado</dt><dd>{participant.status}</dd></div>
           </dl>
         </section>

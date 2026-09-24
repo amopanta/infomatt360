@@ -17,6 +17,7 @@ class ExcelImportJobRead(BaseModel):
     id: str
     project_id: str
     entity_type: str
+    group_name: str | None = None
     template_id: str | None = None
     source_filename: str
     status: str

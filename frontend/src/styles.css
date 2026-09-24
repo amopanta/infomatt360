@@ -136,6 +136,12 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .participants-shell { max-width: 1180px; margin: 28px auto; padding: 0 24px; display: grid; gap: 20px; }
 .participants-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .participants-header p { color: var(--text-muted); max-width: 60ch; }
+.participants-group-toolbar { display: flex; align-items: end; gap: 16px; flex-wrap: wrap; }
+.participants-group-toolbar label { display: grid; gap: 5px; font-weight: 700; }
+.participants-group-toolbar select { min-width: 220px; padding: 8px; }
+.participants-group-edit { display: inline-flex; align-items: center; gap: 4px; }
+.participants-group-edit input { min-width: 170px; padding: 6px; }
+.records-table button.participants-group-action { margin-left: 6px; padding: 3px 6px; background: transparent; color: var(--brand-primary); }
 .participants-header input { width: min(360px, 100%); padding: 11px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); font: inherit; background: var(--surface); }
 .participant-summary-card { padding: 18px 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-md); }
 .participant-summary-card h2 { margin: 0 0 12px; }

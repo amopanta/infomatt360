@@ -29,6 +29,7 @@ export function ExcelImportApp() {
   const [entityType, setEntityType] = useState('participants');
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [templateId, setTemplateId] = useState('');
+  const [groupName, setGroupName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [currentJob, setCurrentJob] = useState<ExcelImportJob | null>(null);
   const [columnMapping, setColumnMapping] = useState<Record<string, string>>({});
@@ -56,13 +57,14 @@ export function ExcelImportApp() {
 
   async function submitUpload() {
     if (!file) return;
+    if (entityType === 'participants' && !groupName.trim()) { setMessage('Escribe un nombre para el grupo de participantes.'); return; }
     if (entityType === 'records' && !templateId) {
       setMessage('Selecciona la plantilla del formulario antes de subir el archivo.');
       return;
     }
     setBusy(true);
     try {
-      const job = await uploadExcelImport({ projectId, entityType, templateId: entityType === 'records' ? templateId : undefined, file });
+      const job = await uploadExcelImport({ projectId, entityType, templateId: entityType === 'records' ? templateId : undefined, groupName: entityType === 'participants' ? groupName.trim() : undefined, file });
       setCurrentJob(job);
       setValidation(null);
       setColumnMapping(job.column_mapping ?? {});
@@ -150,12 +152,13 @@ export function ExcelImportApp() {
                 </select>
               </label>
             ) : null}
+            {entityType === 'participants' && <label>Nombre del grupo de participantes<input value={groupName} maxLength={160} placeholder="Ej. Familias de Soacha 2026" onChange={(event) => setGroupName(event.target.value)} required /><small>Todos los participantes importados en este lote quedarán en este grupo.</small></label>}
             <button type="button" disabled={busy || (entityType === 'records' && !templateId)} onClick={() => void downloadExcelImportTemplate(projectId, entityType, entityType === 'records' ? templateId : undefined).catch((error: Error) => setMessage(error.message))}>⬇ Descargar plantilla</button>
             <label>
               Archivo (.xlsx)
               <input type="file" accept=".xlsx" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
             </label>
-            <button disabled={!file || busy} onClick={() => void submitUpload()}>Subir y previsualizar</button>
+            <button disabled={!file || busy || (entityType === 'participants' && !groupName.trim())} onClick={() => void submitUpload()}>Subir y previsualizar</button>
           </div>
         </section>
 
@@ -164,7 +167,7 @@ export function ExcelImportApp() {
             <header>
               <div>
                 <h2>2. Mapear columnas</h2>
-                <p>{currentJob.source_filename} · {currentJob.total_rows} fila(s) · estado: <span className={`wa-status ${statusClass(currentJob.status)}`}>{statusLabel(currentJob.status)}</span></p>
+                <p>{currentJob.source_filename} · {currentJob.total_rows} fila(s) {currentJob.group_name ? `· Grupo: ${currentJob.group_name}` : ''} · estado: <span className={`wa-status ${statusClass(currentJob.status)}`}>{statusLabel(currentJob.status)}</span></p>
               </div>
             </header>
             <div className="audit-table-wrap">

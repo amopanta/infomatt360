@@ -84,6 +84,18 @@ export async function fetchRuntimeTemplate(templateId: string): Promise<RuntimeT
   return response.json();
 }
 
+export type EligibleParticipant = { id: string; full_name: string; document_id?: string | null; external_code?: string | null; municipality?: string | null };
+
+export async function fetchCaptureParticipants(templateId: string): Promise<{ required: boolean; participants: EligibleParticipant[] }> {
+  const [detailResponse, participantsResponse] = await Promise.all([
+    fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}`, { headers: authorizationHeader() }),
+    fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}/eligible-participants`, { headers: authorizationHeader() }),
+  ]);
+  if (!detailResponse.ok || !participantsResponse.ok) throw new Error('No fue posible consultar los participantes asociados al formulario.');
+  const detail = await detailResponse.json();
+  return { required: Boolean(detail.participant_source?.mode && detail.participant_source.mode !== 'all'), participants: await participantsResponse.json() };
+}
+
 export function toRuntimeValueList(values: RuntimeFormValues): { field_name: string; field_value_json: string }[] {
   return Object.entries(values).map(([fieldName, value]) => ({
     field_name: fieldName,
@@ -94,12 +106,14 @@ export function toRuntimeValueList(values: RuntimeFormValues): { field_name: str
 export async function saveRuntimeRecord(params: {
   projectId: string;
   templateId: string;
+  participantId?: string | null;
   versionId?: string | null;
   values: RuntimeFormValues;
 }): Promise<unknown> {
   const payload = {
     project_id: params.projectId,
     template_id: params.templateId,
+    participant_id: params.participantId ?? null,
     version_id: params.versionId ?? null,
     status: 'submitted',
     values: toRuntimeValueList(params.values),
@@ -112,7 +126,8 @@ export async function saveRuntimeRecord(params: {
   });
 
   if (!response.ok) {
-    throw new Error('No fue posible guardar la respuesta Runtime.');
+    const body = await response.json().catch(() => null);
+    throw new Error(typeof body?.detail === 'string' ? body.detail : 'No fue posible guardar la respuesta.');
   }
 
   return response.json();

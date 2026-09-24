@@ -190,7 +190,11 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .record-detail div { min-width: 0; padding: 10px; border-radius: var(--radius-md); background: var(--surface-muted); }
 .record-detail dt { color: var(--text-muted); font-size: 12px; font-weight: 800; }
 .record-detail dd { margin: 5px 0 0; overflow-wrap: anywhere; }
-.record-deep-link-card { margin-bottom: 18px; padding: 16px; border: 2px solid var(--brand-primary); border-radius: var(--radius-lg); background: #eef6ff; }
+.record-deep-link-card { max-height: calc(100vh - 145px); overflow-y: auto; margin-bottom: 18px; padding: 16px; border: 2px solid var(--brand-primary); border-radius: var(--radius-lg); background: #eef6ff; }
+.record-deep-link-card .record-detail-actions { position: sticky; top: -16px; z-index: 3; padding: 12px 0; background: #eef6ff; }
+.record-field-search { display: flex; align-items: center; gap: 10px; margin: 8px 0; font-weight: 700; }
+.record-field-search input { width: min(440px, 100%); padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: white; }
+.record-field-count { margin: 4px 0 10px; color: var(--text-muted); font-size: 12px; }
 .record-deep-link-card header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
 .record-field-highlighted { outline: 3px solid #d64545; background: #fff2f2 !important; }
 .record-detail dd { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }

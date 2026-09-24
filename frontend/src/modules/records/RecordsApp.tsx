@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
-import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
+import { PROJECT_KEY, currentProjectPermissions, hasAnyCurrentProjectPermission } from '../auth/session';
 import { applyReviewAction, correctRecordField, downloadRecord, downloadTemplateRecords, duplicateRecord, fetchProjectTemplates, fetchRecord, fetchRecordNeighbors, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, promoteRecordToParticipant, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
 import { fetchActaTemplates, printActaBatch, printActaFromRecord, renderActaBatch, renderActaFromRecord } from '../acta/api';
@@ -26,64 +26,6 @@ function templateIdFromPath(): string {
   const parts = window.location.pathname.split('/').filter(Boolean);
   return parts[0] === 'records' ? parts[1] ?? '' : '';
 }
-
-const VOID_ACTION = { label: 'Anular', toStatus: 'voided', action: 'void' };
-
-const REVIEW_ACTIONS: Record<string, Array<{ label: string; toStatus: string; action: string }>> = {
-  draft: [
-    { label: 'Enviar', toStatus: 'submitted', action: 'submit' },
-    { label: 'Cancelar', toStatus: 'cancelled', action: 'cancel' },
-  ],
-  submitted: [
-    { label: 'Iniciar revisión', toStatus: 'under_review', action: 'start_review' },
-    { label: 'Aprobar', toStatus: 'approved', action: 'approve' },
-    { label: 'Devolver', toStatus: 'returned', action: 'return' },
-    { label: 'Rechazar', toStatus: 'rejected', action: 'reject' },
-    VOID_ACTION,
-  ],
-  under_review: [
-    { label: 'Aprobación técnica', toStatus: 'tech_approved', action: 'technical_approve' },
-    { label: 'Aprobar', toStatus: 'approved', action: 'approve' },
-    { label: 'Devolver', toStatus: 'returned', action: 'return' },
-    { label: 'Rechazar', toStatus: 'rejected', action: 'reject' },
-    VOID_ACTION,
-  ],
-  tech_approved: [
-    { label: 'Aprobación coordinador', toStatus: 'coordinator_approved', action: 'coordinator_approve' },
-    { label: 'Aprobar final', toStatus: 'approved', action: 'approve' },
-    { label: 'Devolver', toStatus: 'returned', action: 'return' },
-    { label: 'Rechazar', toStatus: 'rejected', action: 'reject' },
-    VOID_ACTION,
-  ],
-  coordinator_approved: [
-    { label: 'Aprobar final', toStatus: 'approved', action: 'final_approve' },
-    { label: 'Devolver', toStatus: 'returned', action: 'return' },
-    { label: 'Rechazar', toStatus: 'rejected', action: 'reject' },
-    VOID_ACTION,
-  ],
-  returned: [
-    { label: 'Marcar corregido', toStatus: 'corrected', action: 'mark_corrected' },
-    VOID_ACTION,
-  ],
-  corrected: [
-    { label: 'Reenviar a revisión', toStatus: 'under_review', action: 'resubmit_review' },
-    VOID_ACTION,
-  ],
-  approved: [
-    { label: 'Archivar', toStatus: 'archived', action: 'archive' },
-    { label: 'Marcar sincronizado', toStatus: 'synced', action: 'mark_synced' },
-    VOID_ACTION,
-  ],
-  rejected: [
-    { label: 'Archivar', toStatus: 'archived', action: 'archive' },
-    VOID_ACTION,
-  ],
-  archived: [VOID_ACTION],
-  synced: [
-    { label: 'Archivar', toStatus: 'archived', action: 'archive' },
-    VOID_ACTION,
-  ],
-};
 
 function FlowSnapshotSummary({ title, snapshot }: { title: string; snapshot?: ReviewFlowSnapshot | null }) {
   if (!snapshot) return <article><strong>{title}</strong><span>Sin flujo configurado.</span></article>;
@@ -280,10 +222,12 @@ function ReviewPanel({
   const [flowComparison, setFlowComparison] = useState<ReviewFlowComparison | null>(null);
   const [notes, setNotes] = useState('');
   const [rejectedFieldName, setRejectedFieldName] = useState('');
-  const fallbackActions = REVIEW_ACTIONS[record.status] ?? [];
-  const actions = nextActions.length
-    ? nextActions.map((item) => ({ label: item.label, toStatus: item.to_status, action: item.action, source: item.source }))
-    : fallbackActions;
+  const permissions = currentProjectPermissions();
+  const canReview = ['records.review', 'records.approve', 'records.coordinate', 'records.void'].some((permission) => permissions.has(permission))
+    || nextActions.some((item) => Boolean(item.required_permission && permissions.has(item.required_permission)));
+  const actions = nextActions
+    .filter((item) => Boolean(item.required_permission && permissions.has(item.required_permission)))
+    .map((item) => ({ label: item.label, toStatus: item.to_status, action: item.action }));
   const showFieldSelector = actions.some((item) => REJECTION_STATUSES.has(item.toStatus));
 
   async function loadReviewState() {
@@ -309,6 +253,8 @@ function ReviewPanel({
       onMessage(error instanceof Error ? error.message : 'No fue posible aplicar la revisión.');
     }
   }
+
+  if (!canReview) return null;
 
   return (
     <section className="review-panel">
@@ -724,6 +670,11 @@ function DeepLinkedRecordCard({
 }) {
   const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({});
+  const [fieldQuery, setFieldQuery] = useState('');
+  const visibleValues = record.values.filter((value) => {
+    const term = fieldQuery.trim().toLocaleLowerCase();
+    return !term || `${fieldLabels[value.field_name] || value.field_name} ${value.field_name}`.toLocaleLowerCase().includes(term);
+  });
 
   useEffect(() => {
     fetchRuntimeTemplate(record.template_id)
@@ -740,6 +691,9 @@ function DeepLinkedRecordCard({
     <section className="record-deep-link-card">
       <div className="record-detail-actions">
         <a href={`/records/${record.template_id}`}>← Grilla</a>
+        {hasAnyCurrentProjectPermission(['records.write']) && ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && (editMode
+          ? <a href={`/records/${record.template_id}?recordId=${record.id}`}>Ver respuesta</a>
+          : <a href={`/records/${record.template_id}?recordId=${record.id}&edit=1`}>✎ Editar respuesta</a>)}
         <a aria-disabled={!previousId} href={previousId ? `/records/${record.template_id}?recordId=${previousId}` : undefined}>Anterior</a>
         <a aria-disabled={!nextId} href={nextId ? `/records/${record.template_id}?recordId=${nextId}` : undefined}>Siguiente</a>
         <button type="button" onClick={() => void downloadRecord(record.id).catch((error: Error) => onMessage(error.message))}>Descargar JSON</button>
@@ -749,8 +703,10 @@ function DeepLinkedRecordCard({
         <strong>{editMode ? 'Editar respuesta' : 'Respuesta completa'}</strong>
         <span className={`record-status ${record.status}`}>{record.status}</span>
       </header>
+      <label className="record-field-search">Buscar pregunta<input type="search" value={fieldQuery} onChange={(event) => setFieldQuery(event.target.value)} placeholder="Nombre de la pregunta o campo" /></label>
+      <p className="record-field-count">{visibleValues.length} de {record.values.length} campos</p>
       <dl className="record-detail">
-        {record.values.map((value) => (
+        {visibleValues.map((value) => (
           <div
             key={value.id}
             ref={(node) => { fieldRefs.current[value.field_name] = node; }}
@@ -761,6 +717,7 @@ function DeepLinkedRecordCard({
           </div>
         ))}
       </dl>
+      {!visibleValues.length && <p>No se encontraron preguntas con ese nombre.</p>}
       <PromoteToParticipantPanel projectId={projectId} record={record} onPromoted={onRecordUpdated} onMessage={onMessage} />
       <LinkedSubformSection projectId={projectId} record={record} onMessage={onMessage} />
       <ReviewPanel projectId={projectId} record={record} onMessage={onMessage} />

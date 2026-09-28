@@ -9,6 +9,12 @@ from app.db.session import get_db
 from app.main import app
 from app.models.assignment import UserProjectAssignment
 from app.models.identity import Project, User
+from app.models.messages import MailProfile
+from app.services.mail_autoconfig_service import send_smtp_message
+from app.services.password_mail_service import password_mail_service
+from app.core.security import encrypt_text
+from email.message import EmailMessage
+import json
 
 
 def setup_client():
@@ -116,6 +122,61 @@ def test_mail_autoconfig_suggests_known_provider_and_ignores_unknown():
             unknown = client.get("/api/v1/messages/profiles/autoconfig", headers=sender_headers, params={"email": "coordinador@fundacion-interna.org"})
             assert unknown.status_code == 200
             assert unknown.json()["found"] is False
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_smtp_supports_hosting_ssl_and_legacy_starttls(monkeypatch):
+    calls = []
+
+    class FakeSMTP:
+        def __init__(self, host, port, **kwargs):
+            calls.append(("connect", host, port, kwargs))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return None
+
+        def starttls(self, **_kwargs):
+            calls.append(("starttls",))
+
+        def login(self, username, password):
+            calls.append(("login", username, password))
+
+        def send_message(self, message):
+            calls.append(("send", message["To"]))
+
+    monkeypatch.setattr("app.services.mail_autoconfig_service.smtplib.SMTP", FakeSMTP)
+    monkeypatch.setattr("app.services.mail_autoconfig_service.smtplib.SMTP_SSL", FakeSMTP)
+    message = EmailMessage()
+    message["To"] = "test@example.org"
+    send_smtp_message("mail.example.org", 465, {"security": "ssl", "username": "test@example.org", "password": "secret"}, message)
+    assert calls[0][:3] == ("connect", "mail.example.org", 465)
+    assert "context" in calls[0][3]
+    assert ("starttls",) not in calls
+    assert ("login", "test@example.org", "secret") in calls
+    calls.clear()
+    send_smtp_message("mail.example.org", 587, {"use_tls": True}, message)
+    assert ("starttls",) in calls
+
+
+def test_password_recovery_uses_default_project_smtp(monkeypatch):
+    engine = setup_client()
+    sessions = sessionmaker(bind=engine)
+    captured = []
+    monkeypatch.setattr("app.services.password_mail_service.send_smtp_message", lambda *args: captured.append(args))
+    try:
+        with sessions() as db:
+            db.add(MailProfile(project_id="msg-project", name="Hosting", provider="smtp", sender_email="avisos@midominio.com", server_host="mail.midominio.com", server_port="465", config_json=encrypt_text(json.dumps({"security": "ssl", "username": "avisos@midominio.com", "password": "clave"})), is_default="true", status="active"))
+            db.commit()
+            assert password_mail_service.send_reset_link("recipient@example.com", "token", db)
+        assert captured[0][0:2] == ("mail.midominio.com", 465)
+        assert captured[0][2]["security"] == "ssl"
+        assert captured[0][3]["From"] == "avisos@midominio.com"
+        assert captured[0][3]["To"] == "recipient@example.com"
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

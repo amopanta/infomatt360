@@ -18,6 +18,7 @@ from app.core.config import settings
 from app.core.permissions import METRICS_VIEW_PERMISSIONS
 from app.db.session import get_db
 from app.models.identity import User
+from app.models.messages import MailProfile
 from app.services.metrics_service import metrics_service
 
 router = APIRouter()
@@ -98,8 +99,11 @@ def readiness(db: Session = Depends(get_db)) -> dict[str, object]:
         warnings.append("CORS no debe permitir comodin * en produccion")
     if settings.environment.lower() in {"production", "prod"} and not settings.api_rate_limit_trusted_proxy_ips:
         warnings.append("X-Forwarded-For sera ignorado porque no hay proxies confiables configurados")
-    if not settings.smtp_host:
-        warnings.append("SMTP no configurado; recuperacion de contrasena solo registra token en logs/dev")
+    smtp_profile_exists = db.query(MailProfile.id).filter(
+        MailProfile.provider == "smtp", MailProfile.status == "active", MailProfile.is_default == "true"
+    ).first() is not None
+    if not settings.smtp_host and not smtp_profile_exists:
+        warnings.append("SMTP no configurado; la recuperacion de contrasena no puede enviar correos")
     redis_status, redis_error = _redis_health_check()
     if redis_error:
         warnings.append(redis_error)

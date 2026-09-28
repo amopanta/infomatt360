@@ -57,7 +57,7 @@ export type MailProfileCreatePayload = {
   senderEmail: string;
   serverHost?: string;
   serverPort?: string;
-  useTls?: boolean;
+  security?: 'starttls' | 'ssl' | 'none';
   username?: string;
   password?: string;
   isDefault?: boolean;
@@ -67,7 +67,7 @@ export async function createMailProfile(payload: MailProfileCreatePayload): Prom
   const configJson =
     payload.provider === 'imap'
       ? JSON.stringify({ username: payload.username || undefined, password: payload.password || undefined })
-      : JSON.stringify({ use_tls: payload.useTls ?? true, username: payload.username || undefined, password: payload.password || undefined });
+      : JSON.stringify({ security: payload.security ?? 'starttls', username: payload.username || undefined, password: payload.password || undefined });
   const response = await fetch(`${API_BASE_URL}/messages/profiles`, {
     method: 'POST',
     headers: headers(),

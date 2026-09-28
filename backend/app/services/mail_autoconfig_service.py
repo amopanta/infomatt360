@@ -18,10 +18,13 @@ logger = logging.getLogger(__name__)
 
 KNOWN_PROVIDERS: dict[str, dict[str, object]] = {
     "gmail.com": {"server_host": "smtp.gmail.com", "server_port": "587", "use_tls": True},
-    "outlook.com": {"server_host": "smtp.office365.com", "server_port": "587", "use_tls": True},
-    "hotmail.com": {"server_host": "smtp.office365.com", "server_port": "587", "use_tls": True},
+    "outlook.com": {"server_host": "smtp-mail.outlook.com", "server_port": "587", "use_tls": True},
+    "hotmail.com": {"server_host": "smtp-mail.outlook.com", "server_port": "587", "use_tls": True},
+    "live.com": {"server_host": "smtp-mail.outlook.com", "server_port": "587", "use_tls": True},
+    "msn.com": {"server_host": "smtp-mail.outlook.com", "server_port": "587", "use_tls": True},
     "office365.com": {"server_host": "smtp.office365.com", "server_port": "587", "use_tls": True},
     "yahoo.com": {"server_host": "smtp.mail.yahoo.com", "server_port": "587", "use_tls": True},
+    "zoho.com": {"server_host": "smtp.zoho.com", "server_port": "587", "use_tls": True},
 }
 
 

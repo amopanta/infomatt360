@@ -125,6 +125,19 @@ export function ErpApp() {
   return (
     <AppShell title="ERP">
       <main className="erp-shell">
+        <section className="erp-resources" aria-labelledby="erp-resources-title">
+          <div>
+            <h2 id="erp-resources-title">Guías y plantillas</h2>
+            <p>Consulta cómo usar inventario y honorarios, y prepara una prueba del flujo antes de operar con datos reales.</p>
+          </div>
+          <div className="erp-resource-links">
+            <a href="/erp/manual-usuario-erp-infomatt360.pdf" target="_blank" rel="noopener noreferrer">Ver manual de usuario</a>
+            <a href="/erp/manual-usuario-erp-infomatt360.docx" download>Descargar manual editable</a>
+            <a href="/erp/plantilla-erp-infomatt360.xlsx" download>Descargar plantilla Excel</a>
+            <a href="/erp/validacion-erp-infomatt360-2026-09-28.md" download>Descargar diagnóstico</a>
+          </div>
+          <p className="erp-resource-note">La plantilla sirve para preparar y validar datos; el ERP aún no permite importarla directamente.</p>
+        </section>
         <nav className="erp-tabs">
           <button className={tab === 'inventory' ? 'active' : undefined} onClick={() => setTab('inventory')}>Inventario</button>
           <button className={tab === 'payroll' ? 'active' : undefined} onClick={() => setTab('payroll')}>Honorarios</button>

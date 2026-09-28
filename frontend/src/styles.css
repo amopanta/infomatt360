@@ -949,6 +949,13 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .participant-promote-panel button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .erp-shell { max-width: 1180px; margin: 28px auto; padding: 0 24px; }
+.erp-resources { margin-bottom: 20px; padding: 20px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); box-shadow: var(--shadow-md); }
+.erp-resources h2 { margin: 0 0 6px; }
+.erp-resources p { margin: 0; color: var(--text-muted); }
+.erp-resource-links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.erp-resource-links a { display: inline-flex; align-items: center; padding: 9px 12px; border: 1px solid var(--brand-primary); border-radius: var(--radius-md); color: var(--brand-primary); font-weight: 700; text-decoration: none; }
+.erp-resource-links a:hover, .erp-resource-links a:focus-visible { background: var(--brand-primary); color: #fff; }
+.erp-resources .erp-resource-note { margin-top: 12px; font-size: .9rem; }
 .erp-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
 .erp-tabs button { border: 1px solid var(--border); border-radius: var(--radius-md); padding: 10px 16px; background: var(--surface); font-weight: 800; color: var(--text-muted); cursor: pointer; }
 .erp-tabs button.active { background: var(--brand-primary); color: #ffffff; border-color: var(--brand-primary); }

@@ -1255,3 +1255,46 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .indicator-import h3 { width: 100%; margin: 0; }
 .indicator-import input[type=file] { max-width: 320px; }
 .indicator-import > div { width: 100%; }
+/* Navegacion agrupada + iconos (rediseno UI, feat/ui-redesign)
+   Presentacion sobre los tokens existentes. No fija colores literales de marca.
+   ========================================================================= */
+svg.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.app-nav { gap: 2px; }
+.app-nav-section { border: 0; }
+.app-nav-section > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; color: #94a3b8; font-size: var(--font-size-xs); font-weight: 800; letter-spacing: .06em; text-transform: uppercase; padding: 10px var(--space-3) 5px; }
+.app-nav-section > summary::-webkit-details-marker { display: none; }
+.app-nav-section > summary .app-nav-section-icon { width: 15px; height: 15px; opacity: .8; }
+.app-nav-section > summary .app-nav-caret { width: 14px; height: 14px; margin-left: auto; opacity: .7; transition: transform 160ms ease; }
+.app-nav-section[open] > summary .app-nav-caret { transform: rotate(180deg); }
+.app-nav-section-items { display: flex; flex-direction: column; gap: 1px; }
+.app-sidebar a { display: flex; align-items: center; gap: 10px; }
+.app-sidebar a svg.ic { opacity: .9; }
+.app-sidebar a.active svg.ic { opacity: 1; }
+.app-nav-group summary { display: flex; align-items: center; gap: 10px; }
+.app-nav-group summary::after { margin-left: auto; }
+.app-nav-group summary svg.ic { opacity: .9; }
+
+/* ================================================================
+   Tokens de color Infomatt 360 — Dia 2 (rediseno UI)
+   Paleta corporativa Infomatt: #0A2540 / #0066CC / #00C2FF
+   Sobreescribe la paleta teal por defecto del sistema.
+   ================================================================ */
+:root {
+  --brand-primary:        #0066CC;   /* Azul corporativo Infomatt */
+  --brand-accent:         #00C2FF;   /* Azul electrico / highlights */
+  --brand-primary-strong: #0052A3;   /* Azul oscuro (hover, enfasis) */
+  --brand-primary-soft:   #CCE5FF;   /* Azul muy claro (fondos suaves) */
+  --navy:                 #0A2540;   /* Azul marino profundo Infomatt */
+  --navy-soft:            #0D3157;   /* Variante sidebar ligeramente mas clara */
+}
+
+/* Reemplazar teal hardcodeado en auth-page y geo-polygon */
+.auth-page {
+  background:
+    radial-gradient(circle at 75% 20%, rgba(0, 194, 255, 0.18), transparent 32%),
+    var(--text);
+}
+
+.runtime-geo-polygon {
+  fill: rgba(0, 194, 255, 0.18);
+}

@@ -25,6 +25,11 @@ KNOWN_PROVIDERS: dict[str, dict[str, object]] = {
     "office365.com": {"server_host": "smtp.office365.com", "server_port": "587", "use_tls": True},
     "yahoo.com": {"server_host": "smtp.mail.yahoo.com", "server_port": "587", "use_tls": True},
     "zoho.com": {"server_host": "smtp.zoho.com", "server_port": "587", "use_tls": True},
+    "icloud.com": {"server_host": "smtp.mail.me.com", "server_port": "587", "use_tls": True},
+    "me.com": {"server_host": "smtp.mail.me.com", "server_port": "587", "use_tls": True},
+    "mac.com": {"server_host": "smtp.mail.me.com", "server_port": "587", "use_tls": True},
+    "fastmail.com": {"server_host": "smtp.fastmail.com", "server_port": "587", "use_tls": True},
+    "gmx.com": {"server_host": "mail.gmx.com", "server_port": "587", "use_tls": True},
 }
 
 

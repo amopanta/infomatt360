@@ -13,6 +13,11 @@ const SMTP_PRESETS = {
   microsoft365: { label: 'Microsoft 365 empresarial', host: 'smtp.office365.com', port: '587', security: 'starttls', help: 'El administrador debe habilitar SMTP AUTH para el buzón. Algunas organizaciones exigen OAuth2, aún no disponible aquí.' },
   yahoo: { label: 'Yahoo Mail', host: 'smtp.mail.yahoo.com', port: '587', security: 'starttls', help: 'Yahoo puede pedir una contraseña de aplicación para conectar servicios externos.' },
   zoho: { label: 'Zoho Mail personal', host: 'smtp.zoho.com', port: '587', security: 'starttls', help: 'Si tu cuenta Zoho usa un dominio empresarial, el servidor suele ser smtppro.zoho.com: confírmalo en Zoho.' },
+  zohoBusiness: { label: 'Zoho Mail empresarial', host: 'smtppro.zoho.com', port: '587', security: 'starttls', help: 'Usa el correo completo y la contraseña de aplicación si tienes autenticación de dos factores.' },
+  icloud: { label: 'Apple iCloud Mail', host: 'smtp.mail.me.com', port: '587', security: 'starttls', help: 'Usa tu dirección completa de iCloud y una contraseña específica de aplicación de Apple.' },
+  fastmail: { label: 'Fastmail', host: 'smtp.fastmail.com', port: '465', security: 'ssl', help: 'Fastmail requiere una contraseña de aplicación. Comprueba que tu plan permita acceso SMTP.' },
+  gmx: { label: 'GMX', host: 'mail.gmx.com', port: '587', security: 'starttls', help: 'Activa el acceso de aplicaciones externas en GMX si tu cuenta lo requiere.' },
+  protonBusiness: { label: 'Proton Mail (dominio propio y plan compatible)', host: 'smtp.protonmail.ch', port: '587', security: 'starttls', help: 'Solo para cuentas con SMTP submission habilitado y dominio propio. Usa el token SMTP generado en Proton como contraseña; la contraseña habitual no funciona.' },
 } as const;
 type SmtpPreset = keyof typeof SMTP_PRESETS | 'custom';
 

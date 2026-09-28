@@ -127,6 +127,15 @@ def test_mail_autoconfig_suggests_known_provider_and_ignores_unknown():
             assert zoho.status_code == 200
             assert zoho.json()["server_host"] == "smtp.zoho.com"
 
+            for email, host in [
+                ("persona@icloud.com", "smtp.mail.me.com"),
+                ("persona@fastmail.com", "smtp.fastmail.com"),
+                ("persona@gmx.com", "mail.gmx.com"),
+            ]:
+                response = client.get("/api/v1/messages/profiles/autoconfig", headers=sender_headers, params={"email": email})
+                assert response.status_code == 200
+                assert response.json()["server_host"] == host
+
             unknown = client.get("/api/v1/messages/profiles/autoconfig", headers=sender_headers, params={"email": "coordinador@fundacion-interna.org"})
             assert unknown.status_code == 200
             assert unknown.json()["found"] is False

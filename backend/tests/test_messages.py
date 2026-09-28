@@ -119,6 +119,14 @@ def test_mail_autoconfig_suggests_known_provider_and_ignores_unknown():
                 "use_tls": True,
             }
 
+            hotmail = client.get("/api/v1/messages/profiles/autoconfig", headers=sender_headers, params={"email": "persona@hotmail.com"})
+            assert hotmail.status_code == 200
+            assert hotmail.json()["server_host"] == "smtp-mail.outlook.com"
+
+            zoho = client.get("/api/v1/messages/profiles/autoconfig", headers=sender_headers, params={"email": "persona@zoho.com"})
+            assert zoho.status_code == 200
+            assert zoho.json()["server_host"] == "smtp.zoho.com"
+
             unknown = client.get("/api/v1/messages/profiles/autoconfig", headers=sender_headers, params={"email": "coordinador@fundacion-interna.org"})
             assert unknown.status_code == 200
             assert unknown.json()["found"] is False

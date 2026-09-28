@@ -7,6 +7,15 @@ import type { MailProfile } from './mailApi';
 import { createScheduledMailPollTask, fetchScheduledTasks } from './schedulerApi';
 import type { ScheduledTask } from './schedulerApi';
 
+const SMTP_PRESETS = {
+  gmail: { label: 'Gmail / Google Workspace', host: 'smtp.gmail.com', port: '587', security: 'starttls', help: 'Google puede pedir una contraseña de aplicación con verificación en dos pasos.' },
+  outlook: { label: 'Outlook.com / Hotmail / Live', host: 'smtp-mail.outlook.com', port: '587', security: 'starttls', help: 'Microsoft exige OAuth2 para Outlook.com. Infomatt360 aún no ofrece esa vinculación; completar los datos no garantiza el envío.' },
+  microsoft365: { label: 'Microsoft 365 empresarial', host: 'smtp.office365.com', port: '587', security: 'starttls', help: 'El administrador debe habilitar SMTP AUTH para el buzón. Algunas organizaciones exigen OAuth2, aún no disponible aquí.' },
+  yahoo: { label: 'Yahoo Mail', host: 'smtp.mail.yahoo.com', port: '587', security: 'starttls', help: 'Yahoo puede pedir una contraseña de aplicación para conectar servicios externos.' },
+  zoho: { label: 'Zoho Mail personal', host: 'smtp.zoho.com', port: '587', security: 'starttls', help: 'Si tu cuenta Zoho usa un dominio empresarial, el servidor suele ser smtppro.zoho.com: confírmalo en Zoho.' },
+} as const;
+type SmtpPreset = keyof typeof SMTP_PRESETS | 'custom';
+
 export function MailProfilesApp() {
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [profiles, setProfiles] = useState<MailProfile[]>([]);
@@ -17,6 +26,7 @@ export function MailProfilesApp() {
 
   const [name, setName] = useState('');
   const [provider, setProvider] = useState<'smtp' | 'imap'>('smtp');
+  const [smtpPreset, setSmtpPreset] = useState<SmtpPreset>('custom');
   const [senderEmail, setSenderEmail] = useState('');
   const [serverHost, setServerHost] = useState('');
   const [serverPort, setServerPort] = useState('');
@@ -64,7 +74,7 @@ export function MailProfilesApp() {
 
   async function handleEmailBlur() {
     const email = senderEmail.trim();
-    if (!email.includes('@')) return;
+    if (provider !== 'smtp' || smtpPreset !== 'custom' || !email.includes('@')) return;
     try {
       const suggestion = await suggestMailAutoconfig(email);
       if (suggestion.found) {
@@ -78,6 +88,22 @@ export function MailProfilesApp() {
     } catch {
       setAutoconfigNote('');
     }
+  }
+
+  function chooseSmtpPreset(next: SmtpPreset) {
+    setSmtpPreset(next);
+    if (next === 'custom') {
+      setServerHost('');
+      setServerPort('');
+      setAutoconfigNote('Para correo del hosting, consulta servidor SMTP, puerto y seguridad en el panel de tu proveedor.');
+      return;
+    }
+    const preset = SMTP_PRESETS[next];
+    setServerHost(preset.host);
+    setServerPort(preset.port);
+    setSecurity(preset.security);
+    if (senderEmail.trim() && !username.trim()) setUsername(senderEmail.trim());
+    setAutoconfigNote(preset.help);
   }
 
   async function submitCreate() {
@@ -108,6 +134,7 @@ export function MailProfilesApp() {
       setPassword('');
       setIsDefault(false);
       setSecurity('starttls');
+      setSmtpPreset('custom');
       setAutoconfigNote('');
       await loadProfiles();
     } catch (error) {
@@ -138,18 +165,24 @@ export function MailProfilesApp() {
           <header>
             <div>
               <h2>Nuevo perfil de correo</h2>
-              <p>Conecta una cuenta de cualquier proveedor o de tu hosting mediante SMTP. Usa los datos de conexión que te entregó el proveedor.</p>
+              <p>Selecciona tu servicio para completar automáticamente el servidor y la seguridad, o usa los datos de tu hosting.</p>
             </div>
           </header>
           <div className="ai-analyze-inline">
             <label>Tipo
-              <select value={provider} onChange={(event) => setProvider(event.target.value as 'smtp' | 'imap')}>
+              <select value={provider} onChange={(event) => { setProvider(event.target.value as 'smtp' | 'imap'); setSmtpPreset('custom'); setServerHost(''); setServerPort(''); setAutoconfigNote(''); }}>
                 <option value="smtp">Envío (SMTP)</option>
                 <option value="imap">Bandeja externa de solo lectura (IMAP)</option>
               </select>
             </label>
+            {provider === 'smtp' ? <label>Servicio de correo
+              <select value={smtpPreset} onChange={(event) => chooseSmtpPreset(event.target.value as SmtpPreset)}>
+                <option value="custom">Otro proveedor o correo del hosting</option>
+                {Object.entries(SMTP_PRESETS).map(([key, preset]) => <option key={key} value={key}>{preset.label}</option>)}
+              </select>
+            </label> : null}
             <label>Nombre<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Correo institucional" /></label>
-            <label>{provider === 'imap' ? 'Casilla a leer' : 'Correo remitente'}<input value={senderEmail} onChange={(event) => setSenderEmail(event.target.value)} onBlur={() => void handleEmailBlur()} placeholder="notificaciones@midominio.com" /></label>
+            <label>{provider === 'imap' ? 'Casilla a leer' : 'Correo remitente'}<input type="email" value={senderEmail} onChange={(event) => { const previous = senderEmail.trim(); const next = event.target.value; setSenderEmail(next); if (!username.trim() || username.trim() === previous) setUsername(next); }} onBlur={() => void handleEmailBlur()} placeholder="notificaciones@midominio.com" /></label>
             <label>Servidor {provider === 'imap' ? 'IMAP' : 'SMTP'}<input value={serverHost} onChange={(event) => setServerHost(event.target.value)} placeholder={provider === 'imap' ? 'imap.midominio.com' : 'smtp.midominio.com'} /></label>
             <label>Puerto<input value={serverPort} onChange={(event) => setServerPort(event.target.value)} placeholder={provider === 'imap' ? '993' : security === 'ssl' ? '465' : '587'} /></label>
             <label>Usuario<input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Normalmente, el correo completo" /></label>

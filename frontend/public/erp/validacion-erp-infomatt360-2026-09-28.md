@@ -6,7 +6,7 @@ Fecha: 28 de septiembre de 2026. Entorno: VPS de producción, `https://infomatt3
 
 El módulo implementado corresponde al alcance descrito en `docs/84_ERP_HEADLESS_INVENTARIO_NOMINA.md`: inventario por SKU y proyecto, descuento al aprobar entregas de formularios vinculados, historial de movimientos y honorarios de tarifa fija. **Siete pruebas específicas pasaron** en un contenedor aislado que usa el código del VPS. La API de salud respondió `200`; inventario y honorarios rechazaron solicitudes sin sesión con `401`.
 
-La base de producción contiene **0 ítems, 0 movimientos, 0 honorarios y 0 configuraciones de formulario ERP**. Por ello no existe aún un flujo ERP real para certificar en producción. Esta revisión no creó ni modificó datos de negocio y no dispuso de una sesión autenticada para comprobar la interfaz por rol.
+Antes de crear el caso QA, la base de producción contenía **0 ítems, 0 movimientos, 0 honorarios y 0 configuraciones de formulario ERP**. Posteriormente se creó un caso ficticio en un proyecto de pruebas separado. Todavía no se ha certificado el uso de la interfaz con una sesión autenticada por rol ni un flujo con datos operativos reales.
 
 | Requisito documentado | Evidencia | Estado |
 | --- | --- | --- |
@@ -27,9 +27,20 @@ La base de producción contiene **0 ítems, 0 movimientos, 0 honorarios y 0 conf
 4. La pantalla de Honorarios filtra por `user_id`, no por nombre; esto dificulta el uso por personal operativo.
 5. El Excel adjunto es una **plantilla de preparación y validación**, con una fila de ejemplo ficticia. El módulo no dispone de importación masiva de esa plantilla.
 
+## Registro de ejemplo creado en el VPS
+
+- Proyecto: **QA - ERP de ejemplo** (`66580e3a-5ae4-5dd7-a190-135f84616246`), asignado al administrador existente.
+- Formulario: **QA - Entrega de kit ERP** (`eeab3eef-463e-5255-89ad-6d138366e4b2`), vinculado a los campos `sku_kit` y `cantidad_entregada`.
+- Registro ficticio aprobado: `5b600abe-ca9f-5352-a37a-e4ff3706a3f5`, con SKU `KIT-QA-001` y cantidad 3.
+- Inventario: alta inicial de 10 unidades, movimiento de entrega de −3 y saldo final de **7**.
+- Honorario: **15.000** en estado acumulado; no se marcó como pagado ni se efectuó desembolso.
+- La segunda ejecución del creador devolvió `already_exists` y mantuvo un solo proyecto, un formulario, un registro, un ítem, dos movimientos y un honorario.
+
+Para verlo, vuelva a iniciar sesión para actualizar la lista de proyectos, seleccione **QA - ERP de ejemplo** y abra **ERP** para el saldo y honorario o **Formularios activos → QA - Entrega de kit ERP → Datos** para la respuesta.
+
 ## Siguiente validación en producción
 
-Con una cuenta de pruebas que tenga permisos de gestión ERP y otra de aprobación, crear un proyecto o caso QA aislado; cargar un SKU de prueba con 10 unidades; vincular un formulario de entrega con campos SKU y cantidad; enviar y aprobar una respuesta de 3 unidades; comprobar saldo 7, movimiento `-3` y honorario acumulado. Después intentar una entrega de 99 unidades, confirmar que la aprobación se rechaza sin cambiar saldos, y registrar el resultado en la pestaña **Validación** del Excel. El marcado de pago se debe probar solo con un honorario de prueba.
+Con cuentas de pruebas de gestión ERP y aprobación, comprobar visualmente el caso QA anterior. Después, en un caso de prueba adicional, intentar una entrega de 99 unidades y confirmar que la aprobación se rechaza sin cambiar saldos. Registrar el resultado en la pestaña **Validación** del Excel. El marcado de pago se debe probar solo con un honorario de prueba.
 
 ## Entregables
 

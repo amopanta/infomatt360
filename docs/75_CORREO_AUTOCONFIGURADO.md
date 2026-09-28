@@ -64,3 +64,37 @@ llega hasta el servidor SMTP y no falla silenciosamente.
 - El permiso `messages.write` solo controla la visibilidad del menu en el
   frontend: el backend (`messages.py`) solo exige pertenencia al proyecto
   para crear/listar perfiles y enviar la prueba, sin un permiso dedicado.
+
+## Estado actualizado: septiembre de 2026
+
+En Administración → Cuentas de correo, el selector de envío SMTP completa
+servidor, puerto y seguridad para Gmail/Google Workspace,
+Outlook.com/Hotmail/Live, Microsoft 365, Yahoo, Zoho personal, Zoho
+empresarial, iCloud Mail, Fastmail, GMX y Proton Mail con dominio propio.
+"Otro proveedor o correo del hosting" permite introducir los datos de
+cualquier servidor SMTP compatible. La sugerencia por dominio también
+reconoce las direcciones comunes de iCloud, Fastmail y GMX. La tabla es
+estática: las direcciones con dominio institucional se configuran con el
+selector o con los datos del proveedor.
+
+| Servicio | Servidor | Puerto y seguridad | Requisito particular |
+| --- | --- | --- | --- |
+| iCloud Mail | `smtp.mail.me.com` | 587, STARTTLS | Contraseña específica de aplicación. |
+| Fastmail | `smtp.fastmail.com` | 465, SSL/TLS | Contraseña de aplicación y plan con SMTP. |
+| GMX | `mail.gmx.com` | 587, STARTTLS | Acceso de aplicaciones externas según la cuenta. |
+| Zoho empresarial | `smtppro.zoho.com` | 587, STARTTLS | Cuenta del dominio empresarial. |
+| Proton Mail con dominio propio | `smtp.protonmail.ch` | 587, STARTTLS | Plan con SMTP submission y token SMTP generado en Proton. |
+
+La selección carga valores de ejemplo que el administrador puede corregir.
+Outlook.com exige OAuth2 y esa vinculación todavía no está implementada;
+Microsoft 365 depende de que SMTP AUTH esté habilitado en el buzón. El
+perfil se debe verificar con **Enviar prueba**. En el VPS no hay una cuenta
+SMTP predeterminada configurada, así que todavía no se ha acreditado la
+entrega real de correo desde producción.
+
+Referencias oficiales: [Apple](https://support.apple.com/es-es/102525),
+[Fastmail](https://www.fastmail.help/hc/en-us/articles/1500000278342?domain=f-m.fm),
+[GMX](https://support.gmx.com/pop-imap/imap/server.html),
+[Zoho](https://www.zoho.com/mail/help/imap-access.html),
+[Proton](https://proton.me/support/smtp-submission),
+[Microsoft](https://support.microsoft.com/es-es/outlook/pop-imap-and-smtp-settings-for-outlook-com).

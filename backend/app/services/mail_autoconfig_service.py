@@ -8,6 +8,7 @@ conocidos, mas una prueba real de envio antes de guardar la cuenta.
 
 import logging
 import smtplib
+import ssl
 from email.message import EmailMessage
 
 from app.models.messages import MailProfile
@@ -44,18 +45,30 @@ class MailAutoconfigService:
         message.set_content("Este es un correo de prueba para validar la configuracion SMTP del perfil.")
 
         try:
-            with smtplib.SMTP(profile.server_host, int(profile.server_port), timeout=15) as smtp:
-                if credentials.get("use_tls", True):
-                    smtp.starttls()
-                username = credentials.get("username")
-                password = credentials.get("password")
-                if username and password:
-                    smtp.login(str(username), str(password))
-                smtp.send_message(message)
+            send_smtp_message(profile.server_host, int(profile.server_port), credentials, message)
             return True, "Correo de prueba enviado"
-        except (OSError, smtplib.SMTPException) as exc:
+        except (OSError, ValueError, smtplib.SMTPException) as exc:
             logger.warning("Prueba de envio SMTP fallida para perfil %s: %s", profile.id, exc)
-            return False, f"No fue posible enviar el correo de prueba: {exc}"
+            return False, "No fue posible enviar el correo de prueba. Revisa servidor, puerto, seguridad y credenciales."
+
+
+def send_smtp_message(host: str, port: int, credentials: dict[str, object], message: EmailMessage) -> None:
+    """Envia por SMTP configurable, conservando perfiles STARTTLS anteriores."""
+    security = credentials.get("security")
+    if security is None:
+        security = "starttls" if credentials.get("use_tls", True) else "none"
+    if security not in {"starttls", "ssl", "none"}:
+        raise ValueError("Modo de seguridad SMTP invalido")
+    context = ssl.create_default_context()
+    client = smtplib.SMTP_SSL(host, port, timeout=15, context=context) if security == "ssl" else smtplib.SMTP(host, port, timeout=15)
+    with client as smtp:
+        if security == "starttls":
+            smtp.starttls(context=context)
+        username = credentials.get("username")
+        password = credentials.get("password")
+        if username and password:
+            smtp.login(str(username), str(password))
+        smtp.send_message(message)
 
 
 mail_autoconfig_service = MailAutoconfigService()

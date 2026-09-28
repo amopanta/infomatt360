@@ -20,7 +20,7 @@ export function MailProfilesApp() {
   const [senderEmail, setSenderEmail] = useState('');
   const [serverHost, setServerHost] = useState('');
   const [serverPort, setServerPort] = useState('');
-  const [useTls, setUseTls] = useState(true);
+  const [security, setSecurity] = useState<'starttls' | 'ssl' | 'none'>('starttls');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isDefault, setIsDefault] = useState(false);
@@ -70,10 +70,10 @@ export function MailProfilesApp() {
       if (suggestion.found) {
         setServerHost(suggestion.server_host ?? '');
         setServerPort(suggestion.server_port ?? '');
-        setUseTls(suggestion.use_tls ?? true);
+        setSecurity(suggestion.use_tls === false ? 'none' : 'starttls');
         setAutoconfigNote(`Servidor sugerido automaticamente para ${email.split('@')[1]}.`);
       } else {
-        setAutoconfigNote('Dominio no reconocido: completa el servidor SMTP manualmente.');
+        setAutoconfigNote('Usa los datos SMTP de tu proveedor o de tu hosting: servidor, puerto, seguridad y credenciales.');
       }
     } catch {
       setAutoconfigNote('');
@@ -90,7 +90,7 @@ export function MailProfilesApp() {
         senderEmail: senderEmail.trim(),
         serverHost: serverHost.trim(),
         serverPort: serverPort.trim(),
-        useTls,
+        security,
         username: username.trim(),
         password,
         isDefault,
@@ -107,6 +107,7 @@ export function MailProfilesApp() {
       setUsername('');
       setPassword('');
       setIsDefault(false);
+      setSecurity('starttls');
       setAutoconfigNote('');
       await loadProfiles();
     } catch (error) {
@@ -129,7 +130,7 @@ export function MailProfilesApp() {
   }
 
   return (
-    <AppShell title="Correo autoconfigurado">
+    <AppShell title="Cuentas de correo">
       <main className="audit-shell">
         {message ? <p role="status" className="erp-message">{message}</p> : null}
 
@@ -137,7 +138,7 @@ export function MailProfilesApp() {
           <header>
             <div>
               <h2>Nuevo perfil de correo</h2>
-              <p>Al escribir el correo remitente se sugiere el servidor SMTP para proveedores conocidos (Gmail, Outlook/Office365, Yahoo); ver docs/75.</p>
+              <p>Conecta una cuenta de cualquier proveedor o de tu hosting mediante SMTP. Usa los datos de conexión que te entregó el proveedor.</p>
             </div>
           </header>
           <div className="ai-analyze-inline">
@@ -150,16 +151,17 @@ export function MailProfilesApp() {
             <label>Nombre<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Correo institucional" /></label>
             <label>{provider === 'imap' ? 'Casilla a leer' : 'Correo remitente'}<input value={senderEmail} onChange={(event) => setSenderEmail(event.target.value)} onBlur={() => void handleEmailBlur()} placeholder="notificaciones@midominio.com" /></label>
             <label>Servidor {provider === 'imap' ? 'IMAP' : 'SMTP'}<input value={serverHost} onChange={(event) => setServerHost(event.target.value)} placeholder={provider === 'imap' ? 'imap.midominio.com' : 'smtp.midominio.com'} /></label>
-            <label>Puerto<input value={serverPort} onChange={(event) => setServerPort(event.target.value)} placeholder={provider === 'imap' ? '993' : '587'} /></label>
-            <label>Usuario<input value={username} onChange={(event) => setUsername(event.target.value)} /></label>
+            <label>Puerto<input value={serverPort} onChange={(event) => setServerPort(event.target.value)} placeholder={provider === 'imap' ? '993' : security === 'ssl' ? '465' : '587'} /></label>
+            <label>Usuario<input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Normalmente, el correo completo" /></label>
             <label>Contraseña<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-            {provider === 'smtp' ? <label><input type="checkbox" checked={useTls} onChange={(event) => setUseTls(event.target.checked)} /> Usar TLS (STARTTLS)</label> : null}
+            {provider === 'smtp' ? <label>Seguridad SMTP<select value={security} onChange={(event) => { const next = event.target.value as 'starttls' | 'ssl' | 'none'; setSecurity(next); if (!serverPort || serverPort === '465' || serverPort === '587') setServerPort(next === 'ssl' ? '465' : '587'); }}><option value="starttls">STARTTLS (puerto 587)</option><option value="ssl">SSL/TLS (puerto 465)</option><option value="none">Sin cifrado (solo redes confiables)</option></select></label> : null}
             <label><input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} /> Predeterminado</label>
             <button className="primary" disabled={creating || !senderEmail.trim() || !serverHost.trim() || !serverPort.trim()} onClick={() => void submitCreate()}>
               {creating ? 'Creando…' : 'Crear perfil'}
             </button>
           </div>
           {provider === 'imap' ? <p>Bandeja de solo lectura: se sondea INBOX cada hora, sin adjuntos ni respuesta desde la app (ver docs/116).</p> : null}
+          {provider === 'smtp' ? <p>Para usar esta cuenta en recuperación de contraseña, márcala como predeterminada y confirma el envío con “Enviar prueba”. Algunos proveedores requieren una contraseña de aplicación.</p> : null}
           {autoconfigNote ? <p>{autoconfigNote}</p> : null}
         </section>
 

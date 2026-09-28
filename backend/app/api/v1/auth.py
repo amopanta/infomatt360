@@ -189,7 +189,7 @@ def forgot_password(payload: ForgotPasswordRequest, request: Request, db: Sessio
     ip_allowed = auth_throttle_service.record_attempt(db, "forgot-ip", ip_address, maximum=20, window_minutes=60, block_minutes=60)
     raw_token = auth_service.issue_reset_token(db, str(payload.email)) if email_allowed and ip_allowed else None
     if raw_token:
-        password_mail_service.send_reset_link(str(payload.email), raw_token)
+        password_mail_service.send_reset_link(str(payload.email), raw_token, db)
     return ForgotPasswordResponse()
 
 

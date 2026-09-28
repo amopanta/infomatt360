@@ -76,6 +76,13 @@ def msg_to_read(row: InternalMessage) -> InternalMessageRead:
 
 class MessageService:
     def create_mail_profile(self, db: Session, payload: MailProfileCreate) -> MailProfileRead:
+        if payload.is_default:
+            for existing in db.query(MailProfile).filter(
+                MailProfile.project_id == payload.project_id,
+                MailProfile.provider == payload.provider,
+                MailProfile.is_default == "true",
+            ).all():
+                existing.is_default = "false"
         row = MailProfile(
             project_id=payload.project_id,
             name=payload.name,

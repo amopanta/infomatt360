@@ -588,10 +588,16 @@ function PromoteToParticipantPanel({
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [mode, setMode] = useState<'link' | 'create'>('link');
   const [selectedParticipantId, setSelectedParticipantId] = useState('');
+  const [participantQuery, setParticipantQuery] = useState('');
   const [fullName, setFullName] = useState('');
   const [documentId, setDocumentId] = useState('');
   const [externalCode, setExternalCode] = useState('');
   const [saving, setSaving] = useState(false);
+  const selectedParticipant = participants.find((participant) => participant.id === selectedParticipantId);
+  const visibleParticipants = participants.filter((participant) => {
+    const query = participantQuery.trim().toLocaleLowerCase();
+    return !query || `${participant.full_name} ${participant.document_id || ''} ${participant.external_code || ''} ${participant.group_name || ''} ${participant.municipality || ''}`.toLocaleLowerCase().includes(query) || participant.id === selectedParticipantId;
+  }).slice(0, 100);
 
   useEffect(() => {
     fetchProjectParticipants(projectId).then(setParticipants).catch(() => setParticipants([]));
@@ -629,14 +635,21 @@ function PromoteToParticipantPanel({
         <label><input type="radio" checked={mode === 'create'} onChange={() => setMode('create')} /> Crear participante nuevo</label>
       </div>
       {mode === 'link' ? (
-        <label>Participante
-          <select value={selectedParticipantId} onChange={(event) => setSelectedParticipantId(event.target.value)}>
-            <option value="">Selecciona un participante</option>
-            {participants.map((participant) => (
-              <option key={participant.id} value={participant.id}>{participant.full_name}{participant.document_id ? ` (${participant.document_id})` : ''}</option>
-            ))}
-          </select>
-        </label>
+        <>
+          <label>Buscar participante
+            <input type="search" value={participantQuery} onChange={(event) => setParticipantQuery(event.target.value)} placeholder="Nombre, documento, código, grupo o municipio" />
+          </label>
+          <label>Participante
+            <select value={selectedParticipantId} onChange={(event) => setSelectedParticipantId(event.target.value)}>
+              <option value="">Selecciona un participante</option>
+              {visibleParticipants.map((participant) => (
+                <option key={participant.id} value={participant.id}>{participant.full_name} · {participant.document_id || participant.external_code || 'Sin identificador'}{participant.municipality ? ` · ${participant.municipality}` : ''}</option>
+              ))}
+            </select>
+          </label>
+          <small>{visibleParticipants.length} de {participants.length} participantes visibles{participants.length > 100 ? ' (máximo 100; escribe para filtrar)' : ''}.</small>
+          {selectedParticipant && <p>Se asociará a <strong>{selectedParticipant.full_name}</strong>{selectedParticipant.document_id ? ` · documento ${selectedParticipant.document_id}` : ''}{selectedParticipant.group_name ? ` · grupo ${selectedParticipant.group_name}` : ''}.</p>}
+        </>
       ) : (
         <div className="participant-promote-fields">
           <label>Nombre completo<input value={fullName} onChange={(event) => setFullName(event.target.value)} /></label>

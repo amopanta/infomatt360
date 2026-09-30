@@ -8,6 +8,7 @@ import { downloadReportSummary, fetchReportBoard, saveReportBoard } from './api'
 import type { ReportTemplateMetric } from './api';
 import { ReportBoardEditor } from './ReportBoardEditor';
 import { ReportChart } from './ReportChart';
+import { SavedExportsPanel } from './SavedExportsPanel';
 import type { ReportBoard, ReportWidget, ResolvedWidget } from './types';
 
 export function ReportsApp() {
@@ -114,6 +115,7 @@ export function ReportsApp() {
             {tab === 'donantes' && <section className="reports-empty"><h3>Donantes</h3><p>Personaliza este tablero con los indicadores de tus formularios de donantes.</p>{canEdit && <button type="button" onClick={startEditing}>Agregar indicador</button>}</section>}
             {tab === 'geografico' && <section className="reports-empty"><h3>Vista geográfica</h3><p>Consulta los registros con ubicación en el mapa del proyecto.</p><a href="/maps">Abrir mapas</a></section>}
             <footer className="reports-export"><button type="button" onClick={() => void exportXlsx()}>▤ Excel</button><button type="button" onClick={exportCsv}>▤ CSV</button><button type="button" onClick={() => window.print()}>▤ PDF / Imprimir</button></footer>
+            <SavedExportsPanel projectId={projectId} templates={board.summary.templates} />
           </>
         ) : null}
       </main>

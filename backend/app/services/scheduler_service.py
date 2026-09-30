@@ -16,10 +16,13 @@ from sqlalchemy.orm import Session
 
 from app.core.time import utc_now
 from app.models.messages import MailProfile
+from app.models.messages import InternalMessage
+from app.models.case_management import ParticipantCase, SavedExport
 from app.models.scheduler import ScheduledTask, TaskRun
 from app.schemas.scheduler import ScheduledTaskCreate, ScheduledTaskRead, TaskRunCreate, TaskRunRead
 from app.services import imap_service
 from app.services.backup_service import backup_service
+from app.services.saved_export_service import run_saved_export
 
 # Frecuencias recurrentes soportadas por el worker. "manual" (el default del
 # modelo) deliberadamente no aparece aqui: una tarea manual nunca es "due",
@@ -91,7 +94,7 @@ class SchedulerService:
             db.query(ScheduledTask)
             .filter(
                 ScheduledTask.status == "active",
-                ScheduledTask.frequency.in_(RECURRING_INTERVALS.keys()),
+                ScheduledTask.frequency.in_([*RECURRING_INTERVALS.keys(), "once"]),
                 (ScheduledTask.next_run_at.is_(None)) | (ScheduledTask.next_run_at <= now),
             )
             .limit(limit)
@@ -109,7 +112,11 @@ class SchedulerService:
 
             db.add(TaskRun(task_id=task.id, status=status_value, result_text=result_text, finished_at=utc_now()))
             task.last_run_at = now
-            task.next_run_at = now + RECURRING_INTERVALS[task.frequency]
+            if task.frequency == "once":
+                task.status = "completed" if status_value == "success" else "failed"
+                task.next_run_at = None
+            else:
+                task.next_run_at = now + RECURRING_INTERVALS[task.frequency]
             task.last_result = result_text
             db.commit()
 
@@ -126,6 +133,24 @@ class SchedulerService:
             if profile is None:
                 return "failed", "El perfil de correo IMAP referenciado ya no existe"
             return imap_service.poll_profile(db, profile)
+        if task.task_type == "case_reminder":
+            case = db.query(ParticipantCase).filter(ParticipantCase.id == task.target_id, ParticipantCase.project_id == task.project_id).first()
+            if not case or not case.assigned_user_id or case.status == "closed":
+                return "failed", "El caso ya no tiene un responsable o está cerrado"
+            db.add(InternalMessage(project_id=case.project_id, recipient_id=case.assigned_user_id,
+                                   subject=f"Seguimiento pendiente: {case.title}",
+                                   body="El plazo de seguimiento de este caso ha llegado. Abre el participante para revisar el caso."))
+            return "success", f"Aviso interno entregado al responsable del caso {case.id}"
+        if task.task_type == "saved_export":
+            export = db.query(SavedExport).filter(SavedExport.id == task.target_id, SavedExport.project_id == task.project_id).first()
+            if not export:
+                return "failed", "La exportación guardada ya no existe"
+            try:
+                file = run_saved_export(db, export)
+                return "success", f"Exportación disponible: {file.id}"
+            except Exception as exc:
+                db.rollback()
+                return "failed", str(exc)
         return "failed", f"task_type '{task.task_type}' no esta soportado por el worker de tareas programadas"
 
 

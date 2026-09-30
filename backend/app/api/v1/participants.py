@@ -1,11 +1,15 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.v1.cases import allowed_participant_ids, participant_visible
 from app.api.permissions import require_any_project_permission
 from app.core.permissions import IDENTITY_USERS_MANAGE, RECORDS_APPROVE, RECORDS_REVIEW
 from app.db.session import get_db
 from app.models.identity import User
+from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord
 from app.schemas.participants import ParticipantCreate, ParticipantGroupStatusUpdate, ParticipantGroupUpdate, ParticipantHistoryItem, ParticipantPromoteRequest, ParticipantRead
 from app.services.assignment_service import assignment_service
@@ -30,6 +34,10 @@ def change_participant_group_status(project_id: str, group_name: str, payload: P
 def create_participant(payload: ParticipantCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ParticipantRead:
     if not assignment_service.user_has_project_access(db, current_user.id, payload.project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    candidate = Participant(project_id=payload.project_id, full_name=payload.full_name,
+                            metadata_json=json.dumps({"department": payload.department, "municipality": payload.municipality}))
+    if not participant_visible(db, current_user.id, candidate):
+        raise HTTPException(status_code=403, detail="Fuera del territorio asignado")
     return participant_service.create_participant(db, payload)
 
 
@@ -37,7 +45,12 @@ def create_participant(payload: ParticipantCreate, db: Session = Depends(get_db)
 def list_project_participants(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[ParticipantRead]:
     if not assignment_service.user_has_project_access(db, current_user.id, project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
-    return participant_service.list_participants(db, project_id)
+    allowed = allowed_participant_ids(db, current_user.id, project_id)
+    rows = participant_service.list_participants(db, project_id)
+    if allowed is None:
+        return rows
+    allowed_set = set(allowed)
+    return [row for row in rows if row.id in allowed_set]
 
 
 def _require_participant(db: Session, current_user: User, participant_id: str) -> ParticipantRead:
@@ -48,6 +61,8 @@ def _require_participant(db: Session, current_user: User, participant_id: str) -
     if participant is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participante no encontrado")
     if not assignment_service.user_has_project_access(db, current_user.id, participant.project_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participante no encontrado")
+    if not participant_visible(db, current_user.id, db.get(Participant, participant_id)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Participante no encontrado")
     return participant
 

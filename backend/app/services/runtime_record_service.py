@@ -847,12 +847,15 @@ class RuntimeRecordService:
         db.refresh(record)
         return record_to_read(db, record)
 
-    def list_template_records(self, db: Session, template_id: str) -> list[RuntimeRecordRead]:
+    def list_template_records(self, db: Session, template_id: str, allowed_participant_ids: list[str] | None = None) -> list[RuntimeRecordRead]:
         """Lista capturas asociadas a una plantilla Runtime."""
-        rows = db.query(RuntimeRecord).filter(RuntimeRecord.template_id == template_id).order_by(RuntimeRecord.created_at.desc()).all()
+        query = db.query(RuntimeRecord).filter(RuntimeRecord.template_id == template_id)
+        if allowed_participant_ids is not None:
+            query = query.filter(RuntimeRecord.participant_id.in_(allowed_participant_ids))
+        rows = query.order_by(RuntimeRecord.created_at.desc()).all()
         return [record_to_read(db, row) for row in rows]
 
-    def search_template_records(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, limit: int = 25, offset: int = 0, unlinked_only: bool = False, field_filters: dict[str, str] | None = None, sort_by: str = "created_at", sort_dir: str = "desc") -> RuntimeRecordPage:
+    def search_template_records(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, limit: int = 25, offset: int = 0, unlinked_only: bool = False, field_filters: dict[str, str] | None = None, sort_by: str = "created_at", sort_dir: str = "desc", allowed_participant_ids: list[str] | None = None) -> RuntimeRecordPage:
         """Consulta paginada de registros Runtime con filtros seguros para uso operativo.
 
         `unlinked_only` filtra a los registros de "base abierta" que todavia
@@ -860,6 +863,8 @@ class RuntimeRecordService:
         candidatos a promover a la base cerrada.
         """
         query = self._filtered_records_query(db, template_id, search, status, unlinked_only)
+        if allowed_participant_ids is not None:
+            query = query.filter(RuntimeRecord.participant_id.in_(allowed_participant_ids))
         for field_name, field_search in (field_filters or {}).items():
             if not field_search.strip():
                 continue
@@ -887,8 +892,11 @@ class RuntimeRecordService:
         rows = query.order_by(direction, RuntimeRecord.id.asc()).offset(offset).limit(limit).all()
         return RuntimeRecordPage(items=[record_to_read(db, row) for row in rows], total=total, limit=limit, offset=offset)
 
-    def export_template_csv(self, db: Session, template_id: str, search: str | None = None, status: str | None = None) -> str:
-        records = self._filtered_records_query(db, template_id, search, status).order_by(RuntimeRecord.created_at.desc()).all()
+    def export_template_csv(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, allowed_participant_ids: list[str] | None = None) -> str:
+        query = self._filtered_records_query(db, template_id, search, status)
+        if allowed_participant_ids is not None:
+            query = query.filter(RuntimeRecord.participant_id.in_(allowed_participant_ids))
+        records = query.order_by(RuntimeRecord.created_at.desc()).all()
         record_ids = [record.id for record in records]
         values = db.query(RuntimeRecordValue).filter(RuntimeRecordValue.record_id.in_(record_ids)).all() if record_ids else []
         field_names = sorted({value.field_name for value in values})

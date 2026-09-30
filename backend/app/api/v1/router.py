@@ -32,6 +32,9 @@ from app.api.v1.mirror import router as mirror_router
 from app.api.v1.organization_assignments import router as organization_assignments_router
 from app.api.v1.organizations import router as organizations_router
 from app.api.v1.participants import router as participants_router
+from app.api.v1.cases import router as cases_router
+from app.api.v1.territories import router as territories_router
+from app.api.v1.saved_exports import router as saved_exports_router
 from app.api.v1.project_context import router as project_context_router
 from app.api.v1.public import router as public_router
 from app.api.v1.public_forms import router as public_forms_router
@@ -68,6 +71,9 @@ api_v1_router.include_router(support_router, prefix="/support", tags=["support"]
 api_v1_router.include_router(project_context_router, prefix="/projects", tags=["project-context"])
 api_v1_router.include_router(forms_router, prefix="/forms", tags=["forms"])
 api_v1_router.include_router(participants_router, prefix="/participants", tags=["participants"])
+api_v1_router.include_router(cases_router, prefix="/cases", tags=["cases"])
+api_v1_router.include_router(territories_router, prefix="/territories", tags=["territories"])
+api_v1_router.include_router(saved_exports_router, prefix="/saved-exports", tags=["saved-exports"])
 api_v1_router.include_router(excel_import_router, prefix="/excel-import", tags=["excel-import"])
 api_v1_router.include_router(records_router, prefix="/records", tags=["records"])
 api_v1_router.include_router(files_router, prefix="/files", tags=["files"])

@@ -769,6 +769,7 @@ function DeepLinkedRecordCard({
 export function RecordTable({ templateId, embedded = false }: { templateId: string; embedded?: boolean }) {
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [records, setRecords] = useState<RuntimeRecord[]>([]);
+  const [templateStatus, setTemplateStatus] = useState('');
   const [templateFields, setTemplateFields] = useState<Array<{ name: string; label: string }>>([]);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
@@ -804,6 +805,7 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
     fetchRuntimeTemplate(templateId)
       .then((template) => {
         if (!active) return;
+        setTemplateStatus(template.status);
         const names = new Set<string>();
         setTemplateFields(flattenComponents(template)
           .filter((component) => {
@@ -813,7 +815,7 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
           })
           .map((component) => ({ name: component.name, label: component.label || component.name })));
       })
-      .catch(() => { if (active) setTemplateFields([]); });
+      .catch(() => { if (active) { setTemplateFields([]); setTemplateStatus(''); } });
     return () => { active = false; };
   }, [templateId]);
 
@@ -931,6 +933,7 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
         {!deepLink.recordId && <><div className="records-toolbar">
           {!embedded && <a href="/records">Volver a formularios</a>}
           <div className="records-toolbar-actions">
+            {templateStatus === 'published' && hasAnyCurrentProjectPermission(['records.write']) && <a className="forms-primary-link" href={`/runtime/${templateId}`}>+ Agregar registro</a>}
             <input type="search" placeholder="Buscar por campo, valor, estado o usuario" value={query} onChange={(event) => { setQuery(event.target.value); setOffset(0); }} />
             <label className="records-unlinked-filter">
               <input type="checkbox" checked={unlinkedOnly} onChange={(event) => { setUnlinkedOnly(event.target.checked); setOffset(0); }} />

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.api.permissions import require_project_permission
-from app.core.permissions import BACKUPS_MANAGE
+from app.core.permissions import BACKUPS_MANAGE, MESSAGES_WRITE
 from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.scheduler import ScheduledTaskCreate, ScheduledTaskRead, TaskRunCreate, TaskRunRead
@@ -16,11 +16,13 @@ router = APIRouter()
 # proyecto. Hoy solo "backup" tiene un permiso dedicado (BACKUPS_MANAGE,
 # el mismo que exige el boton manual en backups.py); un task_type nuevo sin
 # entrada aqui sigue protegido solo por pertenencia al proyecto.
-TASK_TYPE_PERMISSIONS = {"backup": BACKUPS_MANAGE}
+TASK_TYPE_PERMISSIONS = {"backup": BACKUPS_MANAGE, "mail_poll": MESSAGES_WRITE}
 
 
 @router.post("/tasks", response_model=ScheduledTaskRead)
 def create_task(payload: ScheduledTaskCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ScheduledTaskRead:
+    if payload.task_type not in {"backup", "mail_poll"}:
+        raise HTTPException(status_code=422, detail="Este tipo de tarea se configura desde su módulo")
     required_permission = TASK_TYPE_PERMISSIONS.get(payload.task_type)
     if required_permission:
         require_project_permission(db, current_user.id, payload.project_id, required_permission)
@@ -38,9 +40,14 @@ def list_tasks(project_id: str, db: Session = Depends(get_db), current_user: Use
 
 @router.post("/runs", response_model=TaskRunRead)
 def create_run(payload: TaskRunCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> TaskRunRead:
+    raise HTTPException(status_code=403, detail="Las ejecuciones solo las registra el worker")
     return scheduler_service.create_run(db, payload)
 
 
 @router.get("/runs/{task_id}", response_model=list[TaskRunRead])
 def list_runs(task_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[TaskRunRead]:
+    from app.models.scheduler import ScheduledTask
+    task = db.get(ScheduledTask, task_id)
+    if not task or not assignment_service.user_has_project_access(db, current_user.id, task.project_id):
+        raise HTTPException(status_code=404, detail="Tarea no encontrada")
     return scheduler_service.list_runs(db, task_id)

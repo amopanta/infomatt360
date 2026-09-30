@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
-import { assignParticipantGroup, deleteParticipantGroup, fetchParticipant, fetchParticipantHistory, fetchProjectParticipants, setParticipantGroupStatus } from './api';
-import type { Participant, ParticipantHistoryItem } from './api';
+import { assignParticipantGroup, assignTerritory, createParticipantCase, deleteParticipantGroup, fetchCaseAssignees, fetchCaseEvents, fetchParticipant, fetchParticipantCases, fetchParticipantHistory, fetchProjectParticipants, fetchTerritories, removeTerritory, setParticipantGroupStatus, updateParticipantCase } from './api';
+import type { CaseAssignee, CaseEvent, Participant, ParticipantCase, ParticipantHistoryItem, UserTerritory } from './api';
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Borrador', submitted: 'Enviado', under_review: 'En revisión',
@@ -30,6 +30,11 @@ function ParticipantList() {
   const [editingGroupId, setEditingGroupId] = useState('');
   const [groupDraft, setGroupDraft] = useState('');
   const [message, setMessage] = useState('Cargando participantes...');
+  const [territories, setTerritories] = useState<UserTerritory[]>([]);
+  const [assignees, setAssignees] = useState<CaseAssignee[]>([]);
+  const [territoryUser, setTerritoryUser] = useState('');
+  const [department, setDepartment] = useState('');
+  const [municipality, setMunicipality] = useState('');
 
   useEffect(() => {
     fetchProjectParticipants(projectId)
@@ -38,6 +43,10 @@ function ParticipantList() {
         setMessage(rows.length ? '' : 'Este proyecto aún no tiene participantes registrados.');
       })
       .catch((error: Error) => setMessage(error.message));
+  }, [projectId]);
+  useEffect(() => {
+    if (!hasAnyCurrentProjectPermission(['identity.users.manage'])) return;
+    void Promise.all([fetchTerritories(projectId), fetchCaseAssignees(projectId)]).then(([items, users]) => { setTerritories(items); setAssignees(users); }).catch(() => {});
   }, [projectId]);
 
   const filtered = participants.filter((participant) => {
@@ -89,6 +98,7 @@ function ParticipantList() {
           <input type="search" placeholder="Buscar por nombre, documento, código o municipio" value={query} onChange={(event) => setQuery(event.target.value)} />
         </header>
         <div className="participants-group-toolbar"><label>Grupo de participantes<select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}><option value="">Todos los grupos</option>{groups.map((group) => <option key={group} value={group}>{group}</option>)}</select></label><a href="/admin/excel-import">Importar o actualizar desde Excel</a><span>{filtered.length} participante(s)</span>{groupFilter && hasAnyCurrentProjectPermission(['identity.users.manage']) && <><button type="button" onClick={() => void changeGroupStatus('active')}>Activar grupo</button><button type="button" onClick={() => void changeGroupStatus('inactive')}>Desactivar grupo</button><button type="button" className="participants-remove-group" onClick={() => void removeGroup()}>Eliminar grupo</button></>}</div>
+        {hasAnyCurrentProjectPermission(['identity.users.manage']) && <details className="participant-summary-card"><summary>Acceso territorial</summary><p>Asigna departamentos o municipios. Un usuario con territorios asignados verá únicamente los participantes de esas zonas.</p><div className="participants-group-toolbar"><select aria-label="Usuario" value={territoryUser} onChange={(event) => setTerritoryUser(event.target.value)}><option value="">Seleccionar usuario</option>{assignees.map((item) => <option key={item.id} value={item.id}>{item.full_name}</option>)}</select><input aria-label="Departamento" placeholder="Departamento" value={department} onChange={(event) => setDepartment(event.target.value)} /><input aria-label="Municipio opcional" placeholder="Municipio (opcional)" value={municipality} onChange={(event) => setMunicipality(event.target.value)} /><button type="button" onClick={() => { void assignTerritory(projectId, { user_id: territoryUser, department, municipality }).then(async () => { setTerritories(await fetchTerritories(projectId)); setDepartment(''); setMunicipality(''); setMessage('Territorio asignado.'); }).catch((error: Error) => setMessage(error.message)); }}>Asignar</button></div>{territories.map((item) => <p key={item.id}>{assignees.find((user) => user.id === item.user_id)?.full_name || item.user_id}: {item.department}{item.municipality ? ` / ${item.municipality}` : ''} <button type="button" onClick={() => { void removeTerritory(projectId, item.id).then(async () => setTerritories(await fetchTerritories(projectId))).catch((error: Error) => setMessage(error.message)); }}>Quitar</button></p>)}</details>}
         {message ? <p role="status">{message}</p> : null}
         <div className="records-table-wrap">
           <table className="records-table">
@@ -132,18 +142,27 @@ function ParticipantDetail({ participantId }: { participantId: string }) {
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [history, setHistory] = useState<ParticipantHistoryItem[]>([]);
   const [message, setMessage] = useState('Cargando participante...');
+  const [cases, setCases] = useState<ParticipantCase[]>([]);
+  const [assignees, setAssignees] = useState<CaseAssignee[]>([]);
+  const [caseTitle, setCaseTitle] = useState('');
+  const [caseAssignee, setCaseAssignee] = useState('');
+  const [caseDue, setCaseDue] = useState('');
+  const [openEvents, setOpenEvents] = useState('');
+  const [events, setEvents] = useState<CaseEvent[]>([]);
 
   useEffect(() => {
-    Promise.all([fetchParticipant(participantId), fetchParticipantHistory(participantId)])
-      .then(([participantData, historyData]) => {
+    Promise.all([fetchParticipant(participantId), fetchParticipantHistory(participantId), fetchParticipantCases(participantId)])
+      .then(([participantData, historyData, caseData]) => {
         setParticipant(participantData);
         setHistory(historyData);
+        setCases(caseData);
+        void fetchCaseAssignees(participantData.project_id).then(setAssignees).catch(() => {});
         setMessage('');
       })
       .catch((error: Error) => setMessage(error.message));
   }, [participantId]);
 
-  if (message) {
+  if (message && !participant) {
     return (
       <AppShell title="Participante">
         <main className="participants-shell">
@@ -155,10 +174,23 @@ function ParticipantDetail({ participantId }: { participantId: string }) {
   }
   if (!participant) return null;
 
+  async function saveCase() {
+    try {
+      await createParticipantCase({ participant_id: participantId, title: caseTitle, assigned_user_id: caseAssignee || null, due_at: caseDue ? new Date(caseDue).toISOString().replace('Z', '') : null });
+      setCases(await fetchParticipantCases(participantId)); setCaseTitle(''); setCaseDue(''); setMessage('Caso creado.');
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible crear el caso.'); }
+  }
+
+  async function changeCase(id: string, data: { status?: string; assigned_user_id?: string | null; note?: string }) {
+    try { await updateParticipantCase(id, data); setCases(await fetchParticipantCases(participantId)); setMessage('Caso actualizado.'); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible actualizar el caso.'); }
+  }
+
   return (
     <AppShell title="Participante">
       <main className="participants-shell">
         <a href="/participants">Volver a participantes</a>
+        {message && <p role="status">{message}</p>}
         <section className="participant-summary-card">
           <h2>{participant.full_name}</h2>
           <dl className="record-detail">
@@ -171,6 +203,7 @@ function ParticipantDetail({ participantId }: { participantId: string }) {
             <div><dt>Estado</dt><dd>{participant.status}</dd></div>
           </dl>
         </section>
+        <section className="participant-summary-card"><h3>Casos y remisiones ({cases.length})</h3><p>Da seguimiento al participante, asigna un responsable y fija un plazo. El responsable recibirá un aviso interno al llegar la fecha.</p>{hasAnyCurrentProjectPermission(['records.write']) && <div className="participants-group-toolbar"><input aria-label="Nombre del caso" placeholder="Nombre del caso" value={caseTitle} onChange={(event) => setCaseTitle(event.target.value)} /><select aria-label="Responsable" value={caseAssignee} onChange={(event) => setCaseAssignee(event.target.value)}><option value="">Sin responsable</option>{assignees.map((item) => <option key={item.id} value={item.id}>{item.full_name}</option>)}</select><input aria-label="Plazo del caso" type="datetime-local" value={caseDue} onChange={(event) => setCaseDue(event.target.value)} /><button type="button" disabled={caseTitle.trim().length < 3} onClick={() => void saveCase()}>Crear caso</button></div>}{cases.map((item) => <article key={item.id} className="participant-summary-card"><strong>{item.title}</strong> · {item.status} · Responsable: {assignees.find((user) => user.id === item.assigned_user_id)?.full_name || 'Sin asignar'} · Plazo: {item.due_at ? new Date(`${item.due_at}Z`).toLocaleString() : 'Sin plazo'}<div className="participants-group-toolbar">{hasAnyCurrentProjectPermission(['records.write']) && <><select aria-label={`Estado de ${item.title}`} value={item.status} onChange={(event) => void changeCase(item.id, { status: event.target.value })}><option value="open">Abierto</option><option value="in_progress">En seguimiento</option><option value="referred">Remitido</option><option value="closed">Cerrado</option></select><select aria-label={`Remitir ${item.title}`} value={item.assigned_user_id || ''} onChange={(event) => void changeCase(item.id, { assigned_user_id: event.target.value || null })}><option value="">Sin responsable</option>{assignees.map((user) => <option key={user.id} value={user.id}>{user.full_name}</option>)}</select></>}<button type="button" onClick={() => { if (openEvents === item.id) { setOpenEvents(''); return; } void fetchCaseEvents(item.id).then(setEvents); setOpenEvents(item.id); }}>Historial</button></div>{openEvents === item.id && <ul>{events.map((event) => <li key={event.id}>{new Date(event.created_at).toLocaleString()} · {event.event_type} {event.note || ''}</li>)}</ul>}</article>)}</section>
         <section>
           <h3>Historial unificado ({history.length} formulario(s))</h3>
           {history.length ? (

@@ -81,7 +81,7 @@ async function jsonRequest<T>(path: string, init?: RequestInit): Promise<T> {
 export const fetchParticipantCases = (id: string) => jsonRequest<ParticipantCase[]>(`/cases/participant/${id}`);
 export const fetchCaseEvents = (id: string) => jsonRequest<CaseEvent[]>(`/cases/${id}/events`);
 export const fetchCaseAssignees = (projectId: string) => jsonRequest<CaseAssignee[]>(`/cases/project/${projectId}/assignees`);
-export const createParticipantCase = (data: { participant_id: string; title: string; assigned_user_id?: string | null; due_at?: string | null }) => jsonRequest<ParticipantCase>('/cases/', { method: 'POST', body: JSON.stringify(data) });
+export const createParticipantCase = (data: { participant_id: string; title: string; assigned_user_id?: string | null; due_at?: string | null; reminder_channels?: string[] }) => jsonRequest<ParticipantCase>('/cases/', { method: 'POST', body: JSON.stringify(data) });
 export const updateParticipantCase = (id: string, data: { status?: string; assigned_user_id?: string | null; due_at?: string | null; note?: string }) => jsonRequest<ParticipantCase>(`/cases/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 export const fetchTerritories = (projectId: string) => jsonRequest<UserTerritory[]>(`/territories/${projectId}`);
 export const assignTerritory = (projectId: string, data: { user_id: string; department: string; municipality: string }) => jsonRequest<UserTerritory>(`/territories/${projectId}`, { method: 'POST', body: JSON.stringify(data) });

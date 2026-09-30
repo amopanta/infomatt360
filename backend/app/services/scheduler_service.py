@@ -17,12 +17,15 @@ from sqlalchemy.orm import Session
 from app.core.time import utc_now
 from app.models.messages import MailProfile
 from app.models.messages import InternalMessage
+from app.models.identity import User
 from app.models.case_management import ParticipantCase, SavedExport
 from app.models.scheduler import ScheduledTask, TaskRun
 from app.schemas.scheduler import ScheduledTaskCreate, ScheduledTaskRead, TaskRunCreate, TaskRunRead
 from app.services import imap_service
 from app.services.backup_service import backup_service
 from app.services.saved_export_service import run_saved_export
+from app.services.message_service import message_service
+from app.services.whatsapp_service import whatsapp_service
 
 # Frecuencias recurrentes soportadas por el worker. "manual" (el default del
 # modelo) deliberadamente no aparece aqui: una tarea manual nunca es "due",
@@ -137,10 +140,32 @@ class SchedulerService:
             case = db.query(ParticipantCase).filter(ParticipantCase.id == task.target_id, ParticipantCase.project_id == task.project_id).first()
             if not case or not case.assigned_user_id or case.status == "closed":
                 return "failed", "El caso ya no tiene un responsable o está cerrado"
-            db.add(InternalMessage(project_id=case.project_id, recipient_id=case.assigned_user_id,
-                                   subject=f"Seguimiento pendiente: {case.title}",
-                                   body="El plazo de seguimiento de este caso ha llegado. Abre el participante para revisar el caso."))
-            return "success", f"Aviso interno entregado al responsable del caso {case.id}"
+            import json
+            try:
+                channels = json.loads(case.properties_json or "{}").get("_reminder_channels", ["internal"])
+            except (ValueError, AttributeError):
+                channels = ["internal"]
+            if not isinstance(channels, list):
+                channels = ["internal"]
+            subject = f"Seguimiento pendiente: {case.title}"
+            body = "El plazo de seguimiento de este caso ha llegado. Abre el participante para revisar el caso."
+            results: list[str] = []
+            if "internal" in channels:
+                db.add(InternalMessage(project_id=case.project_id, recipient_id=case.assigned_user_id,
+                                       subject=subject, body=body))
+                results.append("interno: enviado")
+            if "email" in channels:
+                email_status, email_detail = message_service.send_project_email(db, case.project_id, case.assigned_user_id, subject, body)
+                results.append(f"correo: {email_status} ({email_detail})")
+            if "whatsapp" in channels:
+                recipient = db.get(User, case.assigned_user_id)
+                if recipient and recipient.phone:
+                    notification = whatsapp_service.send_text(db, project_id=case.project_id, recipient_phone=recipient.phone,
+                                                              recipient_user_id=recipient.id, message=f"{subject}\n{body}")
+                    results.append(f"WhatsApp: {notification.status}")
+                else:
+                    results.append("WhatsApp: omitido (sin teléfono)")
+            return "success", "; ".join(results) if results else "Sin canales de aviso seleccionados"
         if task.task_type == "saved_export":
             export = db.query(SavedExport).filter(SavedExport.id == task.target_id, SavedExport.project_id == task.project_id).first()
             if not export:

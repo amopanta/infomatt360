@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.v1.cases import allowed_participant_ids, require_record_territory
+from app.api.permissions import allowed_participant_ids, require_record_territory
 from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.records import RecordCreate, RecordEventRead, RecordRead

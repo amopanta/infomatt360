@@ -1,4 +1,6 @@
 import json
+import smtplib
+from email.message import EmailMessage
 
 from cryptography.fernet import InvalidToken
 from sqlalchemy.orm import Session
@@ -75,6 +77,28 @@ def msg_to_read(row: InternalMessage) -> InternalMessageRead:
 
 
 class MessageService:
+    def send_project_email(self, db: Session, project_id: str, recipient_id: str, subject: str, body: str) -> tuple[str, str]:
+        """Usa el perfil SMTP existente; no almacena otro juego de credenciales."""
+        recipient = db.get(User, recipient_id)
+        if not recipient or recipient.status != "active" or not recipient.email:
+            return "skipped", "Destinatario sin correo activo"
+        profile = (db.query(MailProfile).filter(MailProfile.project_id == project_id, MailProfile.status == "active",
+                                                MailProfile.server_host.is_not(None), MailProfile.server_port.is_not(None))
+                   .order_by(MailProfile.is_default.desc(), MailProfile.created_at.desc()).first())
+        if not profile:
+            return "skipped", "No hay perfil SMTP activo en el proyecto"
+        message = EmailMessage()
+        message["Subject"] = subject
+        message["From"] = profile.sender_email
+        message["To"] = recipient.email
+        message.set_content(body)
+        from app.services.mail_autoconfig_service import send_smtp_message
+        try:
+            send_smtp_message(profile.server_host, int(profile.server_port), decrypt_mail_config(profile.config_json), message)
+        except (OSError, ValueError, smtplib.SMTPException) as exc:
+            return "failed", str(exc)[:250]
+        return "sent", "Correo enviado"
+
     def create_mail_profile(self, db: Session, payload: MailProfileCreate) -> MailProfileRead:
         if payload.is_default:
             for existing in db.query(MailProfile).filter(

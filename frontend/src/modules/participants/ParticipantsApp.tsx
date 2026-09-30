@@ -147,6 +147,8 @@ function ParticipantDetail({ participantId }: { participantId: string }) {
   const [caseTitle, setCaseTitle] = useState('');
   const [caseAssignee, setCaseAssignee] = useState('');
   const [caseDue, setCaseDue] = useState('');
+  const [reminderEmail, setReminderEmail] = useState(false);
+  const [reminderWhatsApp, setReminderWhatsApp] = useState(false);
   const [openEvents, setOpenEvents] = useState('');
   const [events, setEvents] = useState<CaseEvent[]>([]);
 
@@ -176,7 +178,7 @@ function ParticipantDetail({ participantId }: { participantId: string }) {
 
   async function saveCase() {
     try {
-      await createParticipantCase({ participant_id: participantId, title: caseTitle, assigned_user_id: caseAssignee || null, due_at: caseDue ? new Date(caseDue).toISOString().replace('Z', '') : null });
+      await createParticipantCase({ participant_id: participantId, title: caseTitle, assigned_user_id: caseAssignee || null, due_at: caseDue ? new Date(caseDue).toISOString().replace('Z', '') : null, reminder_channels: ['internal', ...(reminderEmail ? ['email'] : []), ...(reminderWhatsApp ? ['whatsapp'] : [])] });
       setCases(await fetchParticipantCases(participantId)); setCaseTitle(''); setCaseDue(''); setMessage('Caso creado.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible crear el caso.'); }
   }
@@ -203,6 +205,7 @@ function ParticipantDetail({ participantId }: { participantId: string }) {
             <div><dt>Estado</dt><dd>{participant.status}</dd></div>
           </dl>
         </section>
+        {hasAnyCurrentProjectPermission(['records.write']) && <div className="participants-group-toolbar" aria-label="Canales de aviso del nuevo caso"><strong>Al llegar el plazo:</strong><label><input type="checkbox" checked readOnly /> Aviso interno</label><label><input type="checkbox" checked={reminderEmail} onChange={(event) => setReminderEmail(event.target.checked)} /> Correo</label><label><input type="checkbox" checked={reminderWhatsApp} onChange={(event) => setReminderWhatsApp(event.target.checked)} /> WhatsApp</label></div>}
         <section className="participant-summary-card"><h3>Casos y remisiones ({cases.length})</h3><p>Da seguimiento al participante, asigna un responsable y fija un plazo. El responsable recibirá un aviso interno al llegar la fecha.</p>{hasAnyCurrentProjectPermission(['records.write']) && <div className="participants-group-toolbar"><input aria-label="Nombre del caso" placeholder="Nombre del caso" value={caseTitle} onChange={(event) => setCaseTitle(event.target.value)} /><select aria-label="Responsable" value={caseAssignee} onChange={(event) => setCaseAssignee(event.target.value)}><option value="">Sin responsable</option>{assignees.map((item) => <option key={item.id} value={item.id}>{item.full_name}</option>)}</select><input aria-label="Plazo del caso" type="datetime-local" value={caseDue} onChange={(event) => setCaseDue(event.target.value)} /><button type="button" disabled={caseTitle.trim().length < 3} onClick={() => void saveCase()}>Crear caso</button></div>}{cases.map((item) => <article key={item.id} className="participant-summary-card"><strong>{item.title}</strong> · {item.status} · Responsable: {assignees.find((user) => user.id === item.assigned_user_id)?.full_name || 'Sin asignar'} · Plazo: {item.due_at ? new Date(`${item.due_at}Z`).toLocaleString() : 'Sin plazo'}<div className="participants-group-toolbar">{hasAnyCurrentProjectPermission(['records.write']) && <><select aria-label={`Estado de ${item.title}`} value={item.status} onChange={(event) => void changeCase(item.id, { status: event.target.value })}><option value="open">Abierto</option><option value="in_progress">En seguimiento</option><option value="referred">Remitido</option><option value="closed">Cerrado</option></select><select aria-label={`Remitir ${item.title}`} value={item.assigned_user_id || ''} onChange={(event) => void changeCase(item.id, { assigned_user_id: event.target.value || null })}><option value="">Sin responsable</option>{assignees.map((user) => <option key={user.id} value={user.id}>{user.full_name}</option>)}</select></>}<button type="button" onClick={() => { if (openEvents === item.id) { setOpenEvents(''); return; } void fetchCaseEvents(item.id).then(setEvents); setOpenEvents(item.id); }}>Historial</button></div>{openEvents === item.id && <ul>{events.map((event) => <li key={event.id}>{new Date(event.created_at).toLocaleString()} · {event.event_type} {event.note || ''}</li>)}</ul>}</article>)}</section>
         <section>
           <h3>Historial unificado ({history.length} formulario(s))</h3>

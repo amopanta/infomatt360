@@ -102,6 +102,56 @@ def test_territory_assignment_is_manager_only():
         Base.metadata.drop_all(engine)
 
 
+def test_case_reminder_uses_existing_message_channels(monkeypatch):
+    engine, sessions = setup()
+    sent = []
+    monkeypatch.setattr("app.services.scheduler_service.message_service.send_project_email",
+                        lambda *args: (sent.append("email") or "sent", "Correo enviado"))
+    class WhatsAppResult:
+        status = "sent"
+    monkeypatch.setattr("app.services.scheduler_service.whatsapp_service.send_text",
+                        lambda *args, **kwargs: (sent.append("whatsapp") or WhatsAppResult()))
+    try:
+        with sessions() as db:
+            user = db.get(User, "case-worker")
+            user.phone = "+573001234567"
+            db.commit()
+        with TestClient(app) as client:
+            worker = auth(client, "case-worker@example.com", "Worker12345!")
+            due = (utc_now() - timedelta(minutes=1)).replace(tzinfo=None).isoformat()
+            response = client.post("/api/v1/cases/", headers=worker, json={
+                "participant_id": "case-participant", "title": "Aviso multicanal", "assigned_user_id": "case-worker",
+                "due_at": due, "reminder_channels": ["internal", "email", "whatsapp"]})
+            assert response.status_code == 200, response.text
+        with sessions() as db:
+            assert scheduler_service.run_due_tasks(db) == {"processed": 1, "succeeded": 1, "failed": 0}
+            assert sent == ["email", "whatsapp"]
+            assert db.query(InternalMessage).filter(InternalMessage.recipient_id == "case-worker").count() == 1
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(engine)
+
+
+def test_territory_blocks_project_wide_report_and_snapshot():
+    engine, sessions = setup()
+    try:
+        with sessions() as db:
+            db.get(Role, "case-worker-role").permissions += ",reports.export"
+            db.commit()
+        with TestClient(app) as client:
+            manager = auth(client, "case-manager@example.com", "Manager12345!")
+            worker = auth(client, "case-worker@example.com", "Worker12345!")
+            assert client.post("/api/v1/territories/case-project", headers=manager, json={
+                "user_id": "case-worker", "department": "Cundinamarca", "municipality": "Soacha"}).status_code == 200
+            assert client.get("/api/v1/reports/project/case-project/summary", headers=worker).status_code == 403
+            denied = client.post("/api/v1/saved-exports/case-project", headers=manager, json={
+                "name": "Resumen general", "frequency": "weekly", "recipient_user_id": "case-worker"})
+            assert denied.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(engine)
+
+
 def test_saved_export_generates_authorized_snapshot():
     engine, sessions = setup()
     try:

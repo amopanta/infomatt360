@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.models.builder import BuilderTemplate
 from app.models.case_management import SavedExport, SavedExportFile
 from app.models.messages import InternalMessage
-from app.api.v1.cases import allowed_participant_ids
+from app.api.permissions import allowed_participant_ids
 from app.services.report_service import report_service
 from app.services.runtime_record_service import runtime_record_service
 

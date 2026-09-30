@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, Upl
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.permissions import require_project_permission
+from app.api.permissions import require_project_permission, require_unrestricted_territory
 from app.core.permissions import BUILDER_WRITE
 from app.db.session import get_db
 from app.models.identity import User
@@ -71,6 +71,7 @@ def individual_form_report(template_id: str, db: Session = Depends(get_db), curr
         raise HTTPException(status_code=404, detail="Formulario no encontrado")
     if not assignment_service.user_has_project_access(db, current_user.id, template.project_id):
         raise HTTPException(status_code=403, detail="Sin acceso al proyecto")
+    require_unrestricted_territory(db, current_user.id, template.project_id)
     return form_report_service.resolve(db, template)
 
 
@@ -98,6 +99,7 @@ def get_catalog(report_id: str, db: Session = Depends(get_db), current_user: Use
     row = catalog.get(db, report_id)
     if not assignment_service.user_has_project_access(db, current_user.id, row.project_id):
         raise HTTPException(status_code=403, detail="Sin acceso al proyecto")
+    require_unrestricted_territory(db, current_user.id, row.project_id)
     return catalog.resolve(db, row)
 
 

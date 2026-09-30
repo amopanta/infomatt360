@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.v1.cases import allowed_participant_ids, participant_visible
+from app.api.permissions import allowed_participant_ids, participant_visible
 from app.api.permissions import require_any_project_permission
 from app.core.permissions import IDENTITY_USERS_MANAGE, RECORDS_APPROVE, RECORDS_REVIEW
 from app.db.session import get_db

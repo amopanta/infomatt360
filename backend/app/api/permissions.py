@@ -1,8 +1,15 @@
+import json
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.assignment import UserOrganizationAssignment, UserProjectAssignment
 from app.models.identity import Project, Role
+from app.models.case_management import UserTerritory
+from app.models.participants import Participant
+from app.models.records import Record
+from app.models.runtime_record import RuntimeRecord
+from app.core.permissions import IDENTITY_USERS_MANAGE
 from app.services.permission_cache_service import CachedProjectAssignment, get_permission_cache
 
 
@@ -62,6 +69,59 @@ def get_project_permissions(db: Session, user_id: str, project_id: str) -> tuple
 
     cache.set(user_id, project_id, assignment.role_id if assignment else None, frozenset(permissions))
     return (assignment, permissions)
+
+
+def _matches_territory(participant: Participant, territories: list[UserTerritory]) -> bool:
+    try:
+        metadata = json.loads(participant.metadata_json or "{}")
+        if not isinstance(metadata, dict):
+            return False
+    except ValueError:
+        return False
+    department = str(metadata.get("department") or metadata.get("departamento") or "").strip().casefold()
+    municipality = str(metadata.get("municipality") or metadata.get("municipio") or "").strip().casefold()
+    return any(t.department.casefold() == department and (not t.municipality or t.municipality.casefold() == municipality) for t in territories)
+
+
+def participant_visible(db: Session, user_id: str, participant: Participant) -> bool:
+    _, permissions = get_project_permissions(db, user_id, participant.project_id)
+    if IDENTITY_USERS_MANAGE in permissions:
+        return True
+    territories = db.query(UserTerritory).filter(
+        UserTerritory.project_id == participant.project_id, UserTerritory.user_id == user_id,
+    ).all()
+    return not territories or _matches_territory(participant, territories)
+
+
+def allowed_participant_ids(db: Session, user_id: str, project_id: str) -> list[str] | None:
+    """None: sin restriccion territorial; []: ningun participante visible."""
+    _, permissions = get_project_permissions(db, user_id, project_id)
+    if IDENTITY_USERS_MANAGE in permissions:
+        return None
+    territories = db.query(UserTerritory).filter(UserTerritory.user_id == user_id, UserTerritory.project_id == project_id).all()
+    if not territories:
+        return None
+    return [row.id for row in db.query(Participant).filter(Participant.project_id == project_id).all()
+            if _matches_territory(row, territories)]
+
+
+def require_record_territory(db: Session, user_id: str, project_id: str, participant_id: str | None) -> None:
+    allowed = allowed_participant_ids(db, user_id, project_id)
+    if allowed is not None and participant_id not in allowed:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+
+
+def require_record_id_territory(db: Session, user_id: str, record_id: str) -> None:
+    record = db.get(RuntimeRecord, record_id) or db.get(Record, record_id)
+    if not record:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+    require_record_territory(db, user_id, record.project_id, record.participant_id)
+
+
+def require_unrestricted_territory(db: Session, user_id: str, project_id: str) -> None:
+    """Fail closed for project-wide views that cannot yet filter by participant."""
+    if allowed_participant_ids(db, user_id, project_id) is not None:
+        raise HTTPException(status_code=403, detail="Esta vista general no admite todavía el filtro territorial")
 
 
 def require_project_permission(db: Session, user_id: str, project_id: str, permission: str) -> UserProjectAssignment:

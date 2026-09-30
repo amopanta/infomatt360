@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.permissions import require_any_project_permission
+from app.api.permissions import require_any_project_permission, require_record_id_territory
 from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.approval_flow import ReviewApprovalProgress, ReviewFlowComparison, ReviewNextAction
@@ -30,6 +30,7 @@ REVIEW_STATUS_PERMISSIONS: dict[str, set[str]] = {
 def apply_review_action(payload: ReviewActionCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ReviewActionRead:
     if not assignment_service.user_has_project_access(db, current_user.id, payload.project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    require_record_id_territory(db, current_user.id, payload.record_id)
     context = review_service.get_record_review_context(db, payload.record_id)
     if not context:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado")
@@ -57,6 +58,7 @@ def list_review_actions(record_id: str, db: Session = Depends(get_db), current_u
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado")
     if not assignment_service.user_has_project_access(db, current_user.id, project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    require_record_id_territory(db, current_user.id, record_id)
     return review_service.list_actions(db, record_id)
 
 
@@ -68,6 +70,7 @@ def review_next_actions(record_id: str, db: Session = Depends(get_db), current_u
     project_id, template_id, current_status, snapshot_json = context
     if not assignment_service.user_has_project_access(db, current_user.id, project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    require_record_id_territory(db, current_user.id, record_id)
     return approval_flow_service.next_actions(db, project_id, template_id, current_status, snapshot_json)
 
 
@@ -79,6 +82,7 @@ def review_approval_progress(record_id: str, db: Session = Depends(get_db), curr
     project_id, template_id, current_status, snapshot_json = context
     if not assignment_service.user_has_project_access(db, current_user.id, project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    require_record_id_territory(db, current_user.id, record_id)
     return approval_flow_service.approval_progress(db, project_id, template_id, current_status, record_id, snapshot_json)
 
 
@@ -90,4 +94,5 @@ def review_flow_comparison(record_id: str, db: Session = Depends(get_db), curren
     project_id, template_id, _current_status, snapshot_json = context
     if not assignment_service.user_has_project_access(db, current_user.id, project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    require_record_id_territory(db, current_user.id, record_id)
     return approval_flow_service.flow_comparison(db, project_id, template_id, snapshot_json)

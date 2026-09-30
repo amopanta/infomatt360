@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.api_key_auth import require_api_key_permission
 from app.api.deps import get_current_user
-from app.api.v1.cases import allowed_participant_ids, require_record_territory
+from app.api.permissions import allowed_participant_ids, require_record_territory
 from app.api.permissions import require_any_project_permission, require_project_permission
 from app.core.permissions import BULK_ADMIN_PERMISSIONS, RECORDS_WRITE
 from app.db.session import get_db

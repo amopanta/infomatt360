@@ -10,6 +10,7 @@ class CaseCreate(BaseModel):
     assigned_user_id: str | None = None
     due_at: datetime | None = None
     properties: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
+    reminder_channels: list[Literal["internal", "email", "whatsapp"]] = Field(default_factory=lambda: ["internal"])
 
 
 class CaseUpdate(BaseModel):
@@ -18,6 +19,7 @@ class CaseUpdate(BaseModel):
     due_at: datetime | None = None
     note: str | None = Field(default=None, max_length=4000)
     properties: dict[str, str | int | float | bool | None] | None = None
+    reminder_channels: list[Literal["internal", "email", "whatsapp"]] | None = None
 
 
 class CaseRead(BaseModel):

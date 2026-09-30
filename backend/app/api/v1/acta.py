@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.permissions import require_project_permission
+from app.api.permissions import allowed_participant_ids, require_project_permission, require_record_id_territory, require_record_territory
 from app.core.config import settings
 from app.core.permissions import BUILDER_WRITE
 from app.db.session import get_db
@@ -23,6 +23,7 @@ def render_default_record_acta(record_id: str, db: Session = Depends(get_db), cu
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado")
     if not assignment_service.user_has_project_access(db, current_user.id, record.project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    require_record_territory(db, current_user.id, record.project_id, record.participant_id)
     return _pdf_response(acta_service.render_default_record_pdf(db, record_id), f"acta-{record_id}")
 
 
@@ -75,6 +76,10 @@ def render_acta_from_record(template_id: str, payload: ActaRenderFromRecordReque
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plantilla de acta no encontrada")
     if not assignment_service.user_has_project_access(db, current_user.id, template.project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    record = db.get(RuntimeRecord, payload.record_id)
+    if not record or record.project_id != template.project_id:
+        raise HTTPException(status_code=404, detail="Registro no encontrado en el proyecto de la plantilla")
+    require_record_id_territory(db, current_user.id, payload.record_id)
     pdf_bytes = acta_service.render_pdf_from_record(db, template, payload.record_id)
     return _pdf_response(pdf_bytes, template.name)
 
@@ -91,8 +96,18 @@ def render_acta_batch(template_id: str, payload: ActaRenderBatchRequest, db: Ses
 
     if payload.record_ids:
         record_ids = payload.record_ids
+        for record_id in record_ids:
+            record = db.get(RuntimeRecord, record_id)
+            if not record or record.project_id != template.project_id:
+                raise HTTPException(status_code=404, detail="Registro no encontrado en el proyecto de la plantilla")
+            require_record_id_territory(db, current_user.id, record_id)
     else:
         record_ids = runtime_record_service.list_filtered_record_ids(db, template.template_id, search=payload.search, status=payload.status, unlinked_only=payload.unlinked_only)
+        allowed = allowed_participant_ids(db, current_user.id, template.project_id)
+        if allowed is not None:
+            allowed_set = set(allowed)
+            record_ids = [record_id for record_id in record_ids
+                          if (record := db.get(RuntimeRecord, record_id)) and record.participant_id in allowed_set]
     if not record_ids:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No hay registros que coincidan con la seleccion")
     if len(record_ids) > settings.acta_batch_max_records:

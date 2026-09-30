@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.permissions import require_project_permission
+from app.api.permissions import require_project_permission, require_unrestricted_territory
 from app.core.permissions import BUILDER_WRITE
 from app.db.session import get_db
 from app.models.identity import User
@@ -33,6 +33,7 @@ def list_reports(project_id: str, db: Session = Depends(get_db), current_user: U
 def project_report_summary(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ReportProjectSummary:
     if not assignment_service.user_has_project_access(db, current_user.id, project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    require_unrestricted_territory(db, current_user.id, project_id)
     return report_service.project_summary(db, project_id)
 
 
@@ -40,6 +41,7 @@ def project_report_summary(project_id: str, db: Session = Depends(get_db), curre
 def export_project_report_summary(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Response:
     if not assignment_service.user_has_project_access(db, current_user.id, project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    require_unrestricted_territory(db, current_user.id, project_id)
     content = report_service.export_project_summary_xlsx(db, project_id)
     safe_name = "".join(character if character.isascii() and (character.isalnum() or character in "-_") else "_" for character in project_id).strip("_") or "proyecto"
     return Response(
@@ -53,6 +55,7 @@ def export_project_report_summary(project_id: str, db: Session = Depends(get_db)
 def get_report_board(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ReportBoardRead:
     if not assignment_service.user_has_project_access(db, current_user.id, project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    require_unrestricted_territory(db, current_user.id, project_id)
     row = report_service.get_board_row(db, project_id)
     widgets = ReportBoardLayout.model_validate_json(row.widgets_json).widgets if row else DEFAULT_WIDGETS
     return report_service.resolve_board(db, project_id, widgets)

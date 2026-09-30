@@ -3,11 +3,11 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.permissions import get_project_permissions, require_project_permission
+from app.api.permissions import allowed_participant_ids, get_project_permissions, require_project_permission
 from app.core.permissions import IDENTITY_USERS_MANAGE, REPORTS_EXPORT
 from app.db.session import get_db
 from app.models.builder import BuilderTemplate
-from app.models.case_management import SavedExport, SavedExportFile
+from app.models.case_management import SavedExport, SavedExportFile, UserTerritory
 from app.models.identity import User
 from app.models.scheduler import ScheduledTask
 from app.schemas.case_management import SavedExportCreate, SavedExportRead
@@ -43,6 +43,8 @@ def create_export(project_id: str, payload: SavedExportCreate, db: Session = Dep
         raise HTTPException(status_code=422, detail="El destinatario debe tener acceso al proyecto")
     if REPORTS_EXPORT not in get_project_permissions(db, payload.recipient_user_id, project_id)[1]:
         raise HTTPException(status_code=422, detail="El destinatario necesita permiso para exportar reportes")
+    if not payload.template_id and allowed_participant_ids(db, payload.recipient_user_id, project_id) is not None:
+        raise HTTPException(status_code=422, detail="El resumen general no admite destinatarios con acceso territorial limitado")
     if payload.template_id:
         template = db.get(BuilderTemplate, payload.template_id)
         if not template or template.project_id != project_id:
@@ -78,6 +80,12 @@ def download_export(export_id: str, file_id: str, db: Session = Depends(get_db),
     file = db.query(SavedExportFile).filter(SavedExportFile.id == file_id, SavedExportFile.export_id == row.id).first()
     if not file:
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    if allowed_participant_ids(db, user.id, row.project_id) is not None:
+        if not row.template_id or db.query(UserTerritory.id).filter(
+            UserTerritory.project_id == row.project_id, UserTerritory.user_id == user.id,
+            UserTerritory.created_at > file.created_at,
+        ).first():
+            raise HTTPException(status_code=403, detail="El alcance territorial cambió; genera una exportación nueva")
     extension = "csv" if row.template_id else "xlsx"
     return Response(content=file.content, media_type=file.media_type,
                     headers={"Content-Disposition": f'attachment; filename="exportacion_{row.id}.{extension}"'})

@@ -7,10 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.permissions import get_project_permissions, require_any_project_permission
+from app.api.permissions import participant_visible, require_any_project_permission
 from app.core.permissions import IDENTITY_USERS_MANAGE, RECORDS_READ, RECORDS_WRITE
 from app.db.session import get_db
-from app.models.case_management import CaseEvent, ParticipantCase, UserTerritory
+from app.models.case_management import CaseEvent, ParticipantCase
 from app.models.assignment import UserProjectAssignment
 from app.models.identity import User
 from app.models.messages import InternalMessage
@@ -20,49 +20,6 @@ from app.schemas.case_management import CaseCreate, CaseEventRead, CaseRead, Cas
 from app.services.assignment_service import assignment_service
 
 router = APIRouter()
-
-
-def participant_visible(db: Session, user_id: str, participant: Participant) -> bool:
-    _, permissions = get_project_permissions(db, user_id, participant.project_id)
-    if IDENTITY_USERS_MANAGE in permissions:
-        return True
-    territories = db.query(UserTerritory).filter(
-        UserTerritory.project_id == participant.project_id,
-        UserTerritory.user_id == user_id,
-    ).all()
-    if not territories:
-        return True
-    return _matches_territory(participant, territories)
-
-
-def _matches_territory(participant: Participant, territories: list[UserTerritory]) -> bool:
-    try:
-        metadata = json.loads(participant.metadata_json or "{}")
-        if not isinstance(metadata, dict):
-            return False
-    except ValueError:
-        return False
-    department = str(metadata.get("department") or metadata.get("departamento") or "").strip().casefold()
-    municipality = str(metadata.get("municipality") or metadata.get("municipio") or "").strip().casefold()
-    return any(t.department.casefold() == department and (not t.municipality or t.municipality.casefold() == municipality) for t in territories)
-
-
-def allowed_participant_ids(db: Session, user_id: str, project_id: str) -> list[str] | None:
-    """None means no territorial restriction; [] means no visible participant."""
-    _, permissions = get_project_permissions(db, user_id, project_id)
-    if IDENTITY_USERS_MANAGE in permissions:
-        return None
-    territories = db.query(UserTerritory).filter(UserTerritory.user_id == user_id, UserTerritory.project_id == project_id).all()
-    if not territories:
-        return None
-    return [row.id for row in db.query(Participant).filter(Participant.project_id == project_id).all()
-            if _matches_territory(row, territories)]
-
-
-def require_record_territory(db: Session, user_id: str, project_id: str, participant_id: str | None) -> None:
-    allowed = allowed_participant_ids(db, user_id, project_id)
-    if allowed is not None and participant_id not in allowed:
-        raise HTTPException(status_code=404, detail="Registro no encontrado")
 
 
 def _participant(db: Session, user: User, participant_id: str, *, write: bool = False) -> Participant:
@@ -125,7 +82,7 @@ def create_case(payload: CaseCreate, db: Session = Depends(get_db), user: User =
     now = datetime.utcnow()
     row = ParticipantCase(project_id=participant.project_id, participant_id=participant.id, title=payload.title.strip(),
                           assigned_user_id=payload.assigned_user_id, due_at=payload.due_at,
-                          properties_json=json.dumps(payload.properties, ensure_ascii=False), created_by=user.id,
+                          properties_json=json.dumps({**{key: value for key, value in payload.properties.items() if not key.startswith("_")}, "_reminder_channels": list(dict.fromkeys(payload.reminder_channels))}, ensure_ascii=False), created_by=user.id,
                           created_at=now, updated_at=now)
     db.add(row)
     db.flush()
@@ -145,8 +102,13 @@ def update_case(case_id: str, payload: CaseUpdate, db: Session = Depends(get_db)
         if data["assigned_user_id"] and data["assigned_user_id"] != row.assigned_user_id:
             db.add(InternalMessage(project_id=row.project_id, sender_id=user.id, recipient_id=data["assigned_user_id"],
                                    subject=f"Remisión de caso: {row.title}", body=payload.note or "Se te asignó un caso para seguimiento."))
-    if "properties" in data:
-        row.properties_json = json.dumps(data.pop("properties"), ensure_ascii=False)
+    if "properties" in data or "reminder_channels" in data:
+        properties = json.loads(row.properties_json or "{}")
+        if "properties" in data:
+            properties.update({key: value for key, value in (data.pop("properties") or {}).items() if not key.startswith("_")})
+        if "reminder_channels" in data:
+            properties["_reminder_channels"] = list(dict.fromkeys(data.pop("reminder_channels") or []))
+        row.properties_json = json.dumps(properties, ensure_ascii=False)
     for key in ("status", "assigned_user_id", "due_at"):
         if key in data:
             setattr(row, key, data[key])

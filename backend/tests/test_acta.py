@@ -16,8 +16,10 @@ from app.db.session import get_db
 from app.main import app
 from app.models.assignment import UserProjectAssignment
 from app.models.builder import BuilderComponent, BuilderTemplate
+from app.models.case_management import UserTerritory
 from app.models.identity import Project, Role, User
 from app.models.organization import Organization, OrganizationBranding
+from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
 
 
@@ -508,6 +510,46 @@ def test_acta_render_batch_reports_partial_failure_for_nonexistent_record():
 
             manifest_rows = {row[0]: row for row in csv.reader(io.StringIO(archive.read("manifest.csv").decode("utf-8-sig")))}
             assert manifest_rows["acta-record-does-not-exist"][1] == "failed"
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_acta_render_batch_rejects_record_from_another_project():
+    engine, sessions = setup_layout_client()
+    try:
+        with sessions() as db:
+            db.add(Project(id="acta-foreign-project", name="Otro proyecto"))
+            db.add(RuntimeRecord(id="acta-foreign-record", project_id="acta-foreign-project", template_id="acta-form-template", status="submitted"))
+            db.commit()
+        with TestClient(app) as client:
+            builder_headers = auth(client, "acta-builder@example.com", "Builder12345!")
+            template_id = create_layout_template(client, builder_headers)
+            response = client.post(f"/api/v1/acta-templates/{template_id}/render-batch", headers=builder_headers,
+                                   json={"record_ids": ["acta-record-1", "acta-foreign-record"]})
+            assert response.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_acta_render_batch_rejects_record_outside_user_territory():
+    engine, sessions = setup_layout_client()
+    try:
+        with sessions() as db:
+            db.add(Participant(id="acta-foreign-participant", project_id="acta-project", full_name="Fuera",
+                               metadata_json='{"department":"Antioquia","municipality":"Medellín"}'))
+            db.add(UserTerritory(project_id="acta-project", user_id="acta-basic", department="Cundinamarca", municipality="Soacha"))
+            record = db.get(RuntimeRecord, "acta-record-1")
+            record.participant_id = "acta-foreign-participant"
+            db.commit()
+        with TestClient(app) as client:
+            builder_headers = auth(client, "acta-builder@example.com", "Builder12345!")
+            basic_headers = auth(client, "acta-basic@example.com", "Basic12345!")
+            template_id = create_layout_template(client, builder_headers)
+            response = client.post(f"/api/v1/acta-templates/{template_id}/render-batch", headers=basic_headers,
+                                   json={"record_ids": ["acta-record-1", "acta-record-does-not-exist"]})
+            assert response.status_code == 404
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

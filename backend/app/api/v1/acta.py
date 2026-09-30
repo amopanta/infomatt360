@@ -98,7 +98,10 @@ def render_acta_batch(template_id: str, payload: ActaRenderBatchRequest, db: Ses
         record_ids = payload.record_ids
         for record_id in record_ids:
             record = db.get(RuntimeRecord, record_id)
-            if not record or record.project_id != template.project_id:
+            if record is None:
+                # El renderer registra IDs inexistentes como fallo individual en manifest.csv.
+                continue
+            if record.project_id != template.project_id:
                 raise HTTPException(status_code=404, detail="Registro no encontrado en el proyecto de la plantilla")
             require_record_id_territory(db, current_user.id, record_id)
     else:

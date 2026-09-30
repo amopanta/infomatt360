@@ -1,84 +1,46 @@
-# InfoMatt360 Desktop
+# InfoMatt360 Escritorio
 
-Shell de Electron que envuelve el mismo frontend web (`../frontend`), agregando
-una cola local offline para capturas sin conexion.
+Aplicación Electron para Windows que abre el ERP publicado en
+`https://infomatt360.tecnomatt.com/`. Usa la misma cuenta, API y base de datos
+que la web. Los cambios guardados en línea se ven en ambos sentidos al volver
+a consultar los datos.
 
-## Por que Electron + sql.js (no better-sqlite3)
+## Instalación y prueba de dos vías
 
-`better-sqlite3` es un modulo nativo: debe recompilarse contra el ABI de
-Electron con Visual Studio Build Tools instalado. En un equipo de desarrollo
-sin esas herramientas, la recompilacion falla. `sql.js` (SQLite compilado a
-WebAssembly) evita ese problema por completo, a cambio de tener que llamar
-`db.export()` y escribirlo a disco despues de cada escritura (ver
-`src/offlineQueue.js`).
+1. Instalar `InfoMatt360 Setup 0.1.0.exe` en Windows y abrir InfoMatt360.
+2. Iniciar sesión con una cuenta de pruebas.
+3. Crear o editar un registro de prueba en el escritorio y comprobarlo en el navegador.
+4. Cambiar ese registro desde el navegador y recargarlo en el escritorio.
+5. Para la cola local, capturar sin red en un formulario que admita capturas
+   offline, reconectar y pulsar **Sincronizar pendientes**. Confirmar que el
+   registro aparezca una sola vez en el servidor.
+
+La cola local usa `sql.js` y envía lotes a
+`POST /api/v1/runtime/session/bulk-save` con claves de idempotencia. Las
+pruebas están en `src/offlineQueue.test.js`.
+
+## Límites actuales
+
+- El primer inicio y el inicio de sesión requieren conexión al VPS. La
+  apertura sin red depende de los recursos que haya guardado el navegador
+  integrado.
+- La captura sin red de registros vinculados a participantes todavía no está
+  habilitada; se debe validar la relación con el servidor antes de guardar.
+- Los servicios de correo, mensajería y otras integraciones externas dependen
+  de las credenciales y la configuración del VPS.
+- El instalador no incluye actualizaciones automáticas. Para una nueva versión
+  se genera y distribuye otro instalador.
 
 ## Desarrollo
 
-```powershell
-# 1. Backend y frontend corriendo (ver README raiz del proyecto)
-npm install
-npm run dev
-```
-
-Por defecto carga el build de produccion del frontend
-(`../frontend/dist/index.html`, hay que correr `npm run build` en `frontend/`
-primero). Para apuntar al servidor de desarrollo de Vite en su lugar:
+`ELECTRON_START_URL` permite apuntar a Vite. Sin esa variable, el modo de
+desarrollo sirve `../frontend/dist` desde un servidor HTTP local. La versión
+empaquetada siempre usa el origen publicado, salvo que se configure
+`INFOMATT360_DESKTOP_URL` antes de abrirla. El puente local solo se expone al
+origen publicado o al servidor local de desarrollo.
 
 ```powershell
-$env:ELECTRON_START_URL = "http://127.0.0.1:5173"
-npm run dev
+pnpm install
+node --test src/*.test.js
+pnpm run build:win
 ```
-
-## Pruebas
-
-La cola offline (`src/offlineQueue.js`) es codigo Node puro, sin dependencia
-de Electron, y tiene pruebas con el test runner nativo de Node:
-
-```powershell
-npm test
-```
-
-## Cola offline
-
-`window.desktopBridge` (expuesto via `src/preload.js`) da acceso desde el
-frontend a:
-
-- `enqueueRecord({ projectId, templateId, values })` - guarda una captura
-  localmente. `values` debe ser `[{ field_name, field_value_json }, ...]`,
-  el mismo formato que usa `POST /api/v1/runtime/save`.
-- `getPendingCount()` - cuantos registros faltan por sincronizar.
-- `syncNow({ apiBaseUrl, accessToken })` - reenvia los pendientes contra
-  `POST /api/v1/runtime/save` (el mismo endpoint que usa el guardado en
-  linea, con la sesion normal del usuario). **No** usa
-  `POST /api/v1/runtime/bulk/save`: ese endpoint exige autenticacion por API
-  key (`require_api_key_permission`) para integraciones externas, no sesion
-  de usuario -- se probo primero con el backend real y devolvia 401 "API key
-  requerida".
-
-**Riesgo conocido, no resuelto en esta version**: `/runtime/save` no tiene
-`idempotency_key`. Si la respuesta del servidor se pierde en la red despues
-de que el registro ya se guardo (ej. se corta la conexion justo despues del
-200 OK), un reintento de sincronizacion crearia un registro duplicado. La
-cola local si evita reintentos de registros ya marcados `synced`, pero no
-puede distinguir ese caso especifico (exito silencioso) de un fallo real.
-Mitigacion futura: agregar idempotencia a `/runtime/save` en el backend, o
-usar el anti-duplicidad por hash de contenido que ya existe en
-`runtime_record_service.py` (Fase 1.4) como red de seguridad adicional.
-
-**UI conectada**: el boton "Sincronizar pendientes (N)" ya esta en la barra
-superior (`frontend/src/components/DesktopSyncStatus.tsx`, visible solo
-cuando `window.desktopBridge` existe) y el guardado de Runtime
-(`frontend/src/modules/runtime/RuntimeApp.tsx`) encola automaticamente en
-vez de perder la captura cuando `fetch` falla por falta de red (`TypeError`,
-no un error HTTP real del servidor).
-
-## Empaquetado
-
-```powershell
-cd ../frontend; npm run build
-cd ../desktop
-npm run build:win   # o build:mac / build:linux
-```
-
-Genera el instalador en `desktop/release/`. El build del frontend se copia
-como recurso empaquetado (`extraResources` en `package.json`).

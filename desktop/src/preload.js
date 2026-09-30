@@ -2,6 +2,13 @@
 
 const { contextBridge, ipcRenderer } = require("electron");
 
+const productionOrigin = new URL(process.env.INFOMATT360_DESKTOP_URL || "https://infomatt360.tecnomatt.com/").origin;
+const isLocalDevelopment = /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(location.origin);
+if (location.origin !== productionOrigin && !isLocalDevelopment) {
+  // No habilitar IPC en una pagina ajena si se abriera por otro camino.
+  return;
+}
+
 /**
  * Puente minimo hacia el proceso principal para la cola offline. El frontend
  * web (compartido con la version navegador) puede usar `window.desktopBridge`

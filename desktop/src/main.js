@@ -6,27 +6,28 @@ const { initQueue, close, enqueue, countPending, syncPending, purgeOldSynced } =
 const { startStaticServer } = require("./staticServer");
 const printing = require("./printing");
 
+const PRODUCTION_URL = "https://infomatt360.tecnomatt.com/";
+
 let queueDb = null;
 let localServer = null;
 let mainWindow = null;
 
 async function resolveStartUrl() {
   if (process.env.ELECTRON_START_URL) return process.env.ELECTRON_START_URL;
-  // Empaquetado: el frontend construido se copia como recurso extra (ver
-  // "extraResources" en package.json). En desarrollo sin ELECTRON_START_URL,
-  // cae al build local del frontend si ya existe. Se sirve por HTTP local
-  // (no file://) para que las rutas absolutas del build ("/assets/...")
-  // resuelvan igual que en un despliegue web real, incluyendo rutas
-  // profundas de la SPA como /runtime/xyz.
-  const packagedDir = path.join(process.resourcesPath, "frontend-dist");
+  // El instalador usa el mismo origen del ERP: conserva cookies, CORS y
+  // cache PWA, y no depende de un backend localhost inexistente en el PC.
+  if (app.isPackaged) return process.env.INFOMATT360_DESKTOP_URL || PRODUCTION_URL;
+  // En desarrollo sin ELECTRON_START_URL, usa el build local del frontend.
+  // El servidor HTTP permite resolver las rutas absolutas de la SPA.
   const devBuildDir = path.join(__dirname, "..", "..", "frontend", "dist");
-  const rootDir = app.isPackaged ? packagedDir : devBuildDir;
-  const { server, port } = await startStaticServer(rootDir);
+  const { server, port } = await startStaticServer(devBuildDir);
   localServer = server;
   return `http://127.0.0.1:${port}/`;
 }
 
 async function createWindow() {
+  const startUrl = await resolveStartUrl();
+  const appOrigin = new URL(startUrl).origin;
   const window = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -36,7 +37,22 @@ async function createWindow() {
       nodeIntegration: false,
     },
   });
-  window.loadURL(await resolveStartUrl());
+  // El preload da acceso a la cola e impresoras; no lo exponemos a sitios
+  // externos abiertos desde un enlace del ERP.
+  window.webContents.on("will-navigate", (event, url) => {
+    try {
+      if (new URL(url).origin !== appOrigin) event.preventDefault();
+    } catch {
+      event.preventDefault();
+    }
+  });
+  window.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  try {
+    await window.loadURL(startUrl);
+  } catch {
+    const retryUrl = startUrl.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+    await window.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><html lang="es"><meta charset="utf-8"><title>InfoMatt360</title><body style="font:16px Arial;padding:32px"><h1>Sin conexión</h1><p>Conéctate a internet para iniciar InfoMatt360. Si ya usaste esta aplicación, vuelve a intentarlo cuando regrese la conexión.</p><a href="${retryUrl}">Reintentar</a></body></html>`)}`);
+  }
   mainWindow = window;
   return window;
 }

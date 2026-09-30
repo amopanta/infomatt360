@@ -2,7 +2,7 @@
   "name": "infomatt360-desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "Aplicacion de escritorio InfoMatt360: envuelve el frontend web con soporte offline y sincronizacion por lotes.",
+  "description": "Aplicacion de escritorio InfoMatt360 con cola local y sincronizacion por lotes.",
   "main": "src/main.js",
   "scripts": {
     "dev": "electron .",
@@ -18,12 +18,6 @@
       "src/**/*",
       "!src/**/*.test.js",
       "resources/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "../frontend/dist",
-        "to": "frontend-dist"
-      }
     ],
     "directories": {
       "output": "release"

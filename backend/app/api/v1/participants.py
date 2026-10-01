@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.api.permissions import allowed_participant_ids, participant_visible
 from app.api.permissions import require_any_project_permission
-from app.core.permissions import IDENTITY_USERS_MANAGE, RECORDS_APPROVE, RECORDS_REVIEW
+from app.core.permissions import IDENTITY_USERS_MANAGE, RECORDS_APPROVE, RECORDS_LINK_PARTICIPANT, RECORDS_REVIEW
 from app.db.session import get_db
 from app.models.identity import User
 from app.models.participants import Participant
@@ -90,5 +90,5 @@ def promote_record_to_participant(payload: ParticipantPromoteRequest, db: Sessio
     record = db.query(RuntimeRecord).filter(RuntimeRecord.id == payload.record_id).first()
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado")
-    require_any_project_permission(db, current_user.id, record.project_id, {RECORDS_REVIEW, RECORDS_APPROVE})
+    require_any_project_permission(db, current_user.id, record.project_id, {RECORDS_LINK_PARTICIPANT, RECORDS_REVIEW, RECORDS_APPROVE})
     return participant_service.promote_record_to_participant(db, record, payload)

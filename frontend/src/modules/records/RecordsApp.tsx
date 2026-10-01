@@ -575,17 +575,18 @@ function LinkedSubformSection({ projectId, record, onMessage }: { projectId: str
  * persona. Aqui un revisor decide, explicitamente, enlazarlo a un
  * participante ya existente o crear uno nuevo -- nunca ocurre solo. */
 function PromoteToParticipantPanel({
-  projectId,
   record,
   onPromoted,
   onMessage,
 }: {
-  projectId: string;
   record: RuntimeRecord;
   onPromoted: (record: RuntimeRecord) => void;
   onMessage: (value: string) => void;
 }) {
   const [participants, setParticipants] = useState<Participant[]>([]);
+  const [participantsLoading, setParticipantsLoading] = useState(true);
+  const [participantsError, setParticipantsError] = useState('');
+  const [reloadParticipants, setReloadParticipants] = useState(0);
   const [mode, setMode] = useState<'link' | 'create'>('link');
   const [selectedParticipantId, setSelectedParticipantId] = useState('');
   const [participantQuery, setParticipantQuery] = useState('');
@@ -600,10 +601,21 @@ function PromoteToParticipantPanel({
   }).slice(0, 100);
 
   useEffect(() => {
-    fetchProjectParticipants(projectId).then(setParticipants).catch(() => setParticipants([]));
-  }, [projectId]);
+    let active = true;
+    setParticipantsLoading(true);
+    setParticipantsError('');
+    setParticipants([]);
+    fetchProjectParticipants(record.project_id)
+      .then((rows) => { if (active) setParticipants(rows.filter((participant) => participant.status === 'active')); })
+      .catch((error: Error) => { if (active) setParticipantsError(error.message); })
+      .finally(() => { if (active) setParticipantsLoading(false); });
+    return () => { active = false; };
+  }, [record.project_id, reloadParticipants]);
 
   if (record.participant_id) return null;
+  if (!hasAnyCurrentProjectPermission(['records.link_participant', 'records.review', 'records.approve'])) {
+    return <section className="participant-promote-panel"><h3>Sin participante enlazado</h3><p>Solicita a una persona revisora que vincule este registro aprobado con un participante.</p></section>;
+  }
 
   async function submit() {
     setSaving(true);
@@ -636,6 +648,9 @@ function PromoteToParticipantPanel({
       </div>
       {mode === 'link' ? (
         <>
+          {participantsLoading && <p role="status">Cargando participantes del proyecto…</p>}
+          {participantsError && <p role="alert">{participantsError} <button type="button" onClick={() => setReloadParticipants((value) => value + 1)}>Reintentar</button></p>}
+          {!participantsLoading && !participantsError && participants.length === 0 && <p role="status">Este proyecto no tiene participantes activos. Puedes crear uno aquí o agregarlo primero en Participantes.</p>}
           <label>Buscar participante
             <input type="search" value={participantQuery} onChange={(event) => setParticipantQuery(event.target.value)} placeholder="Nombre, documento, código, grupo o municipio" />
           </label>
@@ -647,7 +662,7 @@ function PromoteToParticipantPanel({
               ))}
             </select>
           </label>
-          <small>{visibleParticipants.length} de {participants.length} participantes visibles{participants.length > 100 ? ' (máximo 100; escribe para filtrar)' : ''}.</small>
+          {!participantsLoading && !participantsError && <small>{visibleParticipants.length} de {participants.length} participantes visibles{participants.length > 100 ? ' (máximo 100; escribe para filtrar)' : ''}.</small>}
           {selectedParticipant && <p>Se asociará a <strong>{selectedParticipant.full_name}</strong>{selectedParticipant.document_id ? ` · documento ${selectedParticipant.document_id}` : ''}{selectedParticipant.group_name ? ` · grupo ${selectedParticipant.group_name}` : ''}.</p>}
         </>
       ) : (
@@ -758,7 +773,7 @@ function DeepLinkedRecordCard({
         ))}
       </dl>
       {!visibleValues.length && <p>No se encontraron preguntas con ese nombre.</p>}
-      <PromoteToParticipantPanel projectId={projectId} record={record} onPromoted={onRecordUpdated} onMessage={onMessage} />
+      <PromoteToParticipantPanel record={record} onPromoted={onRecordUpdated} onMessage={onMessage} />
       <LinkedSubformSection projectId={projectId} record={record} onMessage={onMessage} />
       <ReviewPanel projectId={projectId} record={record} onMessage={onMessage} />
       <GenerateActaPanel projectId={projectId} record={record} onMessage={onMessage} />

@@ -28,16 +28,19 @@ def setup_client():
         project = Project(id="promote-project", name="Promocion de participantes")
         reviewer_role = Role(id="promote-reviewer-role", name="Revisor", permissions="records.review")
         capturer_role = Role(id="promote-capturer-role", name="Capturista", permissions="records.write")
+        linker_role = Role(id="promote-linker-role", name="Enlace", permissions="records.link_participant,records.read")
         reviewer = User(id="promote-reviewer", full_name="Revisor", document_id="promote-reviewer-doc", email="promote-reviewer@example.com", password_hash=hash_password("Reviewer12345!"))
         capturer = User(id="promote-capturer", full_name="Capturista", document_id="promote-capturer-doc", email="promote-capturer@example.com", password_hash=hash_password("Capturer12345!"))
+        linker = User(id="promote-linker", full_name="Enlace", document_id="promote-linker-doc", email="promote-linker@example.com", password_hash=hash_password("Linker12345!"))
 
         template = BuilderTemplate(id="promote-template", project_id=project.id, name="Censo abierto", status="published")
         existing_participant = Participant(id="promote-existing-participant", project_id=project.id, document_id="CC-500", full_name="Participante ya existente")
 
         db.add_all([
-            project, reviewer_role, capturer_role, reviewer, capturer, template, existing_participant,
+            project, reviewer_role, capturer_role, linker_role, reviewer, capturer, linker, template, existing_participant,
             UserProjectAssignment(user_id=reviewer.id, project_id=project.id, role_id=reviewer_role.id, status="active"),
             UserProjectAssignment(user_id=capturer.id, project_id=project.id, role_id=capturer_role.id, status="active"),
+            UserProjectAssignment(user_id=linker.id, project_id=project.id, role_id=linker_role.id, status="active"),
         ])
         db.commit()
 
@@ -113,6 +116,25 @@ def test_promote_links_to_existing_participant():
         Base.metadata.drop_all(bind=engine)
 
 
+def test_link_permission_can_associate_without_review_permission():
+    engine = setup_client()
+    try:
+        with TestClient(app) as client:
+            capturer_headers = auth(client, "promote-capturer@example.com", "Capturer12345!")
+            linker_headers = auth(client, "promote-linker@example.com", "Linker12345!")
+            record_id = _capture_unlinked_record(client, capturer_headers)
+            response = client.post(
+                "/api/v1/participants/promote", headers=linker_headers,
+                json={"record_id": record_id, "participant_id": "promote-existing-participant"},
+            )
+            assert response.status_code == 200, response.text
+            record = client.get(f"/api/v1/runtime/record/{record_id}", headers=linker_headers).json()
+            assert record["participant_id"] == "promote-existing-participant"
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
 def test_promote_rejects_already_linked_record():
     engine = setup_client()
     try:
@@ -137,7 +159,7 @@ def test_promote_rejects_already_linked_record():
         Base.metadata.drop_all(bind=engine)
 
 
-def test_promote_requires_review_permission():
+def test_promote_requires_link_or_review_permission():
     engine = setup_client()
     try:
         with TestClient(app) as client:

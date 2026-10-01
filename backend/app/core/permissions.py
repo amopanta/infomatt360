@@ -18,6 +18,7 @@ MIRROR_MANAGE = "mirror.manage"
 
 RECORDS_READ = "records.read"
 RECORDS_WRITE = "records.write"
+RECORDS_LINK_PARTICIPANT = "records.link_participant"
 RECORDS_REVIEW = "records.review"
 RECORDS_COORDINATE = "records.coordinate"
 RECORDS_APPROVE = "records.approve"
@@ -56,6 +57,7 @@ ALL_PERMISSIONS = {
     MIRROR_MANAGE,
     RECORDS_READ,
     RECORDS_WRITE,
+    RECORDS_LINK_PARTICIPANT,
     RECORDS_REVIEW,
     RECORDS_COORDINATE,
     RECORDS_APPROVE,

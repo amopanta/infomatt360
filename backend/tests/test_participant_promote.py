@@ -237,4 +237,3 @@ def test_unlinked_only_filter_on_records_search():
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
-

@@ -4,12 +4,14 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.models.assignment import UserOrganizationAssignment, UserProjectAssignment
+from app.models.builder import BuilderTemplate
+from app.models.form_assignment import ParticipantFormAssignment
 from app.models.identity import Project, Role
 from app.models.case_management import UserTerritory
 from app.models.participants import Participant
 from app.models.records import Record
 from app.models.runtime_record import RuntimeRecord
-from app.core.permissions import IDENTITY_USERS_MANAGE
+from app.core.permissions import IDENTITY_USERS_MANAGE, RECORDS_APPROVE, RECORDS_COORDINATE, RECORDS_REVIEW, RECORDS_VOID
 from app.services.permission_cache_service import CachedProjectAssignment, get_permission_cache
 
 
@@ -105,6 +107,39 @@ def allowed_participant_ids(db: Session, user_id: str, project_id: str) -> list[
             if _matches_territory(row, territories)]
 
 
+def form_access_mode(template: BuilderTemplate | None) -> str:
+    """Old forms remain operational until an administrator selects a mode."""
+    if not template or not template.participant_source_json:
+        return "legacy"
+    try:
+        return str(json.loads(template.participant_source_json).get("access_mode") or "legacy")
+    except (ValueError, AttributeError):
+        return "legacy"
+
+
+def allowed_form_participant_ids(db: Session, user_id: str, template: BuilderTemplate, *, review: bool = False) -> list[str] | None:
+    territorial = allowed_participant_ids(db, user_id, template.project_id)
+    if form_access_mode(template) == "legacy":
+        return territorial
+    _, permissions = get_project_permissions(db, user_id, template.project_id)
+    if IDENTITY_USERS_MANAGE in permissions or (review and permissions.intersection({RECORDS_REVIEW, RECORDS_APPROVE, RECORDS_COORDINATE, RECORDS_VOID})):
+        return territorial
+    assigned = {row[0] for row in db.query(ParticipantFormAssignment.participant_id).filter(
+        ParticipantFormAssignment.template_id == template.id,
+        ParticipantFormAssignment.responsible_user_id == user_id,
+    ).all()}
+    return sorted(assigned if territorial is None else assigned.intersection(territorial))
+
+
+def require_form_participant_access(db: Session, user_id: str, template_id: str, participant_id: str | None, *, review: bool = False) -> None:
+    template = db.get(BuilderTemplate, template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Formulario no encontrado")
+    allowed = allowed_form_participant_ids(db, user_id, template, review=review)
+    if allowed is not None and participant_id not in allowed:
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+
+
 def require_record_territory(db: Session, user_id: str, project_id: str, participant_id: str | None) -> None:
     allowed = allowed_participant_ids(db, user_id, project_id)
     if allowed is not None and participant_id not in allowed:
@@ -116,6 +151,8 @@ def require_record_id_territory(db: Session, user_id: str, record_id: str) -> No
     if not record:
         raise HTTPException(status_code=404, detail="Registro no encontrado")
     require_record_territory(db, user_id, record.project_id, record.participant_id)
+    if isinstance(record, RuntimeRecord):
+        require_form_participant_access(db, user_id, record.template_id, record.participant_id, review=True)
 
 
 def require_unrestricted_territory(db: Session, user_id: str, project_id: str) -> None:

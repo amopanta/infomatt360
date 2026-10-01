@@ -105,7 +105,7 @@ DEFAULT_ACTIONS: dict[str, list[ReviewNextAction]] = {
         VOID_ACTION,
     ],
     "corrected": [
-        ReviewNextAction(label="Reenviar a revisión", to_status="under_review", action="resubmit_review", required_permission="records.review"),
+        ReviewNextAction(label="Reenviar para aprobación", to_status="submitted", action="resubmit", required_permission="records.write"),
         VOID_ACTION,
     ],
     "approved": [
@@ -288,15 +288,20 @@ class ApprovalFlowService:
         required_user_ids = self.required_approver_user_ids(db, project_id, next_step)
         if not required_user_ids:
             return []
+        last_return = db.query(ReviewAction.created_at).filter(ReviewAction.record_id == record_id, ReviewAction.to_status == "returned").order_by(ReviewAction.created_at.desc()).first()
+        cycle_start = last_return[0] if last_return else None
+        approved_query = db.query(ReviewAction.user_id).filter(
+            ReviewAction.record_id == record_id,
+            ReviewAction.from_status == current_status,
+            ReviewAction.to_status == next_step.status_after,
+            ReviewAction.action == next_step.action,
+            ReviewAction.user_id.in_(required_user_ids),
+        )
+        if cycle_start is not None:
+            approved_query = approved_query.filter(ReviewAction.created_at > cycle_start)
         approved_user_ids = {
             row[0]
-            for row in db.query(ReviewAction.user_id).filter(
-                ReviewAction.record_id == record_id,
-                ReviewAction.from_status == current_status,
-                ReviewAction.to_status == next_step.status_after,
-                ReviewAction.action == next_step.action,
-                ReviewAction.user_id.in_(required_user_ids),
-            ).all()
+            for row in approved_query.all()
         }
         pending_user_ids = required_user_ids - approved_user_ids
         return [ReviewApprovalProgress(

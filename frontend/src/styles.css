@@ -489,6 +489,17 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .runtime-participant-picker strong { color: var(--brand-primary); }
 .runtime-participant-confirmation { display: grid; gap: 3px; padding: 12px 14px; border-radius: 8px; background: var(--success-soft); }
 .runtime-participant-confirmation span { color: var(--text-muted); }
+.runtime-new-participant { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border-strong); border-radius: 8px; }
+.runtime-new-participant label { display: grid; gap: 5px; }
+.form-assignment-manager { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--border-strong); }
+.form-assignment-manager .forms-participant-chooser-actions { align-items: end; flex-wrap: wrap; }
+.form-assignment-manager label { min-width: 200px; }
+.participant-activity-tree { display: grid; gap: 9px; padding-left: 18px; border-left: 2px solid var(--brand-primary); }
+.participant-activity-node { padding: 10px 14px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); }
+.participant-activity-node > div:first-child { display: flex; justify-content: space-between; gap: 12px; }
+.participant-activity-node small { display: block; margin: 4px 0; color: var(--text-muted); }
+.record-correction-panel { margin: 14px 0; padding: 14px; border: 1px solid var(--border-strong); border-radius: 9px; background: var(--surface); }
+.record-correction-panel p { margin: 6px 0 12px; }
 .runtime-shell { max-width: 1040px; margin: 16px auto; padding: 20px; background: var(--form-background, #ffffff); border: 2px solid color-mix(in srgb, var(--form-primary, var(--brand-primary)) 22%, var(--brand-primary-soft)); border-top: 8px solid var(--form-primary, var(--brand-primary)); border-radius: var(--form-radius, 18px); box-shadow: 0 14px 40px rgba(10, 37, 64, 0.08); }
 .runtime-shell h1 { margin-top: 0; color: var(--form-primary, var(--text)); }
 .runtime-page { margin-top: 12px; }
@@ -1317,4 +1328,3 @@ svg.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor
 .runtime-geo-polygon {
   fill: rgba(0, 194, 255, 0.18);
 }
-

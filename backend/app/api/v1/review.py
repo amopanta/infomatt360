@@ -2,16 +2,32 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.permissions import require_any_project_permission, require_record_id_territory
+from app.api.permissions import require_any_project_permission, require_form_participant_access, require_record_id_territory
 from app.db.session import get_db
 from app.models.identity import User
 from app.schemas.approval_flow import ReviewApprovalProgress, ReviewFlowComparison, ReviewNextAction
-from app.schemas.review import ReviewActionCreate, ReviewActionRead
+from app.schemas.review import ReopenApprovedRequest, ReviewActionCreate, ReviewActionRead
+from app.core.permissions import IDENTITY_USERS_MANAGE, RECORDS_WRITE
+from app.models.runtime_record import RuntimeRecord
 from app.services.approval_flow_service import approval_flow_service
 from app.services.assignment_service import assignment_service
 from app.services.review_service import review_service
 
 router = APIRouter()
+
+
+@router.post("/records/{record_id}/reopen", response_model=ReviewActionRead)
+def reopen_approved_record(record_id: str, payload: ReopenApprovedRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ReviewActionRead:
+    project_id = review_service.get_record_project_id(db, record_id)
+    if not project_id or not assignment_service.user_has_project_access(db, current_user.id, project_id):
+        raise HTTPException(status_code=404, detail="Registro no encontrado")
+    require_any_project_permission(db, current_user.id, project_id, {IDENTITY_USERS_MANAGE})
+    require_record_id_territory(db, current_user.id, record_id)
+    try:
+        return review_service.reopen_approved(db, record_id, current_user.id, payload.reason)
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 REVIEW_STATUS_PERMISSIONS: dict[str, set[str]] = {
     "under_review": {"records.review", "records.approve"},
@@ -35,6 +51,11 @@ def apply_review_action(payload: ReviewActionCreate, db: Session = Depends(get_d
     if not context:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado")
     _project_id, template_id, _current_status, snapshot_json = context
+    if payload.to_status in {"corrected", "submitted"} and _current_status in {"returned", "corrected"}:
+        require_any_project_permission(db, current_user.id, payload.project_id, {RECORDS_WRITE})
+        record = db.get(RuntimeRecord, payload.record_id)
+        if record:
+            require_form_participant_access(db, current_user.id, record.template_id, record.participant_id)
     configured_step = approval_flow_service.find_step_for_status(db, payload.project_id, template_id, payload.to_status, snapshot_json)
     if configured_step:
         if not approval_flow_service.user_can_execute_step(db, current_user.id, payload.project_id, configured_step):

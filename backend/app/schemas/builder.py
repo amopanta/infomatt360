@@ -33,6 +33,7 @@ class BuilderTemplateRead(BuilderTemplateCreate):
 
 
 class ParticipantSource(BaseModel):
+    access_mode: Literal["legacy", "open", "closed"] = "legacy"
     mode: Literal["all", "list", "filter", "form", "pull", "group"] = "all"
     participant_ids: list[str] = Field(default_factory=list)
     municipality: str | None = None

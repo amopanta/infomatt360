@@ -12,6 +12,10 @@ class ReviewActionCreate(BaseModel):
     rejected_field_name: str | None = Field(default=None, max_length=180)
 
 
+class ReopenApprovedRequest(BaseModel):
+    reason: str = Field(min_length=5, max_length=2000)
+
+
 class ReviewActionRead(ReviewActionCreate):
     id: str
     from_status: str | None = None

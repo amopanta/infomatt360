@@ -8,7 +8,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.assignment import UserProjectAssignment
-from app.models.identity import Project, User
+from app.models.identity import Project, Role, User
 
 
 def setup_client():
@@ -21,7 +21,8 @@ def setup_client():
         db.add_all([
             project,
             user,
-            UserProjectAssignment(user_id=user.id, project_id=project.id, status="active"),
+            Role(id="participant-create-role", name="Creador", permissions="participants.create"),
+            UserProjectAssignment(user_id=user.id, project_id=project.id, role_id="participant-create-role", status="active"),
         ])
         db.commit()
 

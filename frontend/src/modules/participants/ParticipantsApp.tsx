@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
-import { assignParticipantGroup, assignTerritory, createParticipantCase, deleteParticipantGroup, fetchCaseAssignees, fetchCaseEvents, fetchParticipant, fetchParticipantCases, fetchParticipantHistory, fetchProjectParticipants, fetchTerritories, removeTerritory, setParticipantGroupStatus, updateParticipantCase } from './api';
-import type { CaseAssignee, CaseEvent, Participant, ParticipantCase, ParticipantHistoryItem, UserTerritory } from './api';
+import { assignParticipantGroup, assignTerritory, createParticipantCase, deleteParticipantGroup, fetchCaseAssignees, fetchCaseEvents, fetchParticipant, fetchParticipantActivities, fetchParticipantCases, fetchParticipantHistory, fetchProjectParticipants, fetchTerritories, removeTerritory, setParticipantGroupStatus, updateParticipantCase } from './api';
+import type { CaseAssignee, CaseEvent, Participant, ParticipantActivity, ParticipantCase, ParticipantHistoryItem, UserTerritory } from './api';
 
 const STATUS_LABELS: Record<string, string> = {
   draft: 'Borrador', submitted: 'Enviado', under_review: 'En revisión',
@@ -141,6 +141,7 @@ function ParticipantList() {
 function ParticipantDetail({ participantId }: { participantId: string }) {
   const [participant, setParticipant] = useState<Participant | null>(null);
   const [history, setHistory] = useState<ParticipantHistoryItem[]>([]);
+  const [activities, setActivities] = useState<ParticipantActivity[]>([]);
   const [message, setMessage] = useState('Cargando participante...');
   const [cases, setCases] = useState<ParticipantCase[]>([]);
   const [assignees, setAssignees] = useState<CaseAssignee[]>([]);
@@ -153,10 +154,11 @@ function ParticipantDetail({ participantId }: { participantId: string }) {
   const [events, setEvents] = useState<CaseEvent[]>([]);
 
   useEffect(() => {
-    Promise.all([fetchParticipant(participantId), fetchParticipantHistory(participantId), fetchParticipantCases(participantId)])
-      .then(([participantData, historyData, caseData]) => {
+    Promise.all([fetchParticipant(participantId), fetchParticipantHistory(participantId), fetchParticipantActivities(participantId), fetchParticipantCases(participantId)])
+      .then(([participantData, historyData, activityData, caseData]) => {
         setParticipant(participantData);
         setHistory(historyData);
+        setActivities(activityData);
         setCases(caseData);
         void fetchCaseAssignees(participantData.project_id).then(setAssignees).catch(() => {});
         setMessage('');
@@ -205,6 +207,7 @@ function ParticipantDetail({ participantId }: { participantId: string }) {
             <div><dt>Estado</dt><dd>{participant.status}</dd></div>
           </dl>
         </section>
+        <section className="participant-summary-card"><h3>Árbol de formularios y actividades</h3><p>Solo aparecen las actividades que corresponden a este participante y a tu acceso.</p><div className="participant-activity-tree" role="tree" aria-label="Actividades del participante">{activities.map((activity) => <div key={activity.template_id} className="participant-activity-node" role="treeitem"><div><strong>▸ {activity.template_name}</strong><span className={`record-status ${activity.assignment_status}`}>{({ assigned: 'Asignado', in_progress: 'En curso', completed: 'Completado', closed: 'Cerrado' } as const)[activity.assignment_status] || activity.assignment_status}</span></div><small>Responsable: {activity.responsible_name || 'Histórico'}{activity.record_status ? ` · Respuesta: ${STATUS_LABELS[activity.record_status] || activity.record_status}` : ''}</small><div>{activity.record_id ? <a href={`/records/${activity.template_id}?recordId=${activity.record_id}${activity.record_status === 'returned' && hasAnyCurrentProjectPermission(['records.write']) ? '&edit=1' : ''}`}>{activity.record_status === 'returned' ? 'Corregir respuesta' : 'Ver respuesta'}</a> : activity.assignment_status === 'assigned' || activity.assignment_status === 'in_progress' ? <a href={`/runtime/${activity.template_id}?participantId=${participantId}`}>Diligenciar</a> : null}</div></div>)}{!activities.length && <p>No hay formularios asignados o realizados visibles para este participante.</p>}</div></section>
         {hasAnyCurrentProjectPermission(['records.write']) && <div className="participants-group-toolbar" aria-label="Canales de aviso del nuevo caso"><strong>Al llegar el plazo:</strong><label><input type="checkbox" checked readOnly /> Aviso interno</label><label><input type="checkbox" checked={reminderEmail} onChange={(event) => setReminderEmail(event.target.checked)} /> Correo</label><label><input type="checkbox" checked={reminderWhatsApp} onChange={(event) => setReminderWhatsApp(event.target.checked)} /> WhatsApp</label></div>}
         <section className="participant-summary-card"><h3>Casos y remisiones ({cases.length})</h3><p>Da seguimiento al participante, asigna un responsable y fija un plazo. El responsable recibirá un aviso interno al llegar la fecha.</p>{hasAnyCurrentProjectPermission(['records.write']) && <div className="participants-group-toolbar"><input aria-label="Nombre del caso" placeholder="Nombre del caso" value={caseTitle} onChange={(event) => setCaseTitle(event.target.value)} /><select aria-label="Responsable" value={caseAssignee} onChange={(event) => setCaseAssignee(event.target.value)}><option value="">Sin responsable</option>{assignees.map((item) => <option key={item.id} value={item.id}>{item.full_name}</option>)}</select><input aria-label="Plazo del caso" type="datetime-local" value={caseDue} onChange={(event) => setCaseDue(event.target.value)} /><button type="button" disabled={caseTitle.trim().length < 3} onClick={() => void saveCase()}>Crear caso</button></div>}{cases.map((item) => <article key={item.id} className="participant-summary-card"><strong>{item.title}</strong> · {item.status} · Responsable: {assignees.find((user) => user.id === item.assigned_user_id)?.full_name || 'Sin asignar'} · Plazo: {item.due_at ? new Date(`${item.due_at}Z`).toLocaleString() : 'Sin plazo'}<div className="participants-group-toolbar">{hasAnyCurrentProjectPermission(['records.write']) && <><select aria-label={`Estado de ${item.title}`} value={item.status} onChange={(event) => void changeCase(item.id, { status: event.target.value })}><option value="open">Abierto</option><option value="in_progress">En seguimiento</option><option value="referred">Remitido</option><option value="closed">Cerrado</option></select><select aria-label={`Remitir ${item.title}`} value={item.assigned_user_id || ''} onChange={(event) => void changeCase(item.id, { assigned_user_id: event.target.value || null })}><option value="">Sin responsable</option>{assignees.map((user) => <option key={user.id} value={user.id}>{user.full_name}</option>)}</select></>}<button type="button" onClick={() => { if (openEvents === item.id) { setOpenEvents(''); return; } void fetchCaseEvents(item.id).then(setEvents); setOpenEvents(item.id); }}>Historial</button></div>{openEvents === item.id && <ul>{events.map((event) => <li key={event.id}>{new Date(event.created_at).toLocaleString()} · {event.event_type} {event.note || ''}</li>)}</ul>}</article>)}</section>
         <section>

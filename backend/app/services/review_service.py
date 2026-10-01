@@ -1,3 +1,4 @@
+import json
 from urllib.parse import quote
 
 from sqlalchemy.orm import Session
@@ -10,10 +11,12 @@ from app.models.identity import User
 from app.models.messages import InternalMessage
 from app.models.records import Record, RecordEvent
 from app.models.review import ReviewAction
+from app.models.audit import AuditLog
 from app.models.runtime_record import RuntimeRecord
 from app.schemas.review import ReviewActionCreate, ReviewActionRead
 from app.services.approval_flow_service import approval_flow_service
 from app.services.erp_service import erp_service
+from app.services.form_assignment_service import set_assignment_status
 from app.services.integration_service import integration_service
 from app.services.whatsapp_service import whatsapp_service
 
@@ -68,6 +71,10 @@ class ReviewService:
         if record.project_id != payload.project_id:
             raise ValueError("El registro no pertenece al proyecto indicado")
         from_status = record.status if record else None
+        if from_status == "approved" and payload.to_status == "returned":
+            raise ValueError("Usa la reapertura administrativa con motivo obligatorio")
+        if payload.to_status == "returned" and not (payload.notes or "").strip():
+            raise ValueError("El motivo de devolución es obligatorio")
         template_id = self._record_template_id(record)
         snapshot_json = self._record_approval_snapshot(record)
         self._validate_transition(db, payload, from_status, template_id, snapshot_json)
@@ -75,6 +82,10 @@ class ReviewService:
 
         if should_advance:
             record.status = payload.to_status
+            if isinstance(record, RuntimeRecord):
+                assignment_status = {"submitted": "completed", "under_review": "completed", "returned": "in_progress", "corrected": "in_progress", "approved": "closed"}.get(payload.to_status)
+                if assignment_status:
+                    set_assignment_status(db, record.template_id, record.participant_id, assignment_status)
             if isinstance(record, Record):
                 record.updated_by = user_id
             if hasattr(record, "updated_at"):
@@ -120,8 +131,34 @@ class ReviewService:
         )
         db.add(row)
         db.add(RecordEvent(record_id=payload.record_id, event_type=payload.action, user_id=user_id, notes=payload.notes))
+        db.add(AuditLog(project_id=payload.project_id, user_id=user_id, module="records", action="review_status",
+                        entity_type="runtime_record" if isinstance(record, RuntimeRecord) else "record", entity_id=record.id,
+                        before_json=json.dumps({"status": from_status}), after_json=json.dumps({"status": payload.to_status, "notes": payload.notes})))
         if should_advance:
             self._add_status_notification(db, record, payload, from_status, user_id)
+        db.commit()
+        db.refresh(row)
+        return to_read(row)
+
+    def reopen_approved(self, db: Session, record_id: str, user_id: str, reason: str) -> ReviewActionRead:
+        record = self._find_runtime_or_legacy_record(db, record_id)
+        if not record:
+            raise ValueError("Registro no encontrado")
+        if record.status != "approved":
+            raise ValueError("Solo se puede reabrir un registro aprobado que no esté sincronizado")
+        if isinstance(record, RuntimeRecord):
+            erp_service.reverse_settlement(db, record)
+            set_assignment_status(db, record.template_id, record.participant_id, "in_progress")
+        record.status = "returned"
+        record.updated_at = utc_now()
+        row = ReviewAction(project_id=record.project_id, record_id=record.id, from_status="approved",
+                           to_status="returned", action="admin_reopen", notes=reason.strip(), user_id=user_id)
+        db.add(row)
+        db.add(RecordEvent(record_id=record.id, event_type="admin_reopen", user_id=user_id, notes=reason.strip()))
+        db.add(AuditLog(project_id=record.project_id, user_id=user_id, module="records", action="reopen_approved",
+                        entity_type="runtime_record" if isinstance(record, RuntimeRecord) else "record", entity_id=record.id,
+                        before_json=json.dumps({"status": "approved"}),
+                        after_json=json.dumps({"status": "returned", "reason": reason.strip()})))
         db.commit()
         db.refresh(row)
         return to_read(row)
@@ -155,6 +192,8 @@ class ReviewService:
     def _validate_transition(self, db: Session, payload: ReviewActionCreate, from_status: str | None, template_id: str | None, snapshot_json: str | None = None) -> None:
         if from_status is None:
             raise ValueError("El registro no tiene estado actual")
+        if from_status == "corrected" and payload.to_status == "submitted":
+            return  # El responsable reenvía; los pasos de aprobación empiezan de nuevo.
         configured_actions = approval_flow_service.next_actions(db, payload.project_id, template_id, from_status, snapshot_json)
         configured_targets = {item.to_status for item in configured_actions if item.source == "configured"}
         if configured_targets:
@@ -177,24 +216,22 @@ class ReviewService:
             return True
         if user_id not in required_user_ids:
             raise ValueError("Usuario no requerido para esta aprobacion multiple")
-        existing_for_user = db.query(ReviewAction).filter(
+        last_return = db.query(ReviewAction.created_at).filter(ReviewAction.record_id == payload.record_id, ReviewAction.to_status == "returned").order_by(ReviewAction.created_at.desc()).first()
+        cycle_start = last_return[0] if last_return else None
+        actions_query = db.query(ReviewAction).filter(
             ReviewAction.record_id == payload.record_id,
             ReviewAction.from_status == from_status,
             ReviewAction.to_status == payload.to_status,
             ReviewAction.action == payload.action,
-            ReviewAction.user_id == user_id,
-        ).first()
+        )
+        if cycle_start is not None:
+            actions_query = actions_query.filter(ReviewAction.created_at > cycle_start)
+        existing_for_user = actions_query.filter(ReviewAction.user_id == user_id).first()
         if existing_for_user:
             raise ValueError("Aprobacion ya registrada para este usuario")
         completed_user_ids = {
             row[0]
-            for row in db.query(ReviewAction.user_id).filter(
-                ReviewAction.record_id == payload.record_id,
-                ReviewAction.from_status == from_status,
-                ReviewAction.to_status == payload.to_status,
-                ReviewAction.action == payload.action,
-                ReviewAction.user_id.in_(required_user_ids),
-            ).all()
+            for row in actions_query.with_entities(ReviewAction.user_id).filter(ReviewAction.user_id.in_(required_user_ids)).all()
         }
         completed_user_ids.add(user_id)
         return required_user_ids.issubset(completed_user_ids)

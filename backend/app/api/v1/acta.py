@@ -2,11 +2,12 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.permissions import allowed_participant_ids, require_project_permission, require_record_id_territory, require_record_territory
+from app.api.permissions import allowed_form_participant_ids, require_form_participant_access, require_project_permission, require_record_id_territory, require_record_territory
 from app.core.config import settings
 from app.core.permissions import BUILDER_WRITE
 from app.db.session import get_db
 from app.models.identity import User
+from app.models.builder import BuilderTemplate
 from app.models.runtime_record import RuntimeRecord
 from app.schemas.acta import ActaLayoutTemplateCreate, ActaRenderBatchRequest, ActaRenderFromRecordRequest, ActaRenderRequest, ActaTemplateCreate, ActaTemplateRead
 from app.services.acta_service import acta_service
@@ -24,6 +25,7 @@ def render_default_record_acta(record_id: str, db: Session = Depends(get_db), cu
     if not assignment_service.user_has_project_access(db, current_user.id, record.project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
     require_record_territory(db, current_user.id, record.project_id, record.participant_id)
+    require_form_participant_access(db, current_user.id, record.template_id, record.participant_id, review=True)
     return _pdf_response(acta_service.render_default_record_pdf(db, record_id), f"acta-{record_id}")
 
 
@@ -106,7 +108,8 @@ def render_acta_batch(template_id: str, payload: ActaRenderBatchRequest, db: Ses
             require_record_id_territory(db, current_user.id, record_id)
     else:
         record_ids = runtime_record_service.list_filtered_record_ids(db, template.template_id, search=payload.search, status=payload.status, unlinked_only=payload.unlinked_only)
-        allowed = allowed_participant_ids(db, current_user.id, template.project_id)
+        source_form = db.get(BuilderTemplate, template.template_id)
+        allowed = allowed_form_participant_ids(db, current_user.id, source_form, review=True) if source_form else []
         if allowed is not None:
             allowed_set = set(allowed)
             record_ids = [record_id for record_id in record_ids

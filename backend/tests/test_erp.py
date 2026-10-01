@@ -27,7 +27,7 @@ def setup_client():
         outsider = User(id="erp-outsider", full_name="Sin acceso", document_id="erp-outsider-doc", email="erp-outsider@example.com", password_hash=hash_password("Outsider12345!"))
         project = Project(id="erp-project", name="Proyecto ERP")
         approver_role = Role(id="erp-approver-role", name="Aprobador", permissions="records.approve,records.read")
-        manager_role = Role(id="erp-manager-role", name="ERP Manager", permissions="erp.manage,records.read")
+        manager_role = Role(id="erp-manager-role", name="ERP Manager", permissions="erp.manage,records.read,records.write,identity.users.manage")
         outsider_role = Role(id="erp-outsider-role", name="Sin permiso", permissions="records.read")
         template = BuilderTemplate(id="erp-template", project_id=project.id, name="Entrega de kits", status="published")
         config = ErpTemplateConfig(template_id=template.id, sku_field_name="sku_kit", quantity_field_name="cantidad", fee_amount="15000.00")
@@ -98,6 +98,60 @@ def test_approving_record_settles_inventory_and_payroll():
                 assert payroll.status == "accrued"
     finally:
         engine.dispose()
+
+
+def test_reopening_reverses_erp_and_reapproval_settles_corrected_quantity_once():
+    engine, sessions = setup_client()
+    try:
+        _create_record(sessions, "erp-record-reopen", "3")
+        with TestClient(app) as client:
+            approver = auth(client, "erp-approver@example.com", "Approver12345!")
+            manager = auth(client, "erp-manager@example.com", "Manager12345!")
+            action = {"project_id": "erp-project", "record_id": "erp-record-reopen", "to_status": "approved", "action": "approve"}
+            assert client.post("/api/v1/review/actions", headers=approver, json=action).status_code == 200
+            reopened = client.post("/api/v1/review/records/erp-record-reopen/reopen", headers=manager,
+                json={"reason": "Cantidad entregada incorrecta"})
+            assert reopened.status_code == 200, reopened.text
+            with sessions() as db:
+                assert db.get(ErpInventoryItem, "erp-item-kit").quantity_on_hand == 10
+                assert db.query(ErpPayrollEntry).filter_by(reference_record_id="erp-record-reopen", status="reversed").count() == 1
+            corrected = client.patch("/api/v1/runtime/record/erp-record-reopen/correction", headers=manager,
+                json={"field_name": "cantidad", "field_value_json": '"2"', "expected_lock_version": 1})
+            assert corrected.status_code == 200, corrected.text
+            for state in ("corrected", "submitted"):
+                assert client.post("/api/v1/review/actions", headers=manager,
+                    json={"project_id": "erp-project", "record_id": "erp-record-reopen", "to_status": state, "action": state}).status_code == 200
+            assert client.post("/api/v1/review/actions", headers=approver, json=action).status_code == 200
+            with sessions() as db:
+                assert db.get(ErpInventoryItem, "erp-item-kit").quantity_on_hand == 8
+                assert db.query(ErpInventoryMovement).filter_by(reference_record_id="erp-record-reopen").count() == 3
+                assert db.query(ErpPayrollEntry).filter_by(reference_record_id="erp-record-reopen", status="accrued").count() == 1
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_reopening_blocks_paid_erp_entry_without_changing_stock():
+    engine, sessions = setup_client()
+    try:
+        _create_record(sessions, "erp-record-paid", "2")
+        with TestClient(app) as client:
+            approver = auth(client, "erp-approver@example.com", "Approver12345!")
+            manager = auth(client, "erp-manager@example.com", "Manager12345!")
+            assert client.post("/api/v1/review/actions", headers=approver,
+                json={"project_id": "erp-project", "record_id": "erp-record-paid", "to_status": "approved", "action": "approve"}).status_code == 200
+            with sessions() as db:
+                db.query(ErpPayrollEntry).filter_by(reference_record_id="erp-record-paid").first().status = "paid"
+                db.commit()
+            blocked = client.post("/api/v1/review/records/erp-record-paid/reopen", headers=manager,
+                json={"reason": "Corrección posterior al pago"})
+            assert blocked.status_code == 409
+            with sessions() as db:
+                assert db.get(RuntimeRecord, "erp-record-paid").status == "approved"
+                assert db.get(ErpInventoryItem, "erp-item-kit").quantity_on_hand == 8
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
 
 
 def test_approving_record_with_insufficient_stock_blocks_approval_and_rolls_back():

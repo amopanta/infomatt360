@@ -39,6 +39,7 @@ from app.api.v1.project_context import router as project_context_router
 from app.api.v1.public import router as public_router
 from app.api.v1.public_forms import router as public_forms_router
 from app.api.v1.form_lookups import router as form_lookups_router
+from app.api.v1.form_assignments import router as form_assignments_router
 from app.api.v1.records import router as records_router
 from app.api.v1.reports import router as reports_router
 from app.api.v1.report_catalog import router as report_catalog_router
@@ -71,6 +72,7 @@ api_v1_router.include_router(support_router, prefix="/support", tags=["support"]
 api_v1_router.include_router(project_context_router, prefix="/projects", tags=["project-context"])
 api_v1_router.include_router(forms_router, prefix="/forms", tags=["forms"])
 api_v1_router.include_router(participants_router, prefix="/participants", tags=["participants"])
+api_v1_router.include_router(form_assignments_router, prefix="/form-assignments", tags=["form-assignments"])
 api_v1_router.include_router(cases_router, prefix="/cases", tags=["cases"])
 api_v1_router.include_router(territories_router, prefix="/territories", tags=["territories"])
 api_v1_router.include_router(saved_exports_router, prefix="/saved-exports", tags=["saved-exports"])

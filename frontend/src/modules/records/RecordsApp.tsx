@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, currentProjectPermissions, hasAnyCurrentProjectPermission } from '../auth/session';
-import { applyReviewAction, correctRecordField, downloadRecord, downloadTemplateRecords, duplicateRecord, fetchProjectTemplates, fetchRecord, fetchRecordNeighbors, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, promoteRecordToParticipant, searchTemplateRecords } from './api';
+import { applyReviewAction, correctRecordField, downloadRecord, downloadTemplateRecords, duplicateRecord, fetchProjectTemplates, fetchRecord, fetchRecordNeighbors, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
 import { fetchActaTemplates, printActaBatch, printActaFromRecord, renderActaBatch, renderActaFromRecord, renderDefaultRecordActa } from '../acta/api';
 import type { ActaTemplateSummary } from '../acta/types';
@@ -11,8 +11,6 @@ import type { RuntimeRecordSummary } from '../runtime/api';
 import { RuntimeField } from '../runtime/RuntimeField';
 import { parseFieldConfig } from '../runtime/fieldConfig';
 import type { RuntimeComponent, RuntimeFormValues, RuntimeTemplate } from '../runtime/types';
-import { fetchProjectParticipants } from '../participants/api';
-import type { Participant } from '../participants/api';
 import { isDesktopApp } from '../desktop/desktopBridge';
 import { PrinterPicker } from '../desktop/PrinterPicker';
 import { formatBatchPrintMessage } from '../desktop/printSummary';
@@ -570,115 +568,6 @@ function LinkedSubformSection({ projectId, record, onMessage }: { projectId: str
   );
 }
 
-/** Base abierta -> base cerrada (ver docs/99): un registro sin
- * `participant_id` viene de captura sin certeza previa de quien es la
- * persona. Aqui un revisor decide, explicitamente, enlazarlo a un
- * participante ya existente o crear uno nuevo -- nunca ocurre solo. */
-function PromoteToParticipantPanel({
-  record,
-  onPromoted,
-  onMessage,
-}: {
-  record: RuntimeRecord;
-  onPromoted: (record: RuntimeRecord) => void;
-  onMessage: (value: string) => void;
-}) {
-  const [participants, setParticipants] = useState<Participant[]>([]);
-  const [participantsLoading, setParticipantsLoading] = useState(true);
-  const [participantsError, setParticipantsError] = useState('');
-  const [reloadParticipants, setReloadParticipants] = useState(0);
-  const [mode, setMode] = useState<'link' | 'create'>('link');
-  const [selectedParticipantId, setSelectedParticipantId] = useState('');
-  const [participantQuery, setParticipantQuery] = useState('');
-  const [fullName, setFullName] = useState('');
-  const [documentId, setDocumentId] = useState('');
-  const [externalCode, setExternalCode] = useState('');
-  const [saving, setSaving] = useState(false);
-  const selectedParticipant = participants.find((participant) => participant.id === selectedParticipantId);
-  const visibleParticipants = participants.filter((participant) => {
-    const query = participantQuery.trim().toLocaleLowerCase();
-    return !query || `${participant.full_name} ${participant.document_id || ''} ${participant.external_code || ''} ${participant.group_name || ''} ${participant.municipality || ''}`.toLocaleLowerCase().includes(query) || participant.id === selectedParticipantId;
-  }).slice(0, 100);
-
-  useEffect(() => {
-    let active = true;
-    setParticipantsLoading(true);
-    setParticipantsError('');
-    setParticipants([]);
-    fetchProjectParticipants(record.project_id)
-      .then((rows) => { if (active) setParticipants(rows.filter((participant) => participant.status === 'active')); })
-      .catch((error: Error) => { if (active) setParticipantsError(error.message); })
-      .finally(() => { if (active) setParticipantsLoading(false); });
-    return () => { active = false; };
-  }, [record.project_id, reloadParticipants]);
-
-  if (record.participant_id) return null;
-  if (!hasAnyCurrentProjectPermission(['records.link_participant', 'records.review', 'records.approve'])) {
-    return <section className="participant-promote-panel"><h3>Sin participante enlazado</h3><p>Solicita a una persona revisora que vincule este registro aprobado con un participante.</p></section>;
-  }
-
-  async function submit() {
-    setSaving(true);
-    try {
-      await promoteRecordToParticipant({
-        recordId: record.id,
-        participantId: mode === 'link' ? selectedParticipantId : undefined,
-        fullName: mode === 'create' ? fullName.trim() : undefined,
-        documentId: mode === 'create' ? documentId.trim() || undefined : undefined,
-        externalCode: mode === 'create' ? externalCode.trim() || undefined : undefined,
-      });
-      onPromoted(await fetchRecord(record.id));
-      onMessage('Registro promovido a la base cerrada de participantes.');
-    } catch (error) {
-      onMessage(error instanceof Error ? error.message : 'No fue posible promover el registro.');
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  const canSubmit = mode === 'link' ? Boolean(selectedParticipantId) : Boolean(fullName.trim());
-
-  return (
-    <section className="participant-promote-panel">
-      <h3>Base abierta: sin participante enlazado</h3>
-      <p>Este registro todavía no está asociado a ningún participante de la base cerrada. Enlázalo a uno existente o crea uno nuevo para consolidar la información.</p>
-      <div className="participant-promote-mode">
-        <label><input type="radio" checked={mode === 'link'} onChange={() => setMode('link')} /> Enlazar participante existente</label>
-        <label><input type="radio" checked={mode === 'create'} onChange={() => setMode('create')} /> Crear participante nuevo</label>
-      </div>
-      {mode === 'link' ? (
-        <>
-          {participantsLoading && <p role="status">Cargando participantes del proyecto…</p>}
-          {participantsError && <p role="alert">{participantsError} <button type="button" onClick={() => setReloadParticipants((value) => value + 1)}>Reintentar</button></p>}
-          {!participantsLoading && !participantsError && participants.length === 0 && <p role="status">Este proyecto no tiene participantes activos. Puedes crear uno aquí o agregarlo primero en Participantes.</p>}
-          <label>Buscar participante
-            <input type="search" value={participantQuery} onChange={(event) => setParticipantQuery(event.target.value)} placeholder="Nombre, documento, código, grupo o municipio" />
-          </label>
-          <label>Participante
-            <select value={selectedParticipantId} onChange={(event) => setSelectedParticipantId(event.target.value)}>
-              <option value="">Selecciona un participante</option>
-              {visibleParticipants.map((participant) => (
-                <option key={participant.id} value={participant.id}>{participant.full_name} · {participant.document_id || participant.external_code || 'Sin identificador'}{participant.municipality ? ` · ${participant.municipality}` : ''}</option>
-              ))}
-            </select>
-          </label>
-          {!participantsLoading && !participantsError && <small>{visibleParticipants.length} de {participants.length} participantes visibles{participants.length > 100 ? ' (máximo 100; escribe para filtrar)' : ''}.</small>}
-          {selectedParticipant && <p>Se asociará a <strong>{selectedParticipant.full_name}</strong>{selectedParticipant.document_id ? ` · documento ${selectedParticipant.document_id}` : ''}{selectedParticipant.group_name ? ` · grupo ${selectedParticipant.group_name}` : ''}.</p>}
-        </>
-      ) : (
-        <div className="participant-promote-fields">
-          <label>Nombre completo<input value={fullName} onChange={(event) => setFullName(event.target.value)} /></label>
-          <label>Documento<input value={documentId} onChange={(event) => setDocumentId(event.target.value)} /></label>
-          <label>Código externo<input value={externalCode} onChange={(event) => setExternalCode(event.target.value)} /></label>
-        </div>
-      )}
-      <button type="button" className="primary" disabled={saving || !canSubmit} onClick={() => void submit()}>
-        {saving ? 'Guardando…' : 'Promover a participante'}
-      </button>
-    </section>
-  );
-}
-
 function DeepLinkedRecordCard({
   projectId,
   record,
@@ -773,7 +662,6 @@ function DeepLinkedRecordCard({
         ))}
       </dl>
       {!visibleValues.length && <p>No se encontraron preguntas con ese nombre.</p>}
-      <PromoteToParticipantPanel record={record} onPromoted={onRecordUpdated} onMessage={onMessage} />
       <LinkedSubformSection projectId={projectId} record={record} onMessage={onMessage} />
       <ReviewPanel projectId={projectId} record={record} onMessage={onMessage} />
       <GenerateActaPanel projectId={projectId} record={record} onMessage={onMessage} />
@@ -1040,3 +928,4 @@ function formatValue(raw?: string, detailed = false): string {
     return raw;
   }
 }
+

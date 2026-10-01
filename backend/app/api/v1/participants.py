@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.api.permissions import allowed_participant_ids, participant_visible
 from app.api.permissions import require_any_project_permission
-from app.core.permissions import IDENTITY_USERS_MANAGE, RECORDS_APPROVE, RECORDS_LINK_PARTICIPANT, RECORDS_REVIEW
+from app.core.permissions import IDENTITY_USERS_MANAGE, PARTICIPANTS_CREATE, RECORDS_APPROVE, RECORDS_LINK_PARTICIPANT, RECORDS_REVIEW
 from app.db.session import get_db
 from app.models.identity import User
 from app.models.participants import Participant
@@ -32,6 +32,7 @@ def change_participant_group_status(project_id: str, group_name: str, payload: P
 
 @router.post("/", response_model=ParticipantRead, summary="Crear participante")
 def create_participant(payload: ParticipantCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ParticipantRead:
+    require_any_project_permission(db, current_user.id, payload.project_id, {PARTICIPANTS_CREATE, IDENTITY_USERS_MANAGE})
     if not assignment_service.user_has_project_access(db, current_user.id, payload.project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
     candidate = Participant(project_id=payload.project_id, full_name=payload.full_name,
@@ -91,4 +92,7 @@ def promote_record_to_participant(payload: ParticipantPromoteRequest, db: Sessio
     if record is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado")
     require_any_project_permission(db, current_user.id, record.project_id, {RECORDS_LINK_PARTICIPANT, RECORDS_REVIEW, RECORDS_APPROVE})
+    if not payload.participant_id:
+        require_any_project_permission(db, current_user.id, record.project_id, {PARTICIPANTS_CREATE, IDENTITY_USERS_MANAGE})
     return participant_service.promote_record_to_participant(db, record, payload)
+

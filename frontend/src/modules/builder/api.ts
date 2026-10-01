@@ -27,6 +27,32 @@ export async function duplicateTemplate(templateId: string): Promise<TemplateSum
 
 export type ParticipantSource = NonNullable<TemplateSummary['participant_source']>;
 
+export type FormAssignment = { id: string; template_id: string; participant_id: string; participant_name: string; responsible_user_id: string; responsible_name: string; status: string; created_at: string };
+export type FormCandidate = { id: string; full_name: string; document_id?: string | null; external_code?: string | null };
+
+export async function fetchFormAssignments(templateId: string): Promise<FormAssignment[]> {
+  const response = await fetch(`${API_BASE_URL}/form-assignments/templates/${templateId}`, { headers: authHeaders() });
+  if (!response.ok) throw new Error('No fue posible cargar las asignaciones.');
+  return response.json();
+}
+
+export async function fetchFormCandidates(templateId: string): Promise<FormCandidate[]> {
+  const response = await fetch(`${API_BASE_URL}/form-assignments/templates/${templateId}/candidates`, { headers: authHeaders() });
+  if (!response.ok) throw new Error('No fue posible cargar los participantes elegibles.');
+  return response.json();
+}
+
+export async function assignFormParticipant(templateId: string, participantId: string, responsibleUserId: string): Promise<FormAssignment> {
+  const response = await fetch(`${API_BASE_URL}/form-assignments/templates/${templateId}`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ participant_id: participantId, responsible_user_id: responsibleUserId }) });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible asignar el participante.');
+  return response.json();
+}
+
+export async function removeFormAssignment(templateId: string, participantId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/form-assignments/templates/${templateId}/${participantId}`, { method: 'DELETE', headers: authHeaders() });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible quitar la asignación.');
+}
+
 export async function setParticipantSource(templateId: string, source: ParticipantSource): Promise<TemplateSummary> {
   const response = await fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}/participant-source`, {
     method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ source }),

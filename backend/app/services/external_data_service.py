@@ -5,6 +5,7 @@ Responsabilidad: Gestionar fuentes externas, vinculos con formularios y trabajos
 """
 
 import json
+from datetime import timedelta
 from sqlalchemy.orm import Session
 
 from app.models.external_data import BulkPublishJob, ExternalDataSnapshot, ExternalDataSource, FormDataSourceBinding
@@ -64,11 +65,17 @@ class ExternalDataService:
         if source is None:
             raise ExternalDataNotFoundError(data_source_id)
 
+        previous = db.query(ExternalDataSnapshot.created_at).filter(
+            ExternalDataSnapshot.data_source_id == data_source_id).order_by(ExternalDataSnapshot.created_at.desc()).first()
+        created_at = utc_now()
+        if previous and created_at <= previous[0]:
+            created_at = previous[0] + timedelta(microseconds=1)
         row = ExternalDataSnapshot(
             data_source_id=data_source_id,
             version=payload.version,
             rows_json=json.dumps(payload.rows),
             row_count=len(payload.rows),
+            created_at=created_at,
         )
         source.last_sync_at = utc_now()
         db.add(row)

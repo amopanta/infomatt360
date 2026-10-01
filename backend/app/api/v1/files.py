@@ -5,6 +5,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
+from app.api.permissions import require_form_participant_access
 from app.core.config import settings
 from app.db.session import get_db
 from app.models.files import FileAsset
@@ -24,6 +25,19 @@ def validate_asset_relations(db: Session, project_id: str, participant_id: str |
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El participante no pertenece al proyecto")
     if record_id and not db.query(RuntimeRecord).filter(RuntimeRecord.id == record_id, RuntimeRecord.project_id == project_id).first():
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El registro no pertenece al proyecto")
+
+
+def _record_asset_visible(db: Session, user_id: str, record_id: str | None) -> bool:
+    if not record_id:
+        return True
+    record = db.get(RuntimeRecord, record_id)
+    if not record:
+        return False
+    try:
+        require_form_participant_access(db, user_id, record.template_id, record.participant_id, review=True)
+        return True
+    except HTTPException:
+        return False
 
 
 @router.post("/", response_model=FileAssetRead)
@@ -78,7 +92,7 @@ def list_project_files(
 ) -> list[FileAssetRead]:
     if not assignment_service.user_has_project_access(db, current_user.id, project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
-    return file_service.list_assets(
+    assets = file_service.list_assets(
         db,
         project_id,
         participant_id,
@@ -89,6 +103,7 @@ def list_project_files(
         date_from=date_from,
         date_to=date_to,
     )
+    return [asset for asset in assets if _record_asset_visible(db, current_user.id, asset.record_id)]
 
 
 @router.get("/{file_id}/download", summary="Descargar una evidencia")
@@ -98,6 +113,8 @@ def download_file_asset(file_id: str, db: Session = Depends(get_db), current_use
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Evidencia no encontrada")
     if not assignment_service.user_has_project_access(db, current_user.id, asset.project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    if not _record_asset_visible(db, current_user.id, asset.record_id):
+        raise HTTPException(status_code=404, detail="Evidencia no encontrada")
     content = file_service.read_asset_bytes(db, asset)
     safe_name = "".join(character if character.isascii() and (character.isalnum() or character in "-_.") else "_" for character in asset.original_name).strip("_") or "evidencia"
     return Response(
@@ -127,6 +144,8 @@ def download_file_assets_batch(project_id: str, payload: EvidenceBatchDownloadRe
         )
     if not asset_ids:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No hay evidencias que coincidan con la seleccion")
+    if any(not (asset := db.get(FileAsset, asset_id)) or asset.project_id != project_id or not _record_asset_visible(db, current_user.id, asset.record_id) for asset_id in asset_ids):
+        raise HTTPException(status_code=404, detail="Evidencia no encontrada")
     if len(asset_ids) > settings.evidence_batch_max_records:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=f"El lote excede el maximo permitido ({settings.evidence_batch_max_records} archivos); reduce la seleccion o el filtro.")
 

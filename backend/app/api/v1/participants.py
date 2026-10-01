@@ -4,16 +4,19 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
-from app.api.permissions import allowed_participant_ids, participant_visible
+from app.api.permissions import allowed_form_participant_ids, allowed_participant_ids, form_access_mode, get_project_permissions, participant_visible
 from app.api.permissions import require_any_project_permission
 from app.core.permissions import IDENTITY_USERS_MANAGE, PARTICIPANTS_CREATE, RECORDS_APPROVE, RECORDS_LINK_PARTICIPANT, RECORDS_REVIEW
 from app.db.session import get_db
 from app.models.identity import User
 from app.models.participants import Participant
+from app.models.builder import BuilderTemplate
+from app.models.form_assignment import ParticipantFormAssignment
 from app.models.runtime_record import RuntimeRecord
 from app.schemas.participants import ParticipantCreate, ParticipantGroupStatusUpdate, ParticipantGroupUpdate, ParticipantHistoryItem, ParticipantPromoteRequest, ParticipantRead
 from app.services.assignment_service import assignment_service
 from app.services.participant_service import participant_service
+from pydantic import BaseModel
 
 router = APIRouter()
 
@@ -83,7 +86,56 @@ def set_participant_group(participant_id: str, payload: ParticipantGroupUpdate, 
 @router.get("/{participant_id}/history", response_model=list[ParticipantHistoryItem], summary="Historial unificado del participante entre plantillas y canales")
 def get_participant_history(participant_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[ParticipantHistoryItem]:
     _require_participant(db, current_user, participant_id)
-    return participant_service.get_participant_history(db, participant_id)
+    return [item for item in participant_service.get_participant_history(db, participant_id)
+            if (template := db.get(BuilderTemplate, item.template_id)) is not None
+            and ((allowed := allowed_form_participant_ids(db, current_user.id, template, review=True)) is None or participant_id in allowed)]
+
+
+class ParticipantActivity(BaseModel):
+    template_id: str
+    template_name: str
+    assignment_status: str
+    responsible_user_id: str | None = None
+    responsible_name: str | None = None
+    record_id: str | None = None
+    record_status: str | None = None
+
+
+@router.get("/{participant_id}/activities", response_model=list[ParticipantActivity])
+def participant_activities(participant_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[ParticipantActivity]:
+    participant = _require_participant(db, current_user, participant_id)
+    _, permissions = get_project_permissions(db, current_user.id, participant.project_id)
+    manager = IDENTITY_USERS_MANAGE in permissions
+    query = db.query(ParticipantFormAssignment).filter_by(participant_id=participant_id)
+    if not manager:
+        query = query.filter_by(responsible_user_id=current_user.id)
+    rows = query.all()
+    activities = []
+    assigned_templates = set()
+    for row in rows:
+        template = db.get(BuilderTemplate, row.template_id)
+        if not template:
+            continue
+        assigned_templates.add(row.template_id)
+        latest = db.query(RuntimeRecord).filter_by(template_id=row.template_id, participant_id=participant_id).order_by(RuntimeRecord.created_at.desc()).first()
+        responsible = db.get(User, row.responsible_user_id)
+        activities.append(ParticipantActivity(template_id=row.template_id, template_name=template.name,
+            assignment_status=row.status, responsible_user_id=row.responsible_user_id,
+            responsible_name=responsible.full_name if responsible else None,
+            record_id=latest.id if latest else None, record_status=latest.status if latest else None))
+    for item in participant_service.get_participant_history(db, participant_id):
+        if item.template_id in assigned_templates:
+            continue
+        template = db.get(BuilderTemplate, item.template_id)
+        if not template or form_access_mode(template) != "legacy":
+            continue
+        allowed = allowed_form_participant_ids(db, current_user.id, template, review=True)
+        if allowed is not None and participant_id not in allowed:
+            continue
+        activities.append(ParticipantActivity(template_id=template.id, template_name=template.name,
+            assignment_status="completed", record_id=item.record_id, record_status=item.status))
+        assigned_templates.add(item.template_id)
+    return sorted(activities, key=lambda item: item.template_name.casefold())
 
 
 @router.post("/promote", response_model=ParticipantRead, summary="Base abierta -> base cerrada: enlaza o crea un participante a partir de un registro (ver docs/99)")
@@ -95,4 +147,3 @@ def promote_record_to_participant(payload: ParticipantPromoteRequest, db: Sessio
     if not payload.participant_id:
         require_any_project_permission(db, current_user.id, record.project_id, {PARTICIPANTS_CREATE, IDENTITY_USERS_MANAGE})
     return participant_service.promote_record_to_participant(db, record, payload)
-

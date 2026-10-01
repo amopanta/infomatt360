@@ -1,7 +1,7 @@
 export type RecordValue = { id: string; field_name: string; field_value_json: string };
 export type RuntimeRecord = { id: string; project_id: string; template_id: string; status: string; submitted_by?: string | null; approval_flow_id?: string | null; approval_flow_version?: string | null; participant_id?: string | null; lock_version: number; created_at: string; updated_at: string; values: RecordValue[] };
 export type RuntimeRecordPage = { items: RuntimeRecord[]; total: number; limit: number; offset: number };
-export type TemplateSummary = { id: string; project_id: string; name: string; description?: string | null; theme_json?: string | null; status: string; created_at?: string | null; updated_at?: string | null; published_at?: string | null; starts_at?: string | null; ends_at?: string | null; availability?: string; accepting_responses?: boolean; owner_name?: string | null; submissions_count?: number; participant_source?: { mode: 'all' | 'list' | 'filter' | 'form' | 'pull' | 'group'; participant_ids: string[]; municipality?: string | null; group_name?: string | null; previous_template_id?: string | null; required_status: string; pull_name?: string | null; pull_key_column?: string | null; participant_key_field?: 'external_code' | 'document_id' } | null };
+export type TemplateSummary = { id: string; project_id: string; name: string; description?: string | null; theme_json?: string | null; status: string; created_at?: string | null; updated_at?: string | null; published_at?: string | null; starts_at?: string | null; ends_at?: string | null; availability?: string; accepting_responses?: boolean; owner_name?: string | null; submissions_count?: number; participant_source?: { mode: 'all' | 'list' | 'filter' | 'form' | 'pull' | 'group'; access_mode?: 'legacy' | 'open' | 'closed'; participant_ids: string[]; municipality?: string | null; group_name?: string | null; previous_template_id?: string | null; required_status: string; pull_name?: string | null; pull_key_column?: string | null; participant_key_field?: 'external_code' | 'document_id' } | null };
 export type ReviewAction = { id: string; project_id: string; record_id: string; from_status?: string | null; to_status: string; action: string; notes?: string | null; rejected_field_name?: string | null; user_id: string; approval_flow_id?: string | null; approval_flow_version?: number | null; created_at?: string | null };
 export type ReviewNextAction = { label: string; to_status: string; action: string; required_permission?: string | null; source: string };
 export type ReviewApprovalProgress = {
@@ -198,5 +198,11 @@ export async function applyReviewAction(payload: { projectId: string; recordId: 
     }),
   });
   if (!response.ok) throw new Error('No fue posible aplicar la acción de revisión.');
+  return response.json();
+}
+
+export async function reopenApprovedRecord(recordId: string, reason: string): Promise<ReviewAction> {
+  const response = await fetch(`${API_BASE_URL}/review/records/${recordId}/reopen`, { method: 'POST', headers: jsonHeaders(), body: JSON.stringify({ reason }) });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible devolver el registro aprobado.');
   return response.json();
 }

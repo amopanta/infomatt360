@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.api.api_key_auth import require_api_key_permission
 from app.api.deps import get_current_user
-from app.api.permissions import allowed_participant_ids, require_record_territory
+from app.api.permissions import allowed_form_participant_ids, form_access_mode, require_form_participant_access, require_record_territory
 from app.api.permissions import require_any_project_permission, require_project_permission
 from app.core.permissions import BULK_ADMIN_PERMISSIONS, RECORDS_WRITE
 from app.db.session import get_db
@@ -254,6 +254,7 @@ def get_runtime_record(record_id: str, db: Session = Depends(get_db), current_us
     if not assignment_service.user_has_project_access(db, current_user.id, record.project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
     require_record_territory(db, current_user.id, record.project_id, record.participant_id)
+    require_form_participant_access(db, current_user.id, record.template_id, record.participant_id, review=True)
     return record
 
 
@@ -264,6 +265,9 @@ def duplicate_runtime_record(record_id: str, db: Session = Depends(get_db), curr
         raise HTTPException(status_code=404, detail="Registro no encontrado")
     require_project_permission(db, current_user.id, record.project_id, RECORDS_WRITE)
     require_record_territory(db, current_user.id, record.project_id, record.participant_id)
+    require_form_participant_access(db, current_user.id, record.template_id, record.participant_id)
+    if form_access_mode(db.get(BuilderTemplate, record.template_id)) != "legacy":
+        raise HTTPException(status_code=409, detail="Este formulario usa una asignación única por participante. Asigna otra actividad para una nueva respuesta")
     try:
         return runtime_record_service.duplicate_record(db, record_id, current_user.id)
     except ValueError as exc:
@@ -278,8 +282,9 @@ def runtime_record_neighbors(record_id: str, db: Session = Depends(get_db), curr
     if not assignment_service.user_has_project_access(db, current_user.id, record.project_id):
         raise HTTPException(status_code=403, detail="Sin acceso al proyecto")
     require_record_territory(db, current_user.id, record.project_id, record.participant_id)
+    require_form_participant_access(db, current_user.id, record.template_id, record.participant_id, review=True)
     neighbors = runtime_record_service.record_neighbors(db, record_id)
-    allowed = allowed_participant_ids(db, current_user.id, record.project_id)
+    allowed = allowed_form_participant_ids(db, current_user.id, db.get(BuilderTemplate, record.template_id), review=True)
     if allowed is not None:
         for key, neighbor_id in neighbors.items():
             neighbor = runtime_record_service.get_record(db, neighbor_id) if neighbor_id else None
@@ -296,6 +301,7 @@ def export_runtime_record_json(record_id: str, db: Session = Depends(get_db), cu
     if not assignment_service.user_has_project_access(db, current_user.id, record.project_id):
         raise HTTPException(status_code=403, detail="Sin acceso al proyecto")
     require_record_territory(db, current_user.id, record.project_id, record.participant_id)
+    require_form_participant_access(db, current_user.id, record.template_id, record.participant_id, review=True)
     import json
     payload = record.model_dump(mode="json")
     payload["values"] = {value.field_name: json.loads(value.field_value_json) for value in record.values}
@@ -315,9 +321,9 @@ def list_runtime_record_children(record_id: str, field_name: str, db: Session = 
     if not assignment_service.user_has_project_access(db, current_user.id, parent.project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
     require_record_territory(db, current_user.id, parent.project_id, parent.participant_id)
+    require_form_participant_access(db, current_user.id, parent.template_id, parent.participant_id, review=True)
     children = runtime_record_service.list_child_records(db, record_id, field_name)
-    allowed = allowed_participant_ids(db, current_user.id, parent.project_id)
-    return children if allowed is None else [child for child in children if child.participant_id in allowed]
+    return [child for child in children if allowed_form_participant_ids(db, current_user.id, db.get(BuilderTemplate, child.template_id), review=True) is None or child.participant_id in allowed_form_participant_ids(db, current_user.id, db.get(BuilderTemplate, child.template_id), review=True)]
 
 
 @router.patch("/record/{record_id}/correction", response_model=RuntimeRecordRead)
@@ -334,6 +340,7 @@ def correct_runtime_record_field(record_id: str, payload: RuntimeRecordFieldCorr
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro no encontrado")
     require_project_permission(db, current_user.id, record.project_id, RECORDS_WRITE)
     require_record_territory(db, current_user.id, record.project_id, record.participant_id)
+    require_form_participant_access(db, current_user.id, record.template_id, record.participant_id)
     try:
         return runtime_record_service.correct_field(db, record_id, payload, current_user.id)
     except ValueError as exc:
@@ -352,7 +359,7 @@ def correct_runtime_record_field(record_id: str, payload: RuntimeRecordFieldCorr
 def list_runtime_records(template_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[RuntimeRecordRead]:
     """Lista respuestas guardadas para una plantilla Runtime."""
     template = require_template_access(db, current_user.id, template_id)
-    return runtime_record_service.list_template_records(db, template_id, allowed_participant_ids(db, current_user.id, template.project_id))
+    return runtime_record_service.list_template_records(db, template_id, allowed_form_participant_ids(db, current_user.id, template, review=True))
 
 
 @router.get("/template/{template_id}/records/search", response_model=RuntimeRecordPage)
@@ -385,7 +392,7 @@ def search_runtime_records(
         raise HTTPException(status_code=422, detail="Filtros de columnas invalidos")
     if sort_by not in {"created_at", "updated_at", "status", "submitted_by"} and not (sort_by.startswith("field:") and 0 < len(sort_by[6:]) <= 180):
         raise HTTPException(status_code=422, detail="Columna de ordenacion invalida")
-    return runtime_record_service.search_template_records(db, template_id, search=search, status=status_filter, limit=limit, offset=offset, unlinked_only=unlinked_only, field_filters=parsed_filters, sort_by=sort_by, sort_dir=sort_dir, allowed_participant_ids=allowed_participant_ids(db, current_user.id, template.project_id))
+    return runtime_record_service.search_template_records(db, template_id, search=search, status=status_filter, limit=limit, offset=offset, unlinked_only=unlinked_only, field_filters=parsed_filters, sort_by=sort_by, sort_dir=sort_dir, allowed_participant_ids=allowed_form_participant_ids(db, current_user.id, template, review=True))
 
 
 @router.get("/template/{template_id}/records/export.csv")
@@ -397,7 +404,7 @@ def export_runtime_records(
     current_user: User = Depends(get_current_user),
 ) -> Response:
     template = require_template_access(db, current_user.id, template_id)
-    content = runtime_record_service.export_template_csv(db, template_id, search=search, status=status_filter, allowed_participant_ids=allowed_participant_ids(db, current_user.id, template.project_id))
+    content = runtime_record_service.export_template_csv(db, template_id, search=search, status=status_filter, allowed_participant_ids=allowed_form_participant_ids(db, current_user.id, template, review=True))
     safe_name = "".join(character if character.isascii() and (character.isalnum() or character in "-_") else "_" for character in template.name).strip("_") or "registros"
     return Response(
         content=content.encode("utf-8"),

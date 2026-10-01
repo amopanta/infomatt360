@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { authorizationHeader } from '../auth/session';
+import { hasAnyCurrentProjectPermission } from '../auth/session';
+import { fetchCaseAssignees } from '../participants/api';
 import type { TemplateSummary } from '../records/api';
-import { fetchEligibleParticipants, setParticipantSource, type ParticipantSource } from './api';
+import { assignFormParticipant, fetchEligibleParticipants, fetchFormAssignments, fetchFormCandidates, removeFormAssignment, setParticipantSource, type FormAssignment, type FormCandidate, type ParticipantSource } from './api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
-const DEFAULT_SOURCE: ParticipantSource = { mode: 'all', participant_ids: [], municipality: '', previous_template_id: null, required_status: 'submitted' };
+const DEFAULT_SOURCE: ParticipantSource = { mode: 'all', access_mode: 'legacy', participant_ids: [], municipality: '', previous_template_id: null, required_status: 'submitted' };
 
 export function ParticipantSourcePanel({ template, onUpdate }: { template: TemplateSummary; onUpdate: (value: TemplateSummary) => void }) {
   const [source, setSource] = useState<ParticipantSource>(template.participant_source || DEFAULT_SOURCE);
@@ -15,6 +17,12 @@ export function ParticipantSourcePanel({ template, onUpdate }: { template: Templ
   const [eligible, setEligible] = useState<number | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [assignments, setAssignments] = useState<FormAssignment[]>([]);
+  const [candidates, setCandidates] = useState<FormCandidate[]>([]);
+  const [responsibles, setResponsibles] = useState<Array<{ id: string; full_name: string }>>([]);
+  const [assignParticipantId, setAssignParticipantId] = useState('');
+  const [assignResponsibleId, setAssignResponsibleId] = useState('');
+  const canManageAssignments = hasAnyCurrentProjectPermission(['identity.users.manage']);
   const activePeople = useMemo(() => people.filter((person) => person.status === 'active'), [people]);
   const visiblePeople = useMemo(() => activePeople.filter((person) => `${person.full_name} ${person.document_id || ''} ${person.external_code || ''} ${person.group_name || ''}`.toLocaleLowerCase().includes(participantSearch.trim().toLocaleLowerCase())), [activePeople, participantSearch]);
 
@@ -33,6 +41,15 @@ export function ParticipantSourcePanel({ template, onUpdate }: { template: Templ
     ]).then(([templates, participants, files]) => { setForms(templates); setPeople(participants); setLookups(files); }).catch(() => setMessage('No fue posible cargar formularios, participantes o grupos Pull.'));
   }, [template.project_id]);
 
+  async function refreshAssignments() {
+    const [rows, peopleRows, userRows] = await Promise.all([fetchFormAssignments(template.id), fetchFormCandidates(template.id), fetchCaseAssignees(template.project_id)]);
+    setAssignments(rows); setCandidates(peopleRows); setResponsibles(userRows);
+  }
+
+  useEffect(() => {
+    if (canManageAssignments) void refreshAssignments().catch(() => setMessage('No fue posible consultar las asignaciones del formulario.'));
+  }, [template.id, template.project_id, canManageAssignments]);
+
   useEffect(() => {
     const refreshLookups = () => { void fetch(`${API_BASE_URL}/form-lookups/templates/${template.id}`, { headers: authorizationHeader() }).then((response) => response.json()).then(setLookups).catch(() => undefined); };
     window.addEventListener('infomatt:pull-updated', refreshLookups);
@@ -49,12 +66,29 @@ export function ParticipantSourcePanel({ template, onUpdate }: { template: Templ
       const updated = await setParticipantSource(template.id, source);
       onUpdate(updated);
       setEligible((await fetchEligibleParticipants(template.id)).length);
+      if (canManageAssignments) await refreshAssignments();
       setMessage('Fuente guardada. Se aplicará a las nuevas respuestas.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible guardar.'); }
     finally { setBusy(false); }
   }
 
+  async function assign() {
+    if (!assignParticipantId || !assignResponsibleId) { setMessage('Selecciona participante y responsable.'); return; }
+    setBusy(true);
+    try { await assignFormParticipant(template.id, assignParticipantId, assignResponsibleId); await refreshAssignments(); setAssignParticipantId(''); setMessage('Participante asignado al responsable.'); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible asignar.'); }
+    finally { setBusy(false); }
+  }
+
+  async function remove(participantId: string) {
+    setBusy(true);
+    try { await removeFormAssignment(template.id, participantId); await refreshAssignments(); setMessage('Asignación retirada.'); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible quitar la asignación.'); }
+    finally { setBusy(false); }
+  }
+
   return <div className="forms-public-links"><h3>Fuente de participantes</h3><p>Define quién puede responder. La regla se verifica al guardar cada respuesta.</p>
+    <label>Acceso al formulario<select value={source.access_mode || 'legacy'} onChange={(event) => setSource({ ...source, access_mode: event.target.value as ParticipantSource['access_mode'] })}><option value="legacy">Modo anterior (sin asignaciones individuales)</option><option value="open">Abierto: admite participantes nuevos con permiso</option><option value="closed">Cerrado: solo población previamente asignada</option></select></label>
     <label>Origen<select value={source.mode} onChange={(event) => setSource({ ...source, mode: event.target.value as ParticipantSource['mode'] })}>
       <option value="all">Todos los participantes</option><option value="list">Lista seleccionada</option><option value="group">Grupo de participantes</option><option value="filter">Municipio</option><option value="pull">Grupo Pull</option><option value="form">Formulario anterior completado</option>
     </select></label>
@@ -65,6 +99,6 @@ export function ParticipantSourcePanel({ template, onUpdate }: { template: Templ
     {source.mode === 'pull' && <><label>Grupo Pull<select value={source.pull_name || ''} onChange={(event) => setSource({ ...source, pull_name: event.target.value, pull_key_column: '' })}><option value="">Selecciona un CSV</option>{lookups.map((lookup) => <option key={lookup.name} value={lookup.name}>{lookup.name}.csv</option>)}</select></label><label>Columna de relación<select value={source.pull_key_column || ''} onChange={(event) => setSource({ ...source, pull_key_column: event.target.value })}><option value="">Selecciona una columna</option>{lookups.find((lookup) => lookup.name === source.pull_name)?.columns.map((column) => <option key={column} value={column}>{column}</option>)}</select></label></>}
     <label>Llave para identificar al participante al capturar<select value={source.participant_key_field || 'external_code'} onChange={(event) => setSource({ ...source, participant_key_field: event.target.value as 'external_code' | 'document_id' })}><option value="document_id">Número de documento o cédula</option><option value="external_code">Código del participante</option></select></label>
     <button type="button" disabled={busy} onClick={() => void save()}>Guardar fuente</button>{eligible !== null && <p>{eligible} participante(s) elegibles actualmente.</p>}{message && <p role="status">{message}</p>}
+    {canManageAssignments && (source.access_mode === 'open' || source.access_mode === 'closed') && <section className="form-assignment-manager"><h4>Asignaciones por responsable</h4><p>Cada participante tendrá un responsable para este formulario. Solo él podrá iniciar la captura.</p><div className="forms-participant-chooser-actions"><label>Participante<select value={assignParticipantId} onChange={(event) => setAssignParticipantId(event.target.value)}><option value="">Selecciona participante</option>{candidates.map((person) => <option key={person.id} value={person.id}>{person.full_name} · {person.document_id || person.external_code || 'Sin llave'}</option>)}</select></label><label>Responsable<select value={assignResponsibleId} onChange={(event) => setAssignResponsibleId(event.target.value)}><option value="">Selecciona responsable</option>{responsibles.map((person) => <option key={person.id} value={person.id}>{person.full_name}</option>)}</select></label><button type="button" disabled={busy || !assignParticipantId || !assignResponsibleId} onClick={() => void assign()}>Asignar</button></div><div className="records-table-wrap"><table className="records-table"><thead><tr><th>Participante</th><th>Responsable</th><th>Estado</th><th>Acción</th></tr></thead><tbody>{assignments.map((item) => <tr key={item.id}><td>{item.participant_name}</td><td>{item.responsible_name}</td><td>{item.status}</td><td><button type="button" disabled={busy} onClick={() => void remove(item.participant_id)}>Quitar</button></td></tr>)}</tbody></table></div></section>}
   </div>;
 }
-

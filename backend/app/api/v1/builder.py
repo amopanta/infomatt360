@@ -11,6 +11,7 @@ from app.models.builder import BuilderComponent
 from app.schemas.builder import BuilderComponentCreate, BuilderComponentPropertiesUpdate, BuilderComponentRead, BuilderTemplateCreate, BuilderTemplatePropertiesUpdate, BuilderTemplateRead, BuilderTemplateScheduleUpdate, BuilderTemplateStatusUpdate, BuilderVersionCreate, BuilderVersionRead, ParticipantSourceUpdate
 from app.services.participant_source_service import eligible_participants
 from app.schemas.participants import ParticipantRead
+from app.services.participant_service import _to_read as participant_to_read
 from app.services.assignment_service import assignment_service
 from app.services.builder_service import builder_service
 
@@ -78,7 +79,7 @@ def update_participant_source(template_id: str, payload: ParticipantSourceUpdate
 @router.get("/templates/detail/{template_id}/eligible-participants", response_model=list[ParticipantRead])
 def get_eligible_participants(template_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[ParticipantRead]:
     template = require_template_access(db, current_user.id, template_id)
-    return [ParticipantRead.model_validate(item, from_attributes=True) for item in eligible_participants(db, template)]
+    return [participant_to_read(item) for item in eligible_participants(db, template, current_user.id)]
 
 
 @router.post("/components", response_model=BuilderComponentRead)

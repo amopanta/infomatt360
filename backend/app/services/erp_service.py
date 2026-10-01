@@ -83,6 +83,33 @@ def _parse_text(raw_json: str) -> str:
 
 
 class ErpService:
+    def reverse_settlement(self, db: Session, record: RuntimeRecord) -> None:
+        """Reopen an approved record without duplicating inventory or fees later."""
+        movements = db.query(ErpInventoryMovement).filter(
+            ErpInventoryMovement.reference_record_id == record.id,
+            ErpInventoryMovement.reason.in_(["entrega_aprobada", "approval_reopened"]),
+        ).all()
+        net_by_item = {}
+        for movement in movements:
+            net_by_item[movement.item_id] = net_by_item.get(movement.item_id, 0) + movement.quantity_delta
+        payroll = db.query(ErpPayrollEntry).filter(
+            ErpPayrollEntry.reference_record_id == record.id,
+            ErpPayrollEntry.status.in_(["accrued", "paid"]),
+        ).all()
+        if any(entry.status == "paid" for entry in payroll):
+            raise ValueError("No se puede reabrir: el honorario ya fue pagado. Requiere ajuste contable administrativo")
+        for item_id, net in net_by_item.items():
+            if net >= 0:
+                continue
+            item = db.get(ErpInventoryItem, item_id)
+            if item is None:
+                raise ValueError("No se puede reabrir: falta el insumo liquidado")
+            item.quantity_on_hand -= net
+            db.add(ErpInventoryMovement(item_id=item_id, quantity_delta=-net,
+                reference_record_id=record.id, reason="approval_reopened"))
+        for entry in payroll:
+            entry.status = "reversed"
+
     def settle_record(self, db: Session, record: RuntimeRecord) -> None:
         """Ejecuta la liquidacion de un registro aprobado, si su plantilla esta configurada.
 

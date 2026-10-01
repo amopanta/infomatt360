@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, currentProjectPermissions, hasAnyCurrentProjectPermission } from '../auth/session';
-import { applyReviewAction, correctRecordField, downloadRecord, downloadTemplateRecords, duplicateRecord, fetchProjectTemplates, fetchRecord, fetchRecordNeighbors, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, searchTemplateRecords } from './api';
+import { applyReviewAction, correctRecordField, downloadRecord, downloadTemplateRecords, duplicateRecord, fetchProjectTemplates, fetchRecord, fetchRecordNeighbors, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, reopenApprovedRecord, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
 import { fetchActaTemplates, printActaBatch, printActaFromRecord, renderActaBatch, renderActaFromRecord, renderDefaultRecordActa } from '../acta/api';
 import type { ActaTemplateSummary } from '../acta/types';
@@ -211,10 +211,12 @@ function ReviewPanel({
   projectId,
   record,
   onMessage,
+  onRecordUpdated,
 }: {
   projectId: string;
   record: RuntimeRecord;
   onMessage: (value: string) => void;
+  onRecordUpdated: (record: RuntimeRecord) => void;
 }) {
   const [history, setHistory] = useState<ReviewAction[]>([]);
   const [nextActions, setNextActions] = useState<ReviewNextAction[]>([]);
@@ -223,8 +225,8 @@ function ReviewPanel({
   const [notes, setNotes] = useState('');
   const [rejectedFieldName, setRejectedFieldName] = useState('');
   const permissions = currentProjectPermissions();
-  const canReview = ['records.review', 'records.approve', 'records.coordinate', 'records.void'].some((permission) => permissions.has(permission))
-    || nextActions.some((item) => Boolean(item.required_permission && permissions.has(item.required_permission)));
+  const canReview = ['records.review', 'records.approve', 'records.coordinate', 'records.void', 'identity.users.manage'].some((permission) => permissions.has(permission))
+    || nextActions.some((item) => Boolean(item.required_permission && item.required_permission !== 'records.write' && permissions.has(item.required_permission)));
   const actions = nextActions
     .filter((item) => Boolean(item.required_permission && permissions.has(item.required_permission)))
     .map((item) => ({ label: item.label, toStatus: item.to_status, action: item.action }));
@@ -248,10 +250,17 @@ function ReviewPanel({
       const fieldName = REJECTION_STATUSES.has(action.toStatus) ? rejectedFieldName : undefined;
       await applyReviewAction({ projectId, recordId: record.id, toStatus: action.toStatus, action: action.action, notes, rejectedFieldName: fieldName || undefined });
       await loadReviewState();
+      onRecordUpdated(await fetchRecord(record.id));
       onMessage(`Acción aplicada: ${action.label}.`);
     } catch (error) {
       onMessage(error instanceof Error ? error.message : 'No fue posible aplicar la revisión.');
     }
+  }
+
+  async function reopen() {
+    if (notes.trim().length < 5) { onMessage('Escribe el motivo de devolución (mínimo 5 caracteres).'); return; }
+    try { await reopenApprovedRecord(record.id, notes.trim()); await loadReviewState(); onRecordUpdated(await fetchRecord(record.id)); onMessage('Registro devuelto para corrección. La aprobación anterior permanece en el historial.'); }
+    catch (error) { onMessage(error instanceof Error ? error.message : 'No fue posible devolver el registro.'); }
   }
 
   if (!canReview) return null;
@@ -301,6 +310,7 @@ function ReviewPanel({
         </label>
       ) : null}
       <div className="review-actions">
+        {record.status === 'approved' && permissions.has('identity.users.manage') && <button type="button" disabled={notes.trim().length < 5} onClick={() => void reopen()}>Devolver aprobado para corrección</button>}
         {actions.length ? (
           actions.map((item) => <button key={item.action} onClick={() => void submit(item)}>{item.label}</button>)
         ) : (
@@ -324,6 +334,18 @@ function ReviewPanel({
       </div>
     </section>
   );
+}
+
+function CorrectionSubmitPanel({ projectId, record, onRecordUpdated, onMessage }: { projectId: string; record: RuntimeRecord; onRecordUpdated: (record: RuntimeRecord) => void; onMessage: (value: string) => void }) {
+  const canWrite = hasAnyCurrentProjectPermission(['records.write']);
+  if (!canWrite || !['returned', 'corrected'].includes(record.status)) return null;
+  const toStatus = record.status === 'returned' ? 'corrected' : 'submitted';
+  const label = record.status === 'returned' ? 'Terminé la corrección' : 'Reenviar para aprobación';
+  async function submit() {
+    try { await applyReviewAction({ projectId, recordId: record.id, toStatus, action: toStatus }); onRecordUpdated(await fetchRecord(record.id)); onMessage(`${label}: estado actualizado.`); }
+    catch (error) { onMessage(error instanceof Error ? error.message : 'No fue posible reenviar la respuesta.'); }
+  }
+  return <section className="record-correction-panel"><h3>Corrección de respuesta</h3><p>{record.status === 'returned' ? 'Edita los campos necesarios y luego indica que terminaste.' : 'La respuesta está corregida. Envíala de nuevo para que pase por aprobación.'}</p><button type="button" onClick={() => void submit()}>{label}</button></section>;
 }
 
 export function RecordsApp() {
@@ -663,7 +685,8 @@ function DeepLinkedRecordCard({
       </dl>
       {!visibleValues.length && <p>No se encontraron preguntas con ese nombre.</p>}
       <LinkedSubformSection projectId={projectId} record={record} onMessage={onMessage} />
-      <ReviewPanel projectId={projectId} record={record} onMessage={onMessage} />
+      <CorrectionSubmitPanel projectId={projectId} record={record} onMessage={onMessage} onRecordUpdated={onRecordUpdated} />
+      <ReviewPanel projectId={projectId} record={record} onMessage={onMessage} onRecordUpdated={onRecordUpdated} />
       <GenerateActaPanel projectId={projectId} record={record} onMessage={onMessage} />
     </section>
   );
@@ -928,4 +951,3 @@ function formatValue(raw?: string, detailed = false): string {
     return raw;
   }
 }
-

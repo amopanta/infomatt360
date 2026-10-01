@@ -27,6 +27,8 @@ export type ParticipantHistoryItem = {
   submitted_by?: string | null;
 };
 
+export type ParticipantActivity = { template_id: string; template_name: string; assignment_status: 'assigned' | 'in_progress' | 'completed' | 'closed'; responsible_user_id?: string | null; responsible_name?: string | null; record_id?: string | null; record_status?: string | null };
+
 function headers(): HeadersInit {
   return authorizationHeader();
 }
@@ -64,6 +66,12 @@ export async function setParticipantGroupStatus(projectId: string, groupName: st
 export async function fetchParticipantHistory(participantId: string): Promise<ParticipantHistoryItem[]> {
   const response = await fetch(`${API_BASE_URL}/participants/${participantId}/history`, { headers: headers() });
   if (!response.ok) throw new Error('No fue posible consultar el historial del participante.');
+  return response.json();
+}
+
+export async function fetchParticipantActivities(participantId: string): Promise<ParticipantActivity[]> {
+  const response = await fetch(`${API_BASE_URL}/participants/${participantId}/activities`, { headers: headers() });
+  if (!response.ok) throw new Error('No fue posible consultar las actividades del participante.');
   return response.json();
 }
 

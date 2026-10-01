@@ -86,14 +86,14 @@ export async function fetchRuntimeTemplate(templateId: string): Promise<RuntimeT
 
 export type EligibleParticipant = { id: string; full_name: string; document_id?: string | null; external_code?: string | null; municipality?: string | null };
 
-export async function fetchCaptureParticipants(templateId: string): Promise<{ required: boolean; participants: EligibleParticipant[] }> {
+export async function fetchCaptureParticipants(templateId: string): Promise<{ keyField: 'document_id' | 'external_code'; participants: EligibleParticipant[] }> {
   const [detailResponse, participantsResponse] = await Promise.all([
     fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}`, { headers: authorizationHeader() }),
     fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}/eligible-participants`, { headers: authorizationHeader() }),
   ]);
   if (!detailResponse.ok || !participantsResponse.ok) throw new Error('No fue posible consultar los participantes asociados al formulario.');
   const detail = await detailResponse.json();
-  return { required: Boolean(detail.participant_source?.mode && detail.participant_source.mode !== 'all'), participants: await participantsResponse.json() };
+  return { keyField: detail.participant_source?.participant_key_field === 'document_id' ? 'document_id' : 'external_code', participants: await participantsResponse.json() };
 }
 
 export function toRuntimeValueList(values: RuntimeFormValues): { field_name: string; field_value_json: string }[] {
@@ -132,3 +132,4 @@ export async function saveRuntimeRecord(params: {
 
   return response.json();
 }
+

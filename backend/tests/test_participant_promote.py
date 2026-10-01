@@ -26,7 +26,7 @@ def setup_client():
     Base.metadata.create_all(bind=engine)
     with sessions() as db:
         project = Project(id="promote-project", name="Promocion de participantes")
-        reviewer_role = Role(id="promote-reviewer-role", name="Revisor", permissions="records.review")
+        reviewer_role = Role(id="promote-reviewer-role", name="Revisor", permissions="records.review,participants.create")
         capturer_role = Role(id="promote-capturer-role", name="Capturista", permissions="records.write")
         linker_role = Role(id="promote-linker-role", name="Enlace", permissions="records.link_participant,records.read")
         reviewer = User(id="promote-reviewer", full_name="Revisor", document_id="promote-reviewer-doc", email="promote-reviewer@example.com", password_hash=hash_password("Reviewer12345!"))
@@ -88,6 +88,30 @@ def test_promote_creates_a_new_participant():
 
             record = client.get(f"/api/v1/runtime/record/{record_id}", headers=reviewer_headers).json()
             assert record["participant_id"] == participant["id"]
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_link_permission_does_not_allow_creating_a_participant():
+    engine = setup_client()
+    try:
+        with TestClient(app) as client:
+            capturer_headers = auth(client, "promote-capturer@example.com", "Capturer12345!")
+            linker_headers = auth(client, "promote-linker@example.com", "Linker12345!")
+            record_id = _capture_unlinked_record(client, capturer_headers)
+            response = client.post(
+                "/api/v1/participants/promote",
+                headers=linker_headers,
+                json={"record_id": record_id, "full_name": "Persona sin autorización"},
+            )
+            assert response.status_code == 403
+            direct_create = client.post(
+                "/api/v1/participants/",
+                headers=linker_headers,
+                json={"project_id": "promote-project", "full_name": "Persona sin autorización"},
+            )
+            assert direct_create.status_code == 403
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
@@ -213,3 +237,4 @@ def test_unlinked_only_filter_on_records_search():
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
+

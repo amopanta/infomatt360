@@ -487,6 +487,8 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .runtime-participant-picker input, .runtime-participant-picker select { width: 100%; padding: 10px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--surface); }
 .runtime-participant-picker small { color: var(--text-muted); }
 .runtime-participant-picker strong { color: var(--brand-primary); }
+.runtime-participant-confirmation { display: grid; gap: 3px; padding: 12px 14px; border-radius: 8px; background: var(--success-soft); }
+.runtime-participant-confirmation span { color: var(--text-muted); }
 .runtime-shell { max-width: 1040px; margin: 16px auto; padding: 20px; background: var(--form-background, #ffffff); border: 2px solid color-mix(in srgb, var(--form-primary, var(--brand-primary)) 22%, var(--brand-primary-soft)); border-top: 8px solid var(--form-primary, var(--brand-primary)); border-radius: var(--form-radius, 18px); box-shadow: 0 14px 40px rgba(10, 37, 64, 0.08); }
 .runtime-shell h1 { margin-top: 0; color: var(--form-primary, var(--text)); }
 .runtime-page { margin-top: 12px; }
@@ -1315,3 +1317,4 @@ svg.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor
 .runtime-geo-polygon {
   fill: rgba(0, 194, 255, 0.18);
 }
+

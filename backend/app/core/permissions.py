@@ -6,6 +6,7 @@ documentacion terminen usando permisos diferentes para la misma capacidad.
 
 PROJECT_READ = "projects.read"
 IDENTITY_USERS_MANAGE = "identity.users.manage"
+PARTICIPANTS_CREATE = "participants.create"
 ORGANIZATIONS_MANAGE = "organizations.manage"
 ORGANIZATIONS_BRANDING_MANAGE = "organizations.branding.manage"
 ORGANIZATIONS_TENANT_CLEAN = "organizations.tenant_clean"
@@ -46,6 +47,7 @@ METRICS_VIEW_PERMISSIONS = {
 ALL_PERMISSIONS = {
     PROJECT_READ,
     IDENTITY_USERS_MANAGE,
+    PARTICIPANTS_CREATE,
     ORGANIZATIONS_MANAGE,
     ORGANIZATIONS_BRANDING_MANAGE,
     ORGANIZATIONS_TENANT_CLEAN,
@@ -70,3 +72,4 @@ ALL_PERMISSIONS = {
     INTEGRATIONS_API_KEYS_MANAGE,
     INTEGRATIONS_DONOR_SYNC_MANAGE,
 }
+

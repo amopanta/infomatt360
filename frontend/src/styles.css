@@ -1113,6 +1113,16 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .forms-home-head p, .forms-detail-head p, .forms-panel-head p { margin: 0; color: #60708a; }
 .forms-primary-link { display: inline-flex; align-items: center; justify-content: center; border-radius: 7px; padding: 10px 15px; background: #126488; color: white !important; text-decoration: none; font-weight: 700; white-space: nowrap; }
 .forms-primary-link:hover { background: #0e526f; }
+.forms-participant-chooser { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; }
+.forms-participant-chooser > p { margin: 0; }
+.forms-participant-chooser-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.forms-participant-chooser-actions span { margin-right: auto; font-weight: 700; }
+.forms-participant-options { max-height: 300px; overflow-y: auto; border: 1px solid var(--border); border-radius: 8px; }
+.forms-participant-options > label { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border-bottom: 1px solid var(--border); cursor: pointer; }
+.forms-participant-options > label:last-child { border-bottom: 0; }
+.forms-participant-options input { width: auto; margin-top: 4px; }
+.forms-participant-options span { display: grid; gap: 2px; }
+.forms-participant-options small { color: var(--text-muted); }
 .forms-overview { display: flex; flex-wrap: wrap; gap: 10px; margin: 24px 0 18px; }
 .forms-overview > * { display: inline-block; background: #edf5fb; color: #244762; border: 1px solid #d8e8f3; border-radius: 20px; padding: 6px 13px; font-size: 13px; }
 .forms-toolbar { margin-bottom: 18px; }

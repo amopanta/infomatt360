@@ -1,12 +1,15 @@
 """Form access and participant assignments."""
 
 import json
+import csv
 from datetime import datetime
+from io import BytesIO, StringIO
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import func
+from openpyxl import load_workbook
 
 from app.api.deps import get_current_user
 from app.api.permissions import allowed_form_participant_ids, participant_visible, require_any_project_permission
@@ -56,6 +59,16 @@ class MyFormAssignmentRead(BaseModel):
     document_id: str | None = None
     assignment_status: str
     record_id: str | None = None
+
+
+class BulkAssignmentPreview(BaseModel):
+    selected: int
+    to_assign: int
+    already_assigned: int
+    to_reassign: int
+    protected: int
+    applied: int = 0
+    issues: list[str] = Field(default_factory=list)
 
 
 class OpenParticipantCreate(BaseModel):
@@ -135,6 +148,139 @@ def assignment_candidates(template_id: str, db: Session = Depends(get_db), user:
     require_any_project_permission(db, user.id, template.project_id, {IDENTITY_USERS_MANAGE})
     return [{"id": row.id, "full_name": row.full_name, "document_id": row.document_id,
              "external_code": row.external_code} for row in eligible_participants(db, template, enforce_assignments=False)]
+
+
+def _excel_assignment_keys(filename: str, content: bytes) -> tuple[str, list[str]]:
+    if len(content) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=422, detail="El archivo supera 5 MB")
+    try:
+        if filename.lower().endswith(".xlsx"):
+            workbook = load_workbook(BytesIO(content), read_only=True, data_only=True)
+            sheet = workbook.active
+            rows = sheet.iter_rows(values_only=True)
+        elif filename.lower().endswith(".csv"):
+            rows = csv.reader(StringIO(content.decode("utf-8-sig")))
+        else:
+            raise HTTPException(status_code=422, detail="Sube un archivo .xlsx o .csv")
+        headers = [str(value or "").strip().casefold() for value in next(rows, [])]
+        document_headers = {"documento", "document_id", "cedula", "cédula", "numero_documento"}
+        code_headers = {"codigo", "código", "external_code", "codigo_participante"}
+        document_columns = [index for index, header in enumerate(headers) if header in document_headers]
+        code_columns = [index for index, header in enumerate(headers) if header in code_headers]
+        if len(document_columns) + len(code_columns) != 1:
+            raise HTTPException(status_code=422, detail="Usa una sola columna de identificación: documento o codigo")
+        index = (document_columns or code_columns)[0]
+        field = "document_id" if document_columns else "external_code"
+        keys = []
+        for row_number, row in enumerate(rows, 2):
+            if row_number > 5001:
+                raise HTTPException(status_code=422, detail="El archivo supera 5000 participantes")
+            value = str(row[index]).strip() if index < len(row) and row[index] is not None else ""
+            if value:
+                keys.append(value)
+        if not keys:
+            raise HTTPException(status_code=422, detail="El archivo no contiene documentos o códigos")
+        return field, keys
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"No fue posible leer el archivo: {exc}") from exc
+
+
+@router.post("/templates/{template_id}/bulk-assign", response_model=BulkAssignmentPreview)
+async def bulk_assign_participants(
+    template_id: str,
+    responsible_user_id: str = Form(...),
+    mode: str = Form(...),
+    group_name: str = Form(default=""),
+    preview_only: bool = Form(default=True),
+    upload: UploadFile | None = File(default=None),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> BulkAssignmentPreview:
+    template = _template(db, user, template_id)
+    require_any_project_permission(db, user.id, template.project_id, {IDENTITY_USERS_MANAGE})
+    if configured_source(template).access_mode == "legacy":
+        raise HTTPException(status_code=422, detail="Selecciona primero el modo abierto o cerrado del formulario")
+    if not assignment_service.user_has_project_access(db, responsible_user_id, template.project_id):
+        raise HTTPException(status_code=422, detail="El responsable no tiene acceso al proyecto")
+    candidates = eligible_participants(db, template, enforce_assignments=False)
+    issues: list[str] = []
+    if mode == "group":
+        wanted = group_name.strip().casefold()
+        if not wanted:
+            raise HTTPException(status_code=422, detail="Selecciona un grupo")
+        selected = []
+        for person in candidates:
+            try:
+                metadata = json.loads(person.metadata_json or "{}")
+            except ValueError:
+                metadata = {}
+            if isinstance(metadata, dict) and str(metadata.get("group_name") or "").strip().casefold() == wanted:
+                selected.append(person)
+    elif mode == "excel":
+        if upload is None:
+            raise HTTPException(status_code=422, detail="Selecciona el archivo Excel")
+        field, keys = _excel_assignment_keys(upload.filename or "", await upload.read())
+        by_key: dict[str, list[Participant]] = {}
+        for person in candidates:
+            key = str(getattr(person, field) or "").strip().casefold()
+            if key:
+                by_key.setdefault(key, []).append(person)
+        selected = []
+        seen: set[str] = set()
+        for row_number, key in enumerate(keys, 2):
+            normalized = key.casefold()
+            if normalized in seen:
+                issues.append(f"Fila {row_number}: identificador repetido: {key}")
+                continue
+            seen.add(normalized)
+            matches = by_key.get(normalized, [])
+            if len(matches) != 1:
+                issues.append(f"Fila {row_number}: {key} {'no pertenece a la fuente del formulario' if not matches else 'coincide con varios participantes'}")
+            else:
+                selected.append(matches[0])
+    else:
+        raise HTTPException(status_code=422, detail="Elige grupo o Excel")
+    if not selected:
+        issues.append("No hay participantes para asignar")
+    existing = {row.participant_id: row for row in db.query(ParticipantFormAssignment).filter(
+        ParticipantFormAssignment.template_id == template_id,
+        ParticipantFormAssignment.participant_id.in_([person.id for person in selected]),
+    ).all()}
+    record_ids = {row[0] for row in db.query(RuntimeRecord.participant_id).filter(
+        RuntimeRecord.template_id == template_id,
+        RuntimeRecord.participant_id.in_([person.id for person in selected]),
+        RuntimeRecord.status.notin_(["voided", "cancelled"]),
+    ).all()}
+    result = BulkAssignmentPreview(selected=len(selected), to_assign=0, already_assigned=0, to_reassign=0, protected=0, issues=issues)
+    actionable = []
+    for person in selected:
+        if not participant_visible(db, responsible_user_id, person):
+            result.issues.append(f"{person.full_name}: fuera del territorio del responsable")
+            continue
+        previous = existing.get(person.id)
+        if previous and (previous.status in {"completed", "closed"} or person.id in record_ids):
+            result.protected += 1
+        elif previous and previous.responsible_user_id == responsible_user_id:
+            result.already_assigned += 1
+        elif previous:
+            result.to_reassign += 1
+            actionable.append(person)
+        else:
+            result.to_assign += 1
+            actionable.append(person)
+    if preview_only or result.issues:
+        return result
+    for person in actionable:
+        row = upsert_assignment(db, template, person.id, responsible_user_id, user.id)
+        db.add(AuditLog(project_id=template.project_id, user_id=user.id, module="participants", action="bulk_assign_form",
+                        entity_type="participant_form_assignment", entity_id=row.id,
+                        after_json=json.dumps({"template_id": template_id, "participant_id": person.id,
+                                               "responsible_user_id": responsible_user_id, "mode": mode})))
+    db.commit()
+    result.applied = len(actionable)
+    return result
 
 
 @router.post("/templates/{template_id}", response_model=AssignmentRead)

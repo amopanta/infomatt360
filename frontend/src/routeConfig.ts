@@ -21,6 +21,7 @@ export type AppRouteKey =
   | 'adminUsers'
   | 'accountSecurity'
   | 'participants'
+  | 'teams'
   | 'records'
   | 'reports'
   | 'evidence'
@@ -66,6 +67,7 @@ export function resolveAppRoute(pathname: string): AppRoute {
   if (pathname.startsWith('/admin/users')) return { key: 'adminUsers', permissions: ['identity.users.manage'] };
   if (pathname.startsWith('/account/security')) return { key: 'accountSecurity' };
   if (pathname.startsWith('/participants')) return { key: 'participants' };
+  if (pathname.startsWith('/teams')) return { key: 'teams', permissions: ['identity.users.manage'] };
   if (pathname.startsWith('/records')) return { key: 'records' };
   if (pathname.startsWith('/reports')) return { key: 'reports' };
   if (pathname.startsWith('/evidence')) return { key: 'evidence' };

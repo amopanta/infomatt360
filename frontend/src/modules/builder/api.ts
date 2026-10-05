@@ -49,11 +49,12 @@ export async function assignFormParticipant(templateId: string, participantId: s
   return response.json();
 }
 
-export async function bulkAssignFormParticipants(templateId: string, options: { responsibleUserId: string; mode: 'group' | 'excel'; groupName?: string; file?: File | null; previewOnly: boolean }): Promise<BulkAssignmentPreview> {
+export async function bulkAssignFormParticipants(templateId: string, options: { responsibleUserId: string; mode: 'group' | 'team' | 'excel'; groupName?: string; teamId?: string; file?: File | null; previewOnly: boolean }): Promise<BulkAssignmentPreview> {
   const body = new FormData();
   body.set('responsible_user_id', options.responsibleUserId);
   body.set('mode', options.mode);
   body.set('group_name', options.groupName || '');
+  body.set('team_id', options.teamId || '');
   body.set('preview_only', String(options.previewOnly));
   if (options.file) body.set('upload', options.file);
   const response = await fetch(`${API_BASE_URL}/form-assignments/templates/${templateId}/bulk-assign`, { method: 'POST', headers: authorizationHeader(), body });

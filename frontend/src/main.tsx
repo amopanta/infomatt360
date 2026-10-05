@@ -31,6 +31,7 @@ import { DashboardApp } from './modules/dashboard/DashboardApp';
 import { MapsApp } from './modules/maps/MapsApp';
 import { MessagesApp } from './modules/messages/MessagesApp';
 import { ParticipantsApp } from './modules/participants/ParticipantsApp';
+import { TeamsApp } from './modules/teams/TeamsApp';
 import { RecordsApp } from './modules/records/RecordsApp';
 import { ReportsApp } from './modules/reports/ReportsApp';
 import { ReportCatalogApp } from './modules/reports/ReportCatalogApp';
@@ -113,6 +114,7 @@ function renderRoute(route: AppRoute) {
       case 'adminUsers': return <AdminUserSecurityApp />;
       case 'accountSecurity': return <AccountSecurityApp />;
       case 'participants': return <ParticipantsApp />;
+      case 'teams': return <TeamsApp />;
       case 'records': return <RecordsApp />;
       case 'reports': return window.location.pathname.startsWith('/reports/form/') ? <FormReportApp /> : window.location.pathname.startsWith('/reports/indicators') ? <IndicatorLibraryApp /> : window.location.pathname.startsWith('/reports/catalog') ? <ReportCatalogApp /> : <ReportsApp />;
       case 'evidence': return <EvidenceApp />;

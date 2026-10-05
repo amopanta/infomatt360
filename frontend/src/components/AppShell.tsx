@@ -29,6 +29,7 @@ const MENU: MenuGroup[] = [
     icon: 'gOper',
     items: [
       { label: 'Panel', href: '/', icon: 'dash' },
+      { label: 'Mis formularios', href: '/my-forms', icon: 'form', permissions: ['records.write'] },
       { label: 'Formularios', href: '/builder', icon: 'form', permissions: ['builder.write'], formsSubmenu: true },
       { label: 'Actas', href: '/acta', icon: 'acta', permissions: ['builder.write'] },
       { label: 'Participantes', href: '/participants', icon: 'users' },

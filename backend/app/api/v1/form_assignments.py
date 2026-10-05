@@ -47,6 +47,17 @@ class AssignmentRead(BaseModel):
     created_at: datetime
 
 
+class MyFormAssignmentRead(BaseModel):
+    template_id: str
+    template_name: str
+    template_status: str
+    participant_id: str
+    participant_name: str
+    document_id: str | None = None
+    assignment_status: str
+    record_id: str | None = None
+
+
 class OpenParticipantCreate(BaseModel):
     full_name: str = Field(min_length=2, max_length=220)
     document_id: str | None = Field(default=None, max_length=80)
@@ -80,6 +91,32 @@ def _read(db: Session, row: ParticipantFormAssignment) -> AssignmentRead:
                           responsible_user_id=row.responsible_user_id,
                           responsible_name=responsible.full_name if responsible else "Usuario eliminado",
                           status=row.status, created_at=row.created_at)
+
+
+@router.get("/mine/{project_id}", response_model=list[MyFormAssignmentRead])
+def my_form_assignments(project_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> list[MyFormAssignmentRead]:
+    if not assignment_service.user_has_project_access(db, user.id, project_id):
+        raise HTTPException(status_code=403, detail="Sin acceso al proyecto")
+    require_any_project_permission(db, user.id, project_id, {RECORDS_WRITE})
+    rows = db.query(ParticipantFormAssignment, BuilderTemplate, Participant).join(
+        BuilderTemplate, BuilderTemplate.id == ParticipantFormAssignment.template_id
+    ).join(Participant, Participant.id == ParticipantFormAssignment.participant_id).filter(
+        ParticipantFormAssignment.project_id == project_id,
+        ParticipantFormAssignment.responsible_user_id == user.id,
+        Participant.status == "active",
+        BuilderTemplate.status == "published",
+    ).order_by(BuilderTemplate.name, Participant.full_name).all()
+    result: list[MyFormAssignmentRead] = []
+    for assignment, template, participant in rows:
+        if not participant_visible(db, user.id, participant):
+            continue
+        result.append(MyFormAssignmentRead(
+            template_id=template.id, template_name=template.name, template_status=template.status,
+            participant_id=participant.id, participant_name=participant.full_name,
+            document_id=participant.document_id, assignment_status=assignment.status,
+            record_id=_read(db, assignment).record_id,
+        ))
+    return result
 
 
 @router.get("/templates/{template_id}", response_model=list[AssignmentRead])

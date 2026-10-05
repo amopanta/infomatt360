@@ -71,6 +71,11 @@ def test_closed_form_assignment_capture_visibility_and_reopening():
                 response = client.post("/api/v1/form-assignments/templates/closed-form", headers=admin,
                     json={"participant_id": participant_id, "responsible_user_id": responsible_user_id})
                 assert response.status_code == 200, response.text
+            mine = client.get("/api/v1/form-assignments/mine/assign-project", headers=owner)
+            assert mine.status_code == 200, mine.text
+            assert [(item["template_name"], item["participant_name"], item["document_id"]) for item in mine.json()] == [("Visita cerrada", "Primera", "1001")]
+            assert [item["participant_id"] for item in client.get("/api/v1/form-assignments/mine/assign-project", headers=other).json()] == ["assign-p2"]
+            assert client.get("/api/v1/form-assignments/mine/another-project", headers=owner).status_code == 403
             eligible = client.get("/api/v1/builder/templates/detail/closed-form/eligible-participants", headers=owner)
             assert [row["id"] for row in eligible.json()] == ["assign-p1"]
             unauthorized = client.post("/api/v1/runtime/save", headers=owner,

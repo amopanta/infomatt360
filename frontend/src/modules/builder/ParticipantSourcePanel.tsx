@@ -3,7 +3,7 @@ import { authorizationHeader } from '../auth/session';
 import { hasAnyCurrentProjectPermission } from '../auth/session';
 import { fetchCaseAssignees } from '../participants/api';
 import type { TemplateSummary } from '../records/api';
-import { assignFormParticipant, fetchEligibleParticipants, fetchFormAssignments, fetchFormCandidates, removeFormAssignment, setParticipantSource, type FormAssignment, type FormCandidate, type ParticipantSource } from './api';
+import { assignFormParticipant, bulkAssignFormParticipants, fetchFormAssignments, fetchFormCandidates, removeFormAssignment, setParticipantSource, type BulkAssignmentPreview, type FormAssignment, type FormCandidate, type ParticipantSource } from './api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
 const DEFAULT_SOURCE: ParticipantSource = { mode: 'all', access_mode: 'legacy', participant_ids: [], municipality: '', previous_template_id: null, required_status: 'submitted' };
@@ -14,7 +14,6 @@ export function ParticipantSourcePanel({ template, onUpdate }: { template: Templ
   const [lookups, setLookups] = useState<Array<{ name: string; columns: string[] }>>([]);
   const [people, setPeople] = useState<Array<{ id: string; full_name: string; document_id?: string | null; external_code?: string | null; group_name?: string | null; status: string }>>([]);
   const [participantSearch, setParticipantSearch] = useState('');
-  const [eligible, setEligible] = useState<number | null>(null);
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
   const [assignments, setAssignments] = useState<FormAssignment[]>([]);
@@ -22,6 +21,10 @@ export function ParticipantSourcePanel({ template, onUpdate }: { template: Templ
   const [responsibles, setResponsibles] = useState<Array<{ id: string; full_name: string }>>([]);
   const [assignParticipantId, setAssignParticipantId] = useState('');
   const [assignResponsibleId, setAssignResponsibleId] = useState('');
+  const [bulkMode, setBulkMode] = useState<'group' | 'excel'>('group');
+  const [bulkGroup, setBulkGroup] = useState(source.group_name || '');
+  const [bulkFile, setBulkFile] = useState<File | null>(null);
+  const [bulkPreview, setBulkPreview] = useState<BulkAssignmentPreview | null>(null);
   const canManageAssignments = hasAnyCurrentProjectPermission(['identity.users.manage']);
   const activePeople = useMemo(() => people.filter((person) => person.status === 'active'), [people]);
   const visiblePeople = useMemo(() => activePeople.filter((person) => `${person.full_name} ${person.document_id || ''} ${person.external_code || ''} ${person.group_name || ''}`.toLocaleLowerCase().includes(participantSearch.trim().toLocaleLowerCase())), [activePeople, participantSearch]);
@@ -65,7 +68,7 @@ export function ParticipantSourcePanel({ template, onUpdate }: { template: Templ
     try {
       const updated = await setParticipantSource(template.id, source);
       onUpdate(updated);
-      setEligible((await fetchEligibleParticipants(template.id)).length);
+      if (source.mode === 'group') setBulkGroup(source.group_name || '');
       if (canManageAssignments) await refreshAssignments();
       setMessage('Fuente guardada. Se aplicará a las nuevas respuestas.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible guardar.'); }
@@ -87,6 +90,19 @@ export function ParticipantSourcePanel({ template, onUpdate }: { template: Templ
     finally { setBusy(false); }
   }
 
+  async function runBulk(previewOnly: boolean) {
+    if (!assignResponsibleId) { setMessage('Selecciona primero el responsable.'); return; }
+    if (bulkMode === 'group' && !bulkGroup) { setMessage('Selecciona el grupo que quieres asignar.'); return; }
+    if (bulkMode === 'excel' && !bulkFile) { setMessage('Selecciona un Excel con una columna documento o codigo.'); return; }
+    setBusy(true); setMessage('');
+    try {
+      const result = await bulkAssignFormParticipants(template.id, { responsibleUserId: assignResponsibleId, mode: bulkMode, groupName: bulkGroup, file: bulkFile, previewOnly });
+      setBulkPreview(result);
+      if (!previewOnly) { await refreshAssignments(); setBulkPreview(null); setMessage(`${result.applied} participante(s) asignado(s) o reasignado(s).`); }
+    } catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible procesar la asignación masiva.'); }
+    finally { setBusy(false); }
+  }
+
   return <div className="forms-public-links"><h3>Fuente de participantes</h3><p>Define quién puede responder. La regla se verifica al guardar cada respuesta.</p>
     <label>Acceso al formulario<select value={source.access_mode || 'legacy'} onChange={(event) => setSource({ ...source, access_mode: event.target.value as ParticipantSource['access_mode'] })}><option value="legacy">Modo anterior (sin asignaciones individuales)</option><option value="open">Abierto: admite participantes nuevos con permiso</option><option value="closed">Cerrado: solo población previamente asignada</option></select></label>
     <label>Origen<select value={source.mode} onChange={(event) => setSource({ ...source, mode: event.target.value as ParticipantSource['mode'] })}>
@@ -98,7 +114,7 @@ export function ParticipantSourcePanel({ template, onUpdate }: { template: Templ
     {source.mode === 'form' && <><label>Formulario anterior<select value={source.previous_template_id || ''} onChange={(event) => setSource({ ...source, previous_template_id: event.target.value || null })}><option value="">Selecciona un formulario</option>{forms.filter((form) => form.id !== template.id).map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label><label>Estado requerido<select value={source.required_status} onChange={(event) => setSource({ ...source, required_status: event.target.value })}><option value="submitted">Enviado</option><option value="completed">Completado</option><option value="approved">Aprobado</option></select></label></>}
     {source.mode === 'pull' && <><label>Grupo Pull<select value={source.pull_name || ''} onChange={(event) => setSource({ ...source, pull_name: event.target.value, pull_key_column: '' })}><option value="">Selecciona un CSV</option>{lookups.map((lookup) => <option key={lookup.name} value={lookup.name}>{lookup.name}.csv</option>)}</select></label><label>Columna de relación<select value={source.pull_key_column || ''} onChange={(event) => setSource({ ...source, pull_key_column: event.target.value })}><option value="">Selecciona una columna</option>{lookups.find((lookup) => lookup.name === source.pull_name)?.columns.map((column) => <option key={column} value={column}>{column}</option>)}</select></label></>}
     <label>Llave para identificar al participante al capturar<select value={source.participant_key_field || 'external_code'} onChange={(event) => setSource({ ...source, participant_key_field: event.target.value as 'external_code' | 'document_id' })}><option value="document_id">Número de documento o cédula</option><option value="external_code">Código del participante</option></select></label>
-    <button type="button" disabled={busy} onClick={() => void save()}>Guardar fuente</button>{eligible !== null && <p>{eligible} participante(s) elegibles actualmente.</p>}{message && <p role="status">{message}</p>}
-    {canManageAssignments && (source.access_mode === 'open' || source.access_mode === 'closed') && <section className="form-assignment-manager"><h4>Asignaciones por responsable</h4><p>Cada participante tendrá un responsable para este formulario. Solo él podrá iniciar la captura.</p><div className="forms-participant-chooser-actions"><label>Participante<select value={assignParticipantId} onChange={(event) => setAssignParticipantId(event.target.value)}><option value="">Selecciona participante</option>{candidates.map((person) => <option key={person.id} value={person.id}>{person.full_name} · {person.document_id || person.external_code || 'Sin llave'}</option>)}</select></label><label>Responsable<select value={assignResponsibleId} onChange={(event) => setAssignResponsibleId(event.target.value)}><option value="">Selecciona responsable</option>{responsibles.map((person) => <option key={person.id} value={person.id}>{person.full_name}</option>)}</select></label><button type="button" disabled={busy || !assignParticipantId || !assignResponsibleId} onClick={() => void assign()}>Asignar</button></div><div className="records-table-wrap"><table className="records-table"><thead><tr><th>Participante</th><th>Responsable</th><th>Estado</th><th>Acción</th></tr></thead><tbody>{assignments.map((item) => <tr key={item.id}><td>{item.participant_name}</td><td>{item.responsible_name}</td><td>{item.status}</td><td><button type="button" disabled={busy} onClick={() => void remove(item.participant_id)}>Quitar</button></td></tr>)}</tbody></table></div></section>}
+    <button type="button" disabled={busy} onClick={() => void save()}>Guardar fuente</button>{canManageAssignments && <p>{candidates.length} participante(s) disponibles en la fuente · {assignments.length} asignado(s) a responsables.</p>}{message && <p role="status">{message}</p>}
+    {canManageAssignments && (source.access_mode === 'open' || source.access_mode === 'closed') && <section className="form-assignment-manager"><h4>Asignaciones por responsable</h4><p>Elige un responsable y asigna una persona, un grupo completo o una lista desde Excel.</p><label>Responsable<select value={assignResponsibleId} onChange={(event) => { setAssignResponsibleId(event.target.value); setBulkPreview(null); }}><option value="">Selecciona responsable</option>{responsibles.map((person) => <option key={person.id} value={person.id}>{person.full_name}</option>)}</select></label><details><summary>Asignar uno a uno</summary><div className="forms-participant-chooser-actions"><label>Participante<select value={assignParticipantId} onChange={(event) => setAssignParticipantId(event.target.value)}><option value="">Selecciona participante</option>{candidates.map((person) => <option key={person.id} value={person.id}>{person.full_name} · {person.document_id || person.external_code || 'Sin llave'}</option>)}</select></label><button type="button" disabled={busy || !assignParticipantId || !assignResponsibleId} onClick={() => void assign()}>Asignar participante</button></div></details><details open><summary>Asignar varios participantes</summary><div className="forms-participant-chooser-actions"><label>Método<select value={bulkMode} onChange={(event) => { setBulkMode(event.target.value as 'group' | 'excel'); setBulkPreview(null); }}><option value="group">Grupo completo</option><option value="excel">Lista desde Excel</option></select></label>{bulkMode === 'group' ? <label>Grupo<select value={bulkGroup} onChange={(event) => { setBulkGroup(event.target.value); setBulkPreview(null); }}><option value="">Selecciona grupo</option>{Array.from(new Set(activePeople.map((person) => person.group_name).filter((name): name is string => Boolean(name)))).sort().map((name) => <option key={name} value={name}>{name}</option>)}</select></label> : <label>Archivo .xlsx o .csv<input type="file" accept=".xlsx,.csv" onChange={(event) => { setBulkFile(event.target.files?.[0] || null); setBulkPreview(null); }} /></label>}<button type="button" disabled={busy || !assignResponsibleId || (bulkMode === 'group' ? !bulkGroup : !bulkFile)} onClick={() => void runBulk(true)}>Validar asignación</button></div>{bulkMode === 'excel' && <p>El archivo debe tener una sola columna llamada <strong>documento</strong> o <strong>codigo</strong>, y una fila por participante. Máximo 5000 filas y 5 MB.</p>}{bulkPreview && <div role="status"><p>{bulkPreview.selected} encontrados · {bulkPreview.to_assign} nuevos · {bulkPreview.to_reassign} a reasignar · {bulkPreview.already_assigned} ya asignados · {bulkPreview.protected} con respuesta o cerrados.</p>{bulkPreview.issues.length > 0 && <ul>{bulkPreview.issues.map((issue, index) => <li key={`${index}:${issue}`}>{issue}</li>)}</ul>}<button type="button" disabled={busy || bulkPreview.issues.length > 0 || bulkPreview.to_assign + bulkPreview.to_reassign === 0} onClick={() => void runBulk(false)}>Confirmar asignación masiva</button></div>}</details><div className="records-table-wrap"><table className="records-table"><thead><tr><th>Participante</th><th>Responsable</th><th>Estado</th><th>Acción</th></tr></thead><tbody>{assignments.map((item) => <tr key={item.id}><td>{item.participant_name}</td><td>{item.responsible_name}</td><td>{item.status}</td><td><button type="button" disabled={busy} onClick={() => void remove(item.participant_id)}>Quitar</button></td></tr>)}</tbody></table></div></section>}
   </div>;
 }

@@ -4,7 +4,7 @@
  * Responsabilidad: Centralizar llamadas al backend del constructor visual.
  */
 
-import { jsonAuthHeaders } from '../auth/session';
+import { authorizationHeader, jsonAuthHeaders } from '../auth/session';
 import type { TemplateSummary } from '../records/api';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
@@ -29,6 +29,7 @@ export type ParticipantSource = NonNullable<TemplateSummary['participant_source'
 
 export type FormAssignment = { id: string; template_id: string; participant_id: string; participant_name: string; responsible_user_id: string; responsible_name: string; status: string; created_at: string };
 export type FormCandidate = { id: string; full_name: string; document_id?: string | null; external_code?: string | null };
+export type BulkAssignmentPreview = { selected: number; to_assign: number; already_assigned: number; to_reassign: number; protected: number; applied: number; issues: string[] };
 
 export async function fetchFormAssignments(templateId: string): Promise<FormAssignment[]> {
   const response = await fetch(`${API_BASE_URL}/form-assignments/templates/${templateId}`, { headers: authHeaders() });
@@ -45,6 +46,18 @@ export async function fetchFormCandidates(templateId: string): Promise<FormCandi
 export async function assignFormParticipant(templateId: string, participantId: string, responsibleUserId: string): Promise<FormAssignment> {
   const response = await fetch(`${API_BASE_URL}/form-assignments/templates/${templateId}`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ participant_id: participantId, responsible_user_id: responsibleUserId }) });
   if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible asignar el participante.');
+  return response.json();
+}
+
+export async function bulkAssignFormParticipants(templateId: string, options: { responsibleUserId: string; mode: 'group' | 'excel'; groupName?: string; file?: File | null; previewOnly: boolean }): Promise<BulkAssignmentPreview> {
+  const body = new FormData();
+  body.set('responsible_user_id', options.responsibleUserId);
+  body.set('mode', options.mode);
+  body.set('group_name', options.groupName || '');
+  body.set('preview_only', String(options.previewOnly));
+  if (options.file) body.set('upload', options.file);
+  const response = await fetch(`${API_BASE_URL}/form-assignments/templates/${templateId}/bulk-assign`, { method: 'POST', headers: authorizationHeader(), body });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible procesar la asignación masiva.');
   return response.json();
 }
 

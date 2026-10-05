@@ -1,6 +1,9 @@
 """End-to-end access, capture and controlled reopening for assigned forms."""
 
 import json
+from io import BytesIO
+
+from openpyxl import Workbook
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -40,8 +43,8 @@ def setup_client():
             User(id="assign-other", full_name="Otro", document_id="assign-other-doc", email="assign-other@example.com", password_hash=hash_password("Other12345!")),
         ]
         db.add_all([project, closed, opened, *roles, *users,
-            Participant(id="assign-p1", project_id=project.id, full_name="Primera", document_id="1001"),
-            Participant(id="assign-p2", project_id=project.id, full_name="Segunda", document_id="1002"),
+            Participant(id="assign-p1", project_id=project.id, full_name="Primera", document_id="1001", metadata_json=json.dumps({"group_name": "Soacha"})),
+            Participant(id="assign-p2", project_id=project.id, full_name="Segunda", document_id="1002", metadata_json=json.dumps({"group_name": "Soacha"})),
             *[UserProjectAssignment(user_id=user.id, project_id=project.id, role_id=role.id, status="active") for user, role in zip(users, roles)],
         ])
         db.commit()
@@ -130,6 +133,60 @@ def test_closed_form_assignment_capture_visibility_and_reopening():
             with sessions() as db:
                 edits = db.query(AuditLog).filter_by(entity_id=record_id, action="edit_field").all()
                 assert len(edits) == 1
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_group_and_excel_bulk_assignment_preview_and_apply():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            admin = auth(client, "assign-admin@example.com", "Admin12345!")
+            owner = auth(client, "assign-owner@example.com", "Owner12345!")
+            path = "/api/v1/form-assignments/templates/closed-form/bulk-assign"
+            group = {"responsible_user_id": "assign-owner", "mode": "group", "group_name": "Soacha"}
+            assert client.post(path, headers=owner, data=group).status_code == 403
+            preview = client.post(path, headers=admin, data=group)
+            assert preview.status_code == 200, preview.text
+            assert (preview.json()["selected"], preview.json()["to_assign"], preview.json()["applied"]) == (2, 2, 0)
+            assert client.get("/api/v1/form-assignments/templates/closed-form", headers=admin).json() == []
+            applied = client.post(path, headers=admin, data={**group, "preview_only": "false"})
+            assert applied.status_code == 200, applied.text
+            assert applied.json()["applied"] == 2
+            assert len(client.get("/api/v1/form-assignments/mine/assign-project", headers=owner).json()) == 2
+            assert client.post(path, headers=admin, data=group).json()["already_assigned"] == 2
+
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.append(["documento"])
+            sheet.append(["1001"])
+            sheet.append(["desconocido"])
+            output = BytesIO()
+            workbook.save(output)
+            excel = {"responsible_user_id": "assign-other", "mode": "excel", "preview_only": "false"}
+            invalid = client.post(path, headers=admin, data=excel, files={"upload": ("asignacion.xlsx", output.getvalue())})
+            assert invalid.status_code == 200, invalid.text
+            assert invalid.json()["applied"] == 0 and invalid.json()["issues"]
+            assert len(client.get("/api/v1/form-assignments/mine/assign-project", headers=owner).json()) == 2
+
+            workbook = Workbook()
+            sheet = workbook.active
+            sheet.append(["documento"])
+            sheet.append(["1001"])
+            output = BytesIO()
+            workbook.save(output)
+            valid = client.post(path, headers=admin, data=excel, files={"upload": ("asignacion.xlsx", output.getvalue())})
+            assert valid.status_code == 200, valid.text
+            assert (valid.json()["to_reassign"], valid.json()["applied"]) == (1, 1)
+            assert [item["participant_id"] for item in client.get("/api/v1/form-assignments/mine/assign-project", headers=owner).json()] == ["assign-p2"]
+            other = auth(client, "assign-other@example.com", "Other12345!")
+            saved = client.post("/api/v1/runtime/save", headers=other, json={
+                "project_id": "assign-project", "template_id": "closed-form", "participant_id": "assign-p1", "values": [],
+            })
+            assert saved.status_code == 200, saved.text
+            protected = client.post(path, headers=admin, data=group).json()
+            assert (protected["protected"], protected["already_assigned"], protected["to_reassign"]) == (1, 1, 0)
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

@@ -489,6 +489,15 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .runtime-participant-picker strong { color: var(--brand-primary); }
 .runtime-participant-confirmation { display: grid; gap: 3px; padding: 12px 14px; border-radius: 8px; background: var(--success-soft); }
 .runtime-participant-confirmation span { color: var(--text-muted); }
+.runtime-participant-summary { min-width: 0; margin-top: 6px; border: 1px solid var(--border-strong); border-radius: 8px; overflow: hidden; }
+.runtime-participant-summary-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 12px; background: var(--success-soft); }
+.runtime-participant-summary-heading h3 { margin: 0; font-size: 1rem; }
+.runtime-participant-summary-scroll { max-width: 100%; overflow-x: auto; }
+.runtime-participant-summary table { width: max-content; min-width: 100%; border-collapse: collapse; text-align: left; }
+.runtime-participant-summary th, .runtime-participant-summary td { min-width: 120px; max-width: 240px; padding: 10px 12px; border-top: 1px solid var(--border-strong); border-right: 1px solid var(--border-strong); overflow-wrap: anywhere; vertical-align: top; }
+.runtime-participant-summary th { background: var(--surface); font-weight: 700; white-space: nowrap; }
+.runtime-participant-summary td { background: var(--surface); }
+.runtime-participant-summary th:last-child, .runtime-participant-summary td:last-child { border-right: 0; }
 .runtime-new-participant { display: grid; gap: 10px; padding: 14px; border: 1px solid var(--border-strong); border-radius: 8px; }
 .runtime-new-participant label { display: grid; gap: 5px; }
 .form-assignment-manager { margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--border-strong); }

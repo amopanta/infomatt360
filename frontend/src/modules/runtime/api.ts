@@ -84,7 +84,19 @@ export async function fetchRuntimeTemplate(templateId: string): Promise<RuntimeT
   return response.json();
 }
 
-export type EligibleParticipant = { id: string; full_name: string; document_id?: string | null; external_code?: string | null; municipality?: string | null };
+export type EligibleParticipant = {
+  id: string;
+  full_name: string;
+  document_id?: string | null;
+  external_code?: string | null;
+  department?: string | null;
+  municipality?: string | null;
+  group_name?: string | null;
+  participant_type?: string | null;
+  status?: string | null;
+  duplicate_flag?: string | null;
+  metadata_json?: string | null;
+};
 
 export async function fetchCaptureParticipants(templateId: string): Promise<{ keyField: 'document_id' | 'external_code'; accessMode: 'legacy' | 'open' | 'closed'; participants: EligibleParticipant[] }> {
   const [detailResponse, participantsResponse] = await Promise.all([

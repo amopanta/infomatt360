@@ -140,12 +140,14 @@ def start_assignment(template_id: str, participant_id: str, db: Session = Depend
     template = _template(db, user, template_id)
     require_any_project_permission(db, user.id, template.project_id, {RECORDS_WRITE})
     row = visible_assignment(db, template, participant_id, user.id)
-    if row.responsible_user_id != user.id or row.status not in {"assigned", "in_progress"}:
+    if row.responsible_user_id != user.id:
         raise HTTPException(status_code=403, detail="Actividad no disponible para este responsable")
     if db.query(RuntimeRecord.id).filter(RuntimeRecord.template_id == template_id,
         RuntimeRecord.participant_id == participant_id,
         RuntimeRecord.status.notin_(["voided", "cancelled"])).first():
-        raise HTTPException(status_code=409, detail="Ya existe una respuesta; abre el registro para consultarlo o corregirlo")
+        raise HTTPException(status_code=409, detail="Este participante ya tiene un registro asociado a esta actividad. Abre la respuesta para consultarla.")
+    if row.status in {"completed", "closed"}:
+        raise HTTPException(status_code=409, detail="Esta actividad ya está completada o cerrada para este participante.")
     if row.status == "assigned":
         row.status = "in_progress"
         row.updated_at = utc_now()

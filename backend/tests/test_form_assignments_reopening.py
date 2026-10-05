@@ -83,6 +83,9 @@ def test_closed_form_assignment_capture_visibility_and_reopening():
                       "values": [{"field_name": "respuesta", "field_value_json": '"Antes"'}]})
             assert saved.status_code == 200, saved.text
             record_id = saved.json()["id"]
+            repeated = client.post("/api/v1/form-assignments/templates/closed-form/assign-p1/start", headers=owner)
+            assert repeated.status_code == 409
+            assert "ya tiene un registro asociado" in repeated.json()["detail"]
             listed = client.get("/api/v1/form-assignments/templates/closed-form", headers=owner)
             assert listed.status_code == 200, listed.text
             assert [(row["document_id"], row["status"], row["record_id"]) for row in listed.json()] == [("1001", "completed", record_id)]

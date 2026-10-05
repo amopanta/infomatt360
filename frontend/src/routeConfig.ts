@@ -1,6 +1,7 @@
 export type AppRouteKey =
   | 'acta'
   | 'builder'
+  | 'myForms'
   | 'bulkJobs'
   | 'metrics'
   | 'approvalFlows'
@@ -43,6 +44,7 @@ export function navigateTo(pathname: string): void {
 }
 
 export function resolveAppRoute(pathname: string): AppRoute {
+  if (pathname.startsWith('/my-forms')) return { key: 'myForms', permissions: ['records.write'] };
   if (pathname.startsWith('/builder')) return { key: 'builder', permissions: ['builder.write'] };
   if (pathname.startsWith('/acta')) return { key: 'acta', permissions: ['builder.write'] };
   if (pathname.startsWith('/admin/bulk-jobs')) return { key: 'bulkJobs', permissions: ['integrations.api_keys.manage', 'records.write'] };

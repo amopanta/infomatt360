@@ -25,6 +25,7 @@ import { applyFallbackBranding, loadOrganizationBranding } from './modules/brand
 import { hasAnyCurrentProjectPermission } from './modules/auth/session';
 import { BuilderApp } from './modules/builder/BuilderApp';
 import { FormsApp } from './modules/builder/FormsApp';
+import { MyFormsApp } from './modules/builder/MyFormsApp';
 import { AppShell } from './components/AppShell';
 import { DashboardApp } from './modules/dashboard/DashboardApp';
 import { MapsApp } from './modules/maps/MapsApp';
@@ -91,6 +92,7 @@ function renderRoute(route: AppRoute) {
   const content = (() => {
     switch (route.key) {
       case 'builder': return window.location.pathname === '/builder/new' || window.location.pathname.startsWith('/builder/edit/') ? <BuilderApp /> : <FormsApp />;
+      case 'myForms': return <MyFormsApp />;
       case 'acta': return <ActaApp />;
       case 'bulkJobs': return <BulkJobsApp />;
       case 'metrics': return <OperationalMetricsApp />;

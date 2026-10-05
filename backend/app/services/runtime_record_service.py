@@ -52,6 +52,8 @@ def value_to_read(row: RuntimeRecordValue) -> RuntimeValueRead:
 def record_to_read(db: Session, row: RuntimeRecord) -> RuntimeRecordRead:
     """Convierte la cabecera y sus valores en una respuesta consolidada."""
     values = db.query(RuntimeRecordValue).filter(RuntimeRecordValue.record_id == row.id).all()
+    participant = db.get(Participant, row.participant_id) if row.participant_id else None
+    participant_metadata = json.loads(participant.metadata_json or "{}") if participant else {}
     return RuntimeRecordRead(
         id=row.id,
         project_id=row.project_id,
@@ -66,6 +68,10 @@ def record_to_read(db: Session, row: RuntimeRecord) -> RuntimeRecordRead:
         parent_record_id=row.parent_record_id,
         parent_field_name=row.parent_field_name,
         participant_id=row.participant_id,
+        participant_name=participant.full_name if participant else None,
+        participant_document_id=participant.document_id if participant else None,
+        participant_external_code=participant.external_code if participant else None,
+        participant_municipality=(participant_metadata.get("municipality") or participant_metadata.get("municipio")) if isinstance(participant_metadata, dict) else None,
         duplicate_flag=row.duplicate_flag,
         lock_version=row.lock_version,
         created_at=row.created_at,
@@ -887,12 +893,15 @@ class RuntimeRecordService:
             query = query.filter(RuntimeRecord.id.in_(matching_ids))
         total = query.count()
         sort_columns = {"created_at": RuntimeRecord.created_at, "updated_at": RuntimeRecord.updated_at, "status": RuntimeRecord.status, "submitted_by": RuntimeRecord.submitted_by}
+        participant_sort_columns = {"participant_name": Participant.full_name, "participant_document_id": Participant.document_id}
         if sort_by.startswith("field:"):
             field_name = sort_by[6:]
             sort_column = select(RuntimeRecordValue.field_value_json).where(
                 RuntimeRecordValue.record_id == RuntimeRecord.id,
                 RuntimeRecordValue.field_name == field_name,
             ).limit(1).scalar_subquery()
+        elif sort_by in participant_sort_columns:
+            sort_column = select(participant_sort_columns[sort_by]).where(Participant.id == RuntimeRecord.participant_id).limit(1).scalar_subquery()
         else:
             sort_column = sort_columns.get(sort_by, RuntimeRecord.created_at)
         direction = sort_column.asc() if sort_dir == "asc" else sort_column.desc()
@@ -910,15 +919,23 @@ class RuntimeRecordService:
         by_record: dict[str, dict[str, str]] = {}
         for value in values:
             by_record.setdefault(value.record_id, {})[value.field_name] = self._csv_value(value.field_value_json)
+        participant_ids = {record.participant_id for record in records if record.participant_id}
+        participants = {item.id: item for item in db.query(Participant).filter(Participant.id.in_(participant_ids)).all()} if participant_ids else {}
 
         output = StringIO()
         output.write("\ufeff")
         writer = csv.writer(output, lineterminator="\n")
-        writer.writerow(["record_id", "fecha", "estado", "capturado_por", *[self._safe_csv_cell(name) for name in field_names]])
+        writer.writerow(["record_id", "participante_nombre", "participante_documento", "participante_codigo", "participante_municipio", "fecha", "estado", "capturado_por", *[self._safe_csv_cell(name) for name in field_names]])
         for record in records:
             row_values = by_record.get(record.id, {})
+            participant = participants.get(record.participant_id)
+            metadata = json.loads(participant.metadata_json or "{}") if participant else {}
             writer.writerow([
                 record.id,
+                self._safe_csv_cell(participant.full_name if participant else ""),
+                self._safe_csv_cell(participant.document_id or "") if participant else "",
+                self._safe_csv_cell(participant.external_code or "") if participant else "",
+                self._safe_csv_cell(str(metadata.get("municipality") or metadata.get("municipio") or "")) if isinstance(metadata, dict) else "",
                 record.created_at.isoformat(),
                 record.status,
                 record.submitted_by or "",
@@ -1023,12 +1040,18 @@ class RuntimeRecordService:
             matching_record_ids = db.query(RuntimeRecordValue.record_id).filter(
                 or_(RuntimeRecordValue.field_name.ilike(needle), RuntimeRecordValue.field_value_json.ilike(needle))
             )
+            matching_participant_ids = select(Participant.id).where(or_(
+                Participant.full_name.ilike(needle),
+                Participant.document_id.ilike(needle),
+                Participant.external_code.ilike(needle),
+            ))
             query = query.filter(
                 or_(
                     RuntimeRecord.id.ilike(needle),
                     RuntimeRecord.submitted_by.ilike(needle),
                     RuntimeRecord.status.ilike(needle),
                     RuntimeRecord.id.in_(matching_record_ids),
+                    RuntimeRecord.participant_id.in_(matching_participant_ids),
                 )
             )
         return query

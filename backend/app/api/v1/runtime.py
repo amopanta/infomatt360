@@ -390,7 +390,7 @@ def search_runtime_records(
         for key, value in parsed_filters.items()
     ):
         raise HTTPException(status_code=422, detail="Filtros de columnas invalidos")
-    if sort_by not in {"created_at", "updated_at", "status", "submitted_by"} and not (sort_by.startswith("field:") and 0 < len(sort_by[6:]) <= 180):
+    if sort_by not in {"created_at", "updated_at", "status", "submitted_by", "participant_name", "participant_document_id"} and not (sort_by.startswith("field:") and 0 < len(sort_by[6:]) <= 180):
         raise HTTPException(status_code=422, detail="Columna de ordenacion invalida")
     return runtime_record_service.search_template_records(db, template_id, search=search, status=status_filter, limit=limit, offset=offset, unlinked_only=unlinked_only, field_filters=parsed_filters, sort_by=sort_by, sort_dir=sort_dir, allowed_participant_ids=allowed_form_participant_ids(db, current_user.id, template, review=True))
 

@@ -669,6 +669,10 @@ function DeepLinkedRecordCard({
         <strong>{editMode ? 'Editar respuesta' : 'Respuesta completa'}</strong>
         <span className={`record-status ${record.status}`}>{record.status}</span>
       </header>
+      <div className="record-participant-summary">
+        <strong>Participante asociado</strong>
+        {record.participant_id ? <span>{record.participant_name || 'Nombre no disponible'} · Documento: {record.participant_document_id || '—'} · Código: {record.participant_external_code || '—'} · Municipio: {record.participant_municipality || '—'}</span> : <span>Sin participante enlazado</span>}
+      </div>
       <label className="record-field-search">Buscar pregunta<input type="search" value={fieldQuery} onChange={(event) => setFieldQuery(event.target.value)} placeholder="Nombre de la pregunta o campo" /></label>
       <p className="record-field-count">{visibleValues.length} de {record.values.length} campos</p>
       <dl className="record-detail">
@@ -862,7 +866,7 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
             {templateStatus === 'published' && hasAnyCurrentProjectPermission(['records.write']) && <a className="forms-primary-link" href={`/runtime/${templateId}`}>+ Agregar registro</a>}
             {templateStatus && templateStatus !== 'published' && <span role="status">Captura no disponible: el formulario está {templateStatus === 'paused' ? 'pausado' : templateStatus === 'archived' ? 'archivado' : 'sin publicar'}. Solicita al administrador que habilite la recepción.</span>}
             {templateStatus === 'published' && !hasAnyCurrentProjectPermission(['records.write']) && <span role="status">Para agregar registros necesitas el permiso de captura en este proyecto. Solicítalo al administrador.</span>}
-            <input type="search" placeholder="Buscar por campo, valor, estado o usuario" value={query} onChange={(event) => { setQuery(event.target.value); setOffset(0); }} />
+            <input type="search" aria-label="Buscar registros por participante, documento, código, campo, estado o usuario" placeholder="Buscar participante, documento, código o respuesta" value={query} onChange={(event) => { setQuery(event.target.value); setOffset(0); }} />
             <label className="records-unlinked-filter">
               <input type="checkbox" checked={unlinkedOnly} onChange={(event) => { setUnlinkedOnly(event.target.checked); setOffset(0); }} />
               Sin participante enlazado
@@ -899,6 +903,10 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
                 <th className="records-leading-col">Acciones<br />
                   <input type="checkbox" aria-label="Seleccionar todos los de esta página" checked={pageFullySelected} onChange={togglePageSelection} disabled={pageIds.length === 0} />
                 </th>
+                <th><button type="button" className="records-sort" onClick={() => sortColumn('participant_name')}>Participante {sortBy === 'participant_name' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
+                <th><button type="button" className="records-sort" onClick={() => sortColumn('participant_document_id')}>Documento {sortBy === 'participant_document_id' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
+                <th>Código</th>
+                <th>Municipio</th>
                 <th><button type="button" className="records-sort" onClick={() => sortColumn('created_at')}>Fecha de envío {sortBy === 'created_at' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
                 <th><button type="button" className="records-sort" onClick={() => sortColumn('status')}>Validación {sortBy === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
                 <th><button type="button" className="records-sort" onClick={() => sortColumn('submitted_by')}>Capturado por {sortBy === 'submitted_by' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
@@ -907,7 +915,11 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
               <tr className="records-filter-row">
                 <th />
                 <th />
-                <th><select aria-label="Filtrar por validación" value={status} onChange={(event) => { setStatus(event.target.value); setOffset(0); }}><option value="">Todos</option><option value="draft">Borrador</option><option value="submitted">Enviado</option><option value="under_review">En revisión</option><option value="tech_approved">Aprobado técnico</option><option value="coordinator_approved">Aprobado coordinación</option><option value="returned">Devuelto</option><option value="corrected">Corregido</option><option value="approved">Aprobado</option><option value="rejected">Rechazado</option><option value="cancelled">Cancelado</option><option value="archived">Archivado</option><option value="synced">Sincronizado</option><option value="voided">Anulado</option></select></th>
+                <th />
+                <th />
+                <th />
+                                <th />
+<th><select aria-label="Filtrar por validación" value={status} onChange={(event) => { setStatus(event.target.value); setOffset(0); }}><option value="">Todos</option><option value="draft">Borrador</option><option value="submitted">Enviado</option><option value="under_review">En revisión</option><option value="tech_approved">Aprobado técnico</option><option value="coordinator_approved">Aprobado coordinación</option><option value="returned">Devuelto</option><option value="corrected">Corregido</option><option value="approved">Aprobado</option><option value="rejected">Rechazado</option><option value="cancelled">Cancelado</option><option value="archived">Archivado</option><option value="synced">Sincronizado</option><option value="voided">Anulado</option></select></th>
                 <th />
                 {fields.map((field) => <th key={field.name}><input type="search" aria-label={`Buscar en ${field.label}`} placeholder="Buscar" value={fieldFilters[field.name] ?? ''} onChange={(event) => updateFieldFilter(field.name, event.target.value)} /></th>)}
               </tr>
@@ -921,6 +933,10 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
                       <button type="button" className="record-icon-action" onClick={() => void openRecord(record.id)} aria-label={`Abrir registro ${record.id}`} title="Abrir respuesta completa">◉</button>
                       {hasAnyCurrentProjectPermission(['records.write']) && ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && <button type="button" className="record-icon-action" onClick={() => void openRecord(record.id, true)} aria-label={`Editar registro ${record.id}`} title="Editar respuesta">✎</button>}
                     </td>
+                    <td title={record.participant_name || ''}>{record.participant_id ? record.participant_name || 'Nombre no disponible' : 'Sin participante enlazado'}</td>
+                    <td>{record.participant_document_id || '—'}</td>
+                    <td>{record.participant_external_code || '—'}</td>
+                    <td>{record.participant_municipality || '—'}</td>
                     <td>{new Date(record.created_at).toLocaleString()}</td>
                     <td><span className={`record-status ${record.status}`}>{record.status}</span></td>
                     <td title={record.submitted_by ?? ''}>{record.submitted_by || '—'}</td>

@@ -42,3 +42,44 @@ def test_team_members_and_bulk_form_assignment():
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
+
+
+def test_mass_import_previews_multiple_teams_and_is_idempotent():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            admin = auth(client, "assign-admin@example.com", "Admin12345!")
+            payload = ("equipo,tipo,identificador\n"
+                       "Equipo Norte,gestor,assign-owner@example.com\n"
+                       "Equipo Norte,participante,1001\n"
+                       "Equipo Sur,gestor,assign-other-doc\n"
+                       "Equipo Sur,participante,1002\n")
+            endpoint = "/api/v1/gestor-teams/project/assign-project/bulk-import"
+            def upload(text: str, preview: bool):
+                return client.post(endpoint, headers=admin, data={"preview_only": str(preview).lower()},
+                                   files={"upload": ("equipos.csv", text.encode("utf-8"), "text/csv")})
+            preview = upload(payload, True)
+            assert preview.status_code == 200, preview.text
+            assert preview.json()["teams_to_create"] == 2 and preview.json()["new_members"] == 4
+            assert client.get("/api/v1/gestor-teams/project/assign-project/summaries", headers=admin).json() == []
+            invalid = upload(payload + "Equipo Norte,participante,desconocido\n", False)
+            assert invalid.status_code == 200 and invalid.json()["issues"]
+            assert client.get("/api/v1/gestor-teams/project/assign-project/summaries", headers=admin).json() == []
+            applied = upload(payload, False)
+            assert applied.status_code == 200 and applied.json()["applied"] == 4, applied.text
+            summaries = client.get("/api/v1/gestor-teams/project/assign-project/summaries", headers=admin).json()
+            assert [(row["name"], row["user_count"], row["participant_count"]) for row in summaries] == [
+                ("Equipo Norte", 1, 1), ("Equipo Sur", 1, 1)]
+            again = upload(payload, False)
+            assert again.status_code == 200 and again.json()["applied"] == 0
+            team_id = summaries[0]["id"]
+            found = client.get(f"/api/v1/gestor-teams/{team_id}/members/search", headers=admin,
+                               params={"kind": "participante", "q": "1001"})
+            assert found.status_code == 200 and found.json()[0]["selected"] is True, found.text
+            removed = client.delete(f"/api/v1/gestor-teams/{team_id}/members/participante/assign-p1", headers=admin)
+            assert removed.status_code == 200
+            assert client.get(f"/api/v1/gestor-teams/{team_id}/members/search", headers=admin,
+                              params={"kind": "participante", "q": "1001"}).json()[0]["selected"] is False
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)

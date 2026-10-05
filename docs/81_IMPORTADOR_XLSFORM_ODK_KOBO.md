@@ -28,6 +28,7 @@ XLSForm en minuscula. Los casos con manejo especial en el importador:
 | `select_one <lista>` / `select_multiple <lista>` | Componente `SELECT`/`MULTISELECT` con las opciones de la hoja `choices` |
 | `begin_group` / `end_group` | Se aplanan (no generan un componente propio) |
 | `begin_repeat` / `end_repeat` | Se agrupan en un solo componente `REPEAT`, con los campos anidados guardados en `config_json` |
+| `photo` | Componente `IMAGE` para cargar la fotografía como evidencia |
 | `note`, `start`, `end`, `today`, `deviceid`, `subscriberid`, `simserial`, `username`, `audit`, `text-audit`, `calculate_here` | Se omiten (metadatos de ODK sin campo visible equivalente) |
 | Tipo desconocido sin equivalente | Se importa como campo `HIDDEN` y se agrega una advertencia |
 

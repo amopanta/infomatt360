@@ -38,6 +38,9 @@ class AssignmentRead(BaseModel):
     template_id: str
     participant_id: str
     participant_name: str
+    document_id: str | None = None
+    external_code: str | None = None
+    record_id: str | None = None
     responsible_user_id: str
     responsible_name: str
     status: str
@@ -66,8 +69,14 @@ def _template(db: Session, user: User, template_id: str) -> BuilderTemplate:
 def _read(db: Session, row: ParticipantFormAssignment) -> AssignmentRead:
     participant = db.get(Participant, row.participant_id)
     responsible = db.get(User, row.responsible_user_id)
+    record = db.query(RuntimeRecord.id).filter(RuntimeRecord.template_id == row.template_id,
+        RuntimeRecord.participant_id == row.participant_id,
+        RuntimeRecord.status.notin_(["voided", "cancelled"])).order_by(RuntimeRecord.created_at.desc()).first()
     return AssignmentRead(id=row.id, template_id=row.template_id, participant_id=row.participant_id,
                           participant_name=participant.full_name if participant else "Participante eliminado",
+                          document_id=participant.document_id if participant else None,
+                          external_code=participant.external_code if participant else None,
+                          record_id=record[0] if record else None,
                           responsible_user_id=row.responsible_user_id,
                           responsible_name=responsible.full_name if responsible else "Usuario eliminado",
                           status=row.status, created_at=row.created_at)

@@ -83,6 +83,9 @@ def test_closed_form_assignment_capture_visibility_and_reopening():
                       "values": [{"field_name": "respuesta", "field_value_json": '"Antes"'}]})
             assert saved.status_code == 200, saved.text
             record_id = saved.json()["id"]
+            listed = client.get("/api/v1/form-assignments/templates/closed-form", headers=owner)
+            assert listed.status_code == 200, listed.text
+            assert [(row["document_id"], row["status"], row["record_id"]) for row in listed.json()] == [("1001", "completed", record_id)]
             assert client.get(f"/api/v1/runtime/record/{record_id}", headers=other).status_code == 404
             assert client.get(f"/api/v1/runtime/record/{record_id}", headers=owner).status_code == 200
             assert client.post(f"/api/v1/runtime/record/{record_id}/duplicate", headers=owner).status_code == 409
@@ -92,6 +95,8 @@ def test_closed_form_assignment_capture_visibility_and_reopening():
                 json={"project_id": "assign-project", "record_id": record_id, "to_status": "approved", "action": "approve"})
             assert approved.status_code == 200, approved.text
             assert client.get("/api/v1/participants/assign-p1/activities", headers=owner).json()[0]["assignment_status"] == "closed"
+            closed_list = client.get("/api/v1/form-assignments/templates/closed-form", headers=owner).json()
+            assert closed_list[0]["status"] == "closed" and closed_list[0]["record_id"] == record_id
             correction = {"field_name": "respuesta", "field_value_json": '"Después"', "expected_lock_version": 1}
             assert client.patch(f"/api/v1/runtime/record/{record_id}/correction", headers=owner, json=correction).status_code == 400
             assert client.post(f"/api/v1/review/records/{record_id}/reopen", headers=owner,

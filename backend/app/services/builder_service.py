@@ -96,7 +96,7 @@ class BuilderService:
         return self.get_template(db, clone.id)
 
     def list_templates(self, db: Session, project_id: str) -> list[BuilderTemplateRead]:
-        rows = db.query(BuilderTemplate).filter(BuilderTemplate.project_id == project_id).order_by(BuilderTemplate.created_at.desc()).all()
+        rows = db.query(BuilderTemplate).filter(BuilderTemplate.project_id == project_id, BuilderTemplate.status != "deleted").order_by(BuilderTemplate.created_at.desc()).all()
         if not rows:
             return []
         ids = [row.id for row in rows]
@@ -107,7 +107,7 @@ class BuilderService:
 
     def get_template(self, db: Session, template_id: str) -> BuilderTemplateRead:
         row = db.get(BuilderTemplate, template_id)
-        if row is None:
+        if row is None or row.status == "deleted":
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Formulario no encontrado")
         owner = db.get(User, row.created_by) if row.created_by else None
         count = db.query(func.count(RuntimeRecord.id)).filter(RuntimeRecord.template_id == row.id).scalar() or 0

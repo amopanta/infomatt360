@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AppShell } from '../../components/AppShell';
-import { authorizationHeader, PROJECT_KEY } from '../auth/session';
+import { authorizationHeader, hasAnyCurrentProjectPermission, PROJECT_KEY } from '../auth/session';
+import { navigateTo } from '../../routeConfig';
 import { fetchProjectTemplates } from '../records/api';
 import { RecordTable } from '../records/RecordsApp';
 import type { TemplateSummary } from '../records/api';
 import type { RuntimeTemplate } from '../runtime/types';
 import { createPublicLink, fetchPublicLinks } from '../admin/publicLinksApi';
 import type { PublicFormLink } from '../admin/publicLinksApi';
-import { duplicateTemplate, fetchTemplateDetail, setTemplateSchedule, setTemplateStatus, updateTemplateProperties } from './api';
+import { deleteTemplate, duplicateTemplate, fetchTemplateDetail, setTemplateSchedule, setTemplateStatus, updateTemplateProperties } from './api';
 import { CollectionPanel } from './CollectionPanel';
 import { ParticipantSourcePanel } from './ParticipantSourcePanel';
 import { BulkPullPanel, FormLookupPanel } from './FormLookupPanel';
@@ -106,6 +107,9 @@ function FormDetail({ templateId }: { templateId: string }) {
   const [formDescription, setFormDescription] = useState('');
   const [versionCount, setVersionCount] = useState(0);
   const [pullCount, setPullCount] = useState(0);
+  const [showDelete, setShowDelete] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const canDelete = hasAnyCurrentProjectPermission(['identity.users.manage']);
 
   useEffect(() => {
     setMessage('Cargando formulario…');
@@ -181,6 +185,13 @@ function FormDetail({ templateId }: { templateId: string }) {
     catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible duplicar el formulario.'); setBusy(false); }
   }
 
+  async function removeForm() {
+    if (!template || deleteConfirmation !== template.name) return;
+    setBusy(true); setMessage('');
+    try { await deleteTemplate(template.id, deleteConfirmation); navigateTo('/builder'); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible eliminar el formulario.'); setBusy(false); }
+  }
+
   return <AppShell title="Formulario"><main className="forms-detail">
     <a className="forms-back" href="/builder">← Todos los formularios</a>
     {template && <><header className="forms-detail-head"><div><h1>{template.name}</h1><p>{template.description || 'Sin descripción'}</p></div><span className={`forms-status ${statusClass(template)}`}>{publicationLabel(template)}</span></header>
@@ -191,6 +202,7 @@ function FormDetail({ templateId }: { templateId: string }) {
     {tab === 'configuracion' && <section className="forms-detail-panel"><h2>Propiedades del formulario</h2><div className="forms-properties"><label>Nombre del formulario<input value={formName} maxLength={180} onChange={(event) => setFormName(event.target.value)} /></label><label>Descripción<textarea rows={3} value={formDescription} onChange={(event) => setFormDescription(event.target.value)} /></label><button type="button" disabled={busy || !formName.trim()} onClick={() => void saveProperties()}>Guardar nombre y descripción</button></div><h2>Publicación y respuestas</h2><p>Publicar habilita la captura durante las fechas indicadas. Detener respuestas la pausa de inmediato; archivar conserva los datos y retira el formulario de los activos.</p><div className="forms-actions">{template.status === 'draft' && <button type="button" disabled={busy} onClick={() => void changeStatus('published')}>Publicar formulario</button>}{template.status === 'published' && <button type="button" disabled={busy} onClick={() => void changeStatus('paused')}>Detener respuestas</button>}{template.status === 'paused' && <button type="button" disabled={busy} onClick={() => void changeStatus('published')}>Reanudar respuestas</button>}{template.status !== 'archived' && <button type="button" className="forms-archive-button" disabled={busy} onClick={() => void changeStatus('archived')}>Archivar formulario</button>}{template.status === 'archived' && <button type="button" disabled={busy} onClick={() => void changeStatus('draft')}>Restaurar como borrador</button>}</div><div className="forms-schedule"><h3>Ventana de recepción</h3><p>Deja una fecha vacía si no quieres limitar ese extremo. Las fechas se interpretan en tu zona horaria.</p><div className="forms-schedule-fields"><label>Fecha y hora de inicio<input type="datetime-local" value={startsAt} onChange={(event) => setStartsAt(event.target.value)} /></label><label>Fecha y hora de finalización<input type="datetime-local" value={endsAt} onChange={(event) => setEndsAt(event.target.value)} /></label></div><button type="button" disabled={busy || template.status === 'archived'} onClick={() => void saveSchedule()}>Guardar fechas</button></div><div className="forms-public-links"><h3>Enlaces públicos</h3><p>{links.length} enlace(s) generados. Sólo admiten respuestas si el formulario está publicado y dentro de la ventana de fechas.</p><button type="button" disabled={busy || template.status !== 'published' || template.availability === 'closed'} onClick={() => void makeLink()}>Generar enlace público</button>{newPublicUrl && <label>Nuevo enlace — cópialo ahora<input readOnly value={newPublicUrl} onFocus={(event) => event.target.select()} /></label>}<a href={`/admin/public-links?template=${template.id}`}>Administrar enlaces y vencimientos</a></div></section>}
     {tab === 'configuracion' && <section className="forms-detail-panel"><ParticipantSourcePanel template={template} onUpdate={setTemplate} /></section>}
     {tab === 'configuracion' && <section className="forms-detail-panel"><FormLookupPanel templateId={template.id} /></section>}
+    {tab === 'configuracion' && canDelete && <section className="forms-detail-panel"><h2>Eliminar formulario</h2><p>Retira este formulario de los listados y bloquea nuevas capturas. Las respuestas históricas y la auditoría se conservan por trazabilidad. Esta acción no se puede deshacer desde la interfaz.</p>{!showDelete ? <button type="button" disabled={busy} onClick={() => setShowDelete(true)}>Eliminar formulario</button> : <div className="forms-properties"><label>Escribe el nombre exacto para confirmar: <strong>{template.name}</strong><input value={deleteConfirmation} onChange={(event) => setDeleteConfirmation(event.target.value)} /></label><div className="forms-actions"><button type="button" disabled={busy || deleteConfirmation !== template.name} onClick={() => void removeForm()}>Confirmar eliminación</button><button type="button" disabled={busy} onClick={() => { setShowDelete(false); setDeleteConfirmation(''); }}>Cancelar</button></div></div>}</section>}
     </>}
     {message && <p role="status" className="forms-feedback">{message}</p>}
   </main></AppShell>;

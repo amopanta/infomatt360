@@ -10,7 +10,7 @@ from app.services.assignment_service import assignment_service
 
 def require_template_access(db: Session, user_id: str, template_id: str) -> BuilderTemplate:
     template = db.query(BuilderTemplate).filter(BuilderTemplate.id == template_id).first()
-    if template is None:
+    if template is None or template.status == "deleted":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plantilla no encontrada")
     if not assignment_service.user_has_project_access(db, user_id, template.project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")

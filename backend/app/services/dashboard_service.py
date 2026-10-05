@@ -10,7 +10,7 @@ from app.schemas.dashboard import DashboardRecentRecord, DashboardSummary
 
 class DashboardService:
     def summary(self, db: Session, project_id: str) -> DashboardSummary:
-        templates_total = db.query(func.count(BuilderTemplate.id)).filter(BuilderTemplate.project_id == project_id).scalar() or 0
+        templates_total = db.query(func.count(BuilderTemplate.id)).filter(BuilderTemplate.project_id == project_id, BuilderTemplate.status != "deleted").scalar() or 0
         published_templates = db.query(func.count(BuilderTemplate.id)).filter(BuilderTemplate.project_id == project_id, BuilderTemplate.status == "published").scalar() or 0
         records_total = db.query(func.count(RuntimeRecord.id)).filter(RuntimeRecord.project_id == project_id).scalar() or 0
         users_total = db.query(func.count(func.distinct(UserProjectAssignment.user_id))).filter(UserProjectAssignment.project_id == project_id, UserProjectAssignment.status == "active").scalar() or 0

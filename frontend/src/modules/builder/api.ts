@@ -25,6 +25,13 @@ export async function duplicateTemplate(templateId: string): Promise<TemplateSum
   return response.json();
 }
 
+export async function deleteTemplate(templateId: string, name: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}/delete`, {
+    method: 'POST', headers: authHeaders(), body: JSON.stringify({ name }),
+  });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible eliminar el formulario.');
+}
+
 export type ParticipantSource = NonNullable<TemplateSummary['participant_source']>;
 
 export type FormAssignment = { id: string; template_id: string; participant_id: string; participant_name: string; responsible_user_id: string; responsible_name: string; status: string; created_at: string };

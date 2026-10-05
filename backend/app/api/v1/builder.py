@@ -1,13 +1,17 @@
+import json
+
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.api.builder_access import require_column_access, require_template_access, template_id_for_column
 from app.api.permissions import require_project_permission
-from app.core.permissions import BUILDER_WRITE
+from app.core.permissions import BUILDER_WRITE, IDENTITY_USERS_MANAGE
+from app.models.audit import AuditLog
 from app.db.session import get_db
 from app.models.identity import User
-from app.models.builder import BuilderComponent
+from app.models.builder import BuilderComponent, BuilderTemplate
 from app.schemas.builder import BuilderComponentCreate, BuilderComponentPropertiesUpdate, BuilderComponentRead, BuilderTemplateCreate, BuilderTemplatePropertiesUpdate, BuilderTemplateRead, BuilderTemplateScheduleUpdate, BuilderTemplateStatusUpdate, BuilderVersionCreate, BuilderVersionRead, ParticipantSourceUpdate
 from app.services.participant_source_service import eligible_participants
 from app.schemas.participants import ParticipantRead
@@ -16,6 +20,10 @@ from app.services.assignment_service import assignment_service
 from app.services.builder_service import builder_service
 
 router = APIRouter()
+
+
+class TemplateDeleteConfirmation(BaseModel):
+    name: str
 
 
 @router.post("/templates", response_model=BuilderTemplateRead)
@@ -39,6 +47,25 @@ def list_templates(project_id: str, db: Session = Depends(get_db), current_user:
 def get_template_detail(template_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> BuilderTemplateRead:
     require_template_access(db, current_user.id, template_id)
     return builder_service.get_template(db, template_id)
+
+
+@router.post("/templates/detail/{template_id}/delete")
+def delete_template(template_id: str, payload: TemplateDeleteConfirmation, db: Session = Depends(get_db),
+                    current_user: User = Depends(get_current_user)) -> dict[str, bool]:
+    template = require_template_access(db, current_user.id, template_id)
+    require_project_permission(db, current_user.id, template.project_id, IDENTITY_USERS_MANAGE)
+    if payload.name.strip() != template.name:
+        raise HTTPException(status_code=422, detail="Escribe el nombre exacto del formulario para confirmar")
+    before = {"name": template.name, "status": template.status}
+    template.status = "deleted"
+    from app.core.time import utc_now
+    template.updated_at = utc_now()
+    db.add(AuditLog(project_id=template.project_id, user_id=current_user.id, module="builder",
+                    action="delete_template", entity_type="builder_template", entity_id=template.id,
+                    before_json=json.dumps(before, ensure_ascii=False),
+                    after_json=json.dumps({"status": "deleted"})))
+    db.commit()
+    return {"deleted": True}
 
 
 @router.post("/templates/detail/{template_id}/duplicate", response_model=BuilderTemplateRead)

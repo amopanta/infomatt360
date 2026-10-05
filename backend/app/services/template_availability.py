@@ -6,6 +6,8 @@ from app.models.builder import BuilderTemplate
 
 def availability(template: BuilderTemplate) -> str:
     now = utc_now()
+    if template.status == "deleted":
+        return "deleted"
     if template.status == "archived":
         return "archived"
     if template.status == "paused":
@@ -25,6 +27,7 @@ def ensure_accepting(template: BuilderTemplate) -> None:
         "draft": "El formulario no esta publicado",
         "paused": "La recepcion de respuestas esta detenida",
         "archived": "El formulario esta archivado",
+        "deleted": "El formulario fue eliminado",
         "scheduled": "La fecha de inicio del formulario aun no ha llegado",
         "closed": "La fecha de finalizacion del formulario ya paso",
     }

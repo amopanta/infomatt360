@@ -19,8 +19,10 @@ from app.models.form_assignment import ParticipantFormAssignment
 from app.models.identity import User
 from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord
+from app.schemas.participants import ParticipantRead
 from app.services.assignment_service import assignment_service
 from app.services.form_assignment_service import upsert_assignment, visible_assignment
+from app.services.participant_service import _to_read as participant_to_read
 from app.services.participant_source_service import configured_source, eligible_participants
 
 router = APIRouter()
@@ -48,6 +50,10 @@ class OpenParticipantCreate(BaseModel):
     external_code: str | None = Field(default=None, max_length=120)
     department: str | None = Field(default=None, max_length=120)
     municipality: str | None = Field(default=None, max_length=120)
+
+
+class ParticipantPhoneUpdate(BaseModel):
+    phone: str = Field(min_length=7, max_length=25, pattern=r"^\+?[0-9 ()-]+$")
 
 
 def _template(db: Session, user: User, template_id: str) -> BuilderTemplate:
@@ -136,6 +142,43 @@ def start_assignment(template_id: str, participant_id: str, db: Session = Depend
         row.updated_at = utc_now()
         db.commit()
     return _read(db, row)
+
+
+@router.patch("/templates/{template_id}/{participant_id}/phone", response_model=ParticipantRead)
+def update_assigned_participant_phone(template_id: str, participant_id: str, payload: ParticipantPhoneUpdate,
+                                      db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> ParticipantRead:
+    template = _template(db, user, template_id)
+    require_any_project_permission(db, user.id, template.project_id, {RECORDS_WRITE})
+    row = visible_assignment(db, template, participant_id, user.id)
+    if row.responsible_user_id != user.id or row.status not in {"assigned", "in_progress"}:
+        raise HTTPException(status_code=403, detail="El participante no está disponible para esta captura")
+    if db.query(RuntimeRecord.id).filter(RuntimeRecord.template_id == template_id,
+        RuntimeRecord.participant_id == participant_id,
+        RuntimeRecord.status.notin_(["voided", "cancelled"])).first():
+        raise HTTPException(status_code=409, detail="La respuesta ya fue enviada; solicita una corrección autorizada")
+    participant = db.query(Participant).filter_by(id=participant_id, project_id=template.project_id).with_for_update().first()
+    if not participant or not participant_visible(db, user.id, participant):
+        raise HTTPException(status_code=404, detail="Participante no encontrado")
+    try:
+        metadata = json.loads(participant.metadata_json or "{}")
+    except ValueError:
+        metadata = {}
+    if not isinstance(metadata, dict):
+        metadata = {}
+    phone_keys = ("phone", "telefono", "teléfono", "celular", "mobile", "phone_number")
+    phone_key = next((key for key in phone_keys if key in metadata), "phone")
+    previous = str(metadata.get(phone_key) or "")
+    updated = payload.phone.strip()
+    if previous != updated:
+        metadata[phone_key] = updated
+        participant.metadata_json = json.dumps(metadata, ensure_ascii=False)
+        db.add(AuditLog(project_id=template.project_id, user_id=user.id, module="participants", action="update_phone_from_form",
+                        entity_type="participant", entity_id=participant.id,
+                        before_json=json.dumps({"phone": previous}, ensure_ascii=False),
+                        after_json=json.dumps({"phone": updated, "template_id": template.id}, ensure_ascii=False)))
+        db.commit()
+        db.refresh(participant)
+    return participant_to_read(participant)
 
 
 @router.post("/templates/{template_id}/participants", response_model=AssignmentRead)

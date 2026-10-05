@@ -4,6 +4,7 @@ import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
 import { createParticipantInForm, fetchCaptureParticipants, fetchRuntimeTemplate, saveRuntimeRecord, startFormAssignment } from './api';
 import type { EligibleParticipant } from './api';
 import { ParticipantSummaryTable } from './ParticipantSummaryTable';
+import { ParticipantPhoneCheck } from './ParticipantPhoneCheck';
 import { RuntimeRenderer, themeStyle } from './RuntimeRenderer';
 import { resolveFormValues, validateFormValues } from './formLogic';
 import { usePullData } from './pullData';
@@ -139,12 +140,37 @@ export function RuntimeApp() {
   return (
     <AppShell title="Vista de Formulario">
       <div className="runtime-themed" style={themeStyle(template.theme_json)}>
-        {!isPreview && <section className="runtime-participant-picker" aria-label="Identificar participante"><h2>Identificar participante</h2><p>Ingresa {keyField === 'document_id' ? 'el número de documento o cédula' : 'el código del participante'} para comenzar.</p><label>{keyField === 'document_id' ? 'Número de documento o cédula' : 'Código del participante'}<input type="text" autoComplete="off" value={participantKey} disabled={!participantsReady} onChange={(event) => { setParticipantKey(event.target.value); setShowNewParticipant(false); }} /></label>{!participantsReady && <small>Cargando participantes...</small>}{participantsReady && !participants.length && accessMode !== 'open' && <p role="alert">No hay participantes habilitados para este formulario. Solicita al administrador que los asigne.</p>}{participantsReady && participantKey.trim() && !matchingParticipants.length && <p role="alert">No se encontró un participante asignado a tu usuario con esa llave.</p>}{accessMode === 'open' && participantKey.trim() && !matchingParticipants.length && hasAnyCurrentProjectPermission(['participants.create', 'identity.users.manage']) && <><button type="button" onClick={() => setShowNewParticipant((value) => !value)}>Registrar participante nuevo</button>{showNewParticipant && <div className="runtime-new-participant"><label>Nombre completo<input value={newName} onChange={(event) => setNewName(event.target.value)} /></label><label>Departamento<input value={newDepartment} onChange={(event) => setNewDepartment(event.target.value)} /></label><label>Municipio<input value={newMunicipality} onChange={(event) => setNewMunicipality(event.target.value)} /></label><button type="button" disabled={creatingParticipant || !newName.trim()} onClick={() => void registerParticipant()}>{creatingParticipant ? 'Registrando...' : 'Guardar y continuar'}</button></div>}</>}{matchingParticipants.length > 1 && <p role="alert">Esta llave coincide con varias personas. Solicita al administrador corregir los documentos o códigos duplicados.</p>}{selectedParticipant && <ParticipantSummaryTable person={selectedParticipant} assignmentReady={assignmentReady || accessMode === 'legacy'} />}</section>}
-        {(isPreview || (selectedParticipant && assignmentReady)) && <RuntimeRenderer template={template} projectId={projectId} values={values} onValueChange={updateValue} />}
-        <div className="runtime-actions">
-          {!isPreview && selectedParticipant && assignmentReady && <button onClick={save}>Guardar respuesta</button>}
-          {status ? <p>{status}</p> : null}{pullError && <p role="alert">{pullError}</p>}
-        </div>
+        <RuntimeRenderer template={template} projectId={projectId} values={values} onValueChange={updateValue}
+          showQuestions={isPreview || Boolean(selectedParticipant && assignmentReady)}
+          participantSection={!isPreview && <section className="runtime-participant-picker" aria-label="Identificar participante">
+            <h2>Identificar participante</h2>
+            <p>Ingresa {keyField === 'document_id' ? 'el número de documento o cédula' : 'el código del participante'} para comenzar.</p>
+            <label>{keyField === 'document_id' ? 'Número de documento o cédula' : 'Código del participante'}
+              <input type="text" autoComplete="off" value={participantKey} disabled={!participantsReady}
+                onChange={(event) => { setParticipantKey(event.target.value); setShowNewParticipant(false); }} />
+            </label>
+            {!participantsReady && <small>Cargando participantes...</small>}
+            {participantsReady && !participants.length && accessMode !== 'open' && <p role="alert">No hay participantes habilitados para este formulario. Solicita al administrador que los asigne.</p>}
+            {participantsReady && participantKey.trim() && !matchingParticipants.length && <p role="alert">No se encontró un participante asignado a tu usuario con esa llave.</p>}
+            {accessMode === 'open' && participantKey.trim() && !matchingParticipants.length && hasAnyCurrentProjectPermission(['participants.create', 'identity.users.manage']) && <>
+              <button type="button" onClick={() => setShowNewParticipant((value) => !value)}>Registrar participante nuevo</button>
+              {showNewParticipant && <div className="runtime-new-participant">
+                <label>Nombre completo<input value={newName} onChange={(event) => setNewName(event.target.value)} /></label>
+                <label>Departamento<input value={newDepartment} onChange={(event) => setNewDepartment(event.target.value)} /></label>
+                <label>Municipio<input value={newMunicipality} onChange={(event) => setNewMunicipality(event.target.value)} /></label>
+                <button type="button" disabled={creatingParticipant || !newName.trim()} onClick={() => void registerParticipant()}>{creatingParticipant ? 'Registrando...' : 'Guardar y continuar'}</button>
+              </div>}
+            </>}
+            {matchingParticipants.length > 1 && <p role="alert">Esta llave coincide con varias personas. Solicita al administrador corregir los documentos o códigos duplicados.</p>}
+            {selectedParticipant && <ParticipantSummaryTable person={selectedParticipant} assignmentReady={assignmentReady || accessMode === 'legacy'} />}
+            {selectedParticipant && accessMode !== 'legacy' && <ParticipantPhoneCheck key={selectedParticipant.id}
+              person={selectedParticipant} templateId={templateId} assignmentReady={assignmentReady}
+              onUpdated={(updated) => setParticipants((current) => current.map((person) => person.id === updated.id ? updated : person))} />}
+          </section>}
+          footerContent={<div className="runtime-actions">
+            {!isPreview && selectedParticipant && assignmentReady && <button onClick={save}>Guardar respuesta</button>}
+            {status ? <p>{status}</p> : null}{pullError && <p role="alert">{pullError}</p>}
+          </div>} />
       </div>
     </AppShell>
   );

@@ -860,6 +860,8 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
           {!embedded && <a href="/records">Volver a formularios</a>}
           <div className="records-toolbar-actions">
             {templateStatus === 'published' && hasAnyCurrentProjectPermission(['records.write']) && <a className="forms-primary-link" href={`/runtime/${templateId}`}>+ Agregar registro</a>}
+            {templateStatus && templateStatus !== 'published' && <span role="status">Captura no disponible: el formulario está {templateStatus === 'paused' ? 'pausado' : templateStatus === 'archived' ? 'archivado' : 'sin publicar'}. Solicita al administrador que habilite la recepción.</span>}
+            {templateStatus === 'published' && !hasAnyCurrentProjectPermission(['records.write']) && <span role="status">Para agregar registros necesitas el permiso de captura en este proyecto. Solicítalo al administrador.</span>}
             <input type="search" placeholder="Buscar por campo, valor, estado o usuario" value={query} onChange={(event) => { setQuery(event.target.value); setOffset(0); }} />
             <label className="records-unlinked-filter">
               <input type="checkbox" checked={unlinkedOnly} onChange={(event) => { setUnlinkedOnly(event.target.checked); setOffset(0); }} />

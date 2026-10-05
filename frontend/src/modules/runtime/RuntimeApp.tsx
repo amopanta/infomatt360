@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
 import { createParticipantInForm, fetchCaptureParticipants, fetchRuntimeTemplate, saveRuntimeRecord, startFormAssignment } from './api';
-import type { EligibleParticipant } from './api';
+import type { CaptureAssignment, EligibleParticipant } from './api';
 import { ParticipantSummaryTable } from './ParticipantSummaryTable';
 import { ParticipantPhoneCheck } from './ParticipantPhoneCheck';
 import { RuntimeRenderer, themeStyle } from './RuntimeRenderer';
@@ -21,6 +21,7 @@ export function RuntimeApp() {
   const [template, setTemplate] = useState<RuntimeTemplate | null>(null);
   const [status, setStatus] = useState('Cargando formulario...');
   const [participants, setParticipants] = useState<EligibleParticipant[]>([]);
+  const [assignments, setAssignments] = useState<CaptureAssignment[]>([]);
   const [participantsReady, setParticipantsReady] = useState(false);
   const [participantKey, setParticipantKey] = useState('');
   const [keyField, setKeyField] = useState<'document_id' | 'external_code'>('external_code');
@@ -37,7 +38,9 @@ export function RuntimeApp() {
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const initialParticipantId = new URLSearchParams(window.location.search).get('participantId') || '';
   const matchingParticipants = participants.filter((person) => participantKey.trim() && (person[keyField] || '').trim().toLocaleLowerCase() === participantKey.trim().toLocaleLowerCase());
-  const selectedParticipant = matchingParticipants.length === 1 ? matchingParticipants[0] : null;
+  const matchingAssignments = assignments.filter((assignment) => participantKey.trim() && (assignment[keyField] || '').trim().toLocaleLowerCase() === participantKey.trim().toLocaleLowerCase());
+  const existingAssignment = matchingAssignments.length === 1 && (matchingAssignments[0].record_id || ['completed', 'closed'].includes(matchingAssignments[0].status)) ? matchingAssignments[0] : null;
+  const selectedParticipant = !existingAssignment && matchingParticipants.length === 1 ? matchingParticipants[0] : null;
   const participantId = selectedParticipant?.id || '';
   const { values, setValues, clearDraft } = useRuntimeDraft(`${templateId || 'sin-template'}${isPreview ? '-vista-previa' : ''}`);
   const { pulls, error: pullError, ready: pullsReady } = usePullData(template, values);
@@ -45,7 +48,7 @@ export function RuntimeApp() {
   useEffect(() => {
     if (!templateId || isPreview) return;
     fetchCaptureParticipants(templateId)
-      .then(({ participants: rows, keyField: field, accessMode: mode }) => { setParticipants(rows); setKeyField(field); setAccessMode(mode); setParticipantsReady(true); const preselected = rows.find((person) => person.id === initialParticipantId); if (preselected?.[field]) setParticipantKey(preselected[field]); })
+      .then(({ participants: rows, keyField: field, accessMode: mode, assignments: assigned }) => { setParticipants(rows); setAssignments(assigned); setKeyField(field); setAccessMode(mode); setParticipantsReady(true); const preselected = rows.find((person) => person.id === initialParticipantId); const existing = assigned.find((item) => item.participant_id === initialParticipantId); if (preselected?.[field] || existing?.[field]) setParticipantKey(preselected?.[field] || existing?.[field] || ''); })
       .catch((error: Error) => { setParticipantsReady(false); setStatus(error.message); });
   }, [templateId, isPreview]);
 
@@ -92,6 +95,7 @@ export function RuntimeApp() {
         department: newDepartment.trim(), municipality: newMunicipality.trim() });
       const refreshed = await fetchCaptureParticipants(templateId);
       setParticipants(refreshed.participants);
+      setAssignments(refreshed.assignments);
       setShowNewParticipant(false);
       setNewName(''); setNewMunicipality(''); setNewDepartment('');
       setStatus('Participante registrado y asignado a tu usuario.');
@@ -113,7 +117,8 @@ export function RuntimeApp() {
       const resolved = resolveFormValues(template, values, pulls);
       const invalid = validateFormValues(template, resolved);
       if (invalid) { setStatus(invalid); return; }
-      await saveRuntimeRecord({ projectId, templateId: template.template_id, participantId: participantId || null, values: resolved });
+      const saved = await saveRuntimeRecord({ projectId, templateId: template.template_id, participantId: participantId || null, values: resolved });
+      setAssignments((current) => current.map((assignment) => assignment.participant_id === participantId ? { ...assignment, status: 'completed', record_id: saved.id } : assignment));
       clearDraft();
       setParticipantKey('');
       setStatus('Respuesta guardada y asociada correctamente.');
@@ -147,12 +152,17 @@ export function RuntimeApp() {
             <p>Ingresa {keyField === 'document_id' ? 'el número de documento o cédula' : 'el código del participante'} para comenzar.</p>
             <label>{keyField === 'document_id' ? 'Número de documento o cédula' : 'Código del participante'}
               <input type="text" autoComplete="off" value={participantKey} disabled={!participantsReady}
-                onChange={(event) => { setParticipantKey(event.target.value); setShowNewParticipant(false); }} />
+                onChange={(event) => { setParticipantKey(event.target.value); setShowNewParticipant(false); setStatus('Borrador local activo.'); }} />
             </label>
             {!participantsReady && <small>Cargando participantes...</small>}
             {participantsReady && !participants.length && accessMode !== 'open' && <p role="alert">No hay participantes habilitados para este formulario. Solicita al administrador que los asigne.</p>}
-            {participantsReady && participantKey.trim() && !matchingParticipants.length && <p role="alert">No se encontró un participante asignado a tu usuario con esa llave.</p>}
-            {accessMode === 'open' && participantKey.trim() && !matchingParticipants.length && hasAnyCurrentProjectPermission(['participants.create', 'identity.users.manage']) && <>
+            {participantsReady && participantKey.trim() && !matchingParticipants.length && !matchingAssignments.length && <p role="alert">No se encontró un participante asignado a tu usuario con esa llave.</p>}
+            {existingAssignment && <div className="runtime-existing-activity" role="alert">
+              <strong>Este participante ya tiene un registro asociado a esta actividad.</strong>
+              <span>{existingAssignment.participant_name} · {existingAssignment.status === 'closed' ? 'Actividad aprobada y cerrada' : 'Respuesta ya enviada'}</span>
+              {existingAssignment.record_id && <a href={`/records/${templateId}?recordId=${existingAssignment.record_id}`}>Ver registro asociado</a>}
+            </div>}
+            {accessMode === 'open' && participantKey.trim() && !matchingParticipants.length && !matchingAssignments.length && hasAnyCurrentProjectPermission(['participants.create', 'identity.users.manage']) && <>
               <button type="button" onClick={() => setShowNewParticipant((value) => !value)}>Registrar participante nuevo</button>
               {showNewParticipant && <div className="runtime-new-participant">
                 <label>Nombre completo<input value={newName} onChange={(event) => setNewName(event.target.value)} /></label>
@@ -161,7 +171,7 @@ export function RuntimeApp() {
                 <button type="button" disabled={creatingParticipant || !newName.trim()} onClick={() => void registerParticipant()}>{creatingParticipant ? 'Registrando...' : 'Guardar y continuar'}</button>
               </div>}
             </>}
-            {matchingParticipants.length > 1 && <p role="alert">Esta llave coincide con varias personas. Solicita al administrador corregir los documentos o códigos duplicados.</p>}
+            {(matchingParticipants.length > 1 || matchingAssignments.length > 1) && <p role="alert">Esta llave coincide con varias personas. Solicita al administrador corregir los documentos o códigos duplicados.</p>}
             {selectedParticipant && <ParticipantSummaryTable person={selectedParticipant} assignmentReady={assignmentReady || accessMode === 'legacy'} />}
             {selectedParticipant && accessMode !== 'legacy' && <ParticipantPhoneCheck key={selectedParticipant.id}
               person={selectedParticipant} templateId={templateId} assignmentReady={assignmentReady}

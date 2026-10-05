@@ -98,14 +98,24 @@ export type EligibleParticipant = {
   metadata_json?: string | null;
 };
 
-export async function fetchCaptureParticipants(templateId: string): Promise<{ keyField: 'document_id' | 'external_code'; accessMode: 'legacy' | 'open' | 'closed'; participants: EligibleParticipant[] }> {
-  const [detailResponse, participantsResponse] = await Promise.all([
+export type CaptureAssignment = {
+  participant_id: string;
+  participant_name: string;
+  document_id: string | null;
+  external_code: string | null;
+  status: 'assigned' | 'in_progress' | 'completed' | 'closed';
+  record_id: string | null;
+};
+
+export async function fetchCaptureParticipants(templateId: string): Promise<{ keyField: 'document_id' | 'external_code'; accessMode: 'legacy' | 'open' | 'closed'; participants: EligibleParticipant[]; assignments: CaptureAssignment[] }> {
+  const [detailResponse, participantsResponse, assignmentsResponse] = await Promise.all([
     fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}`, { headers: authorizationHeader() }),
     fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}/eligible-participants`, { headers: authorizationHeader() }),
+    fetch(`${API_BASE_URL}/form-assignments/templates/${templateId}`, { headers: authorizationHeader() }),
   ]);
-  if (!detailResponse.ok || !participantsResponse.ok) throw new Error('No fue posible consultar los participantes asociados al formulario.');
+  if (!detailResponse.ok || !participantsResponse.ok || !assignmentsResponse.ok) throw new Error('No fue posible consultar los participantes asociados al formulario.');
   const detail = await detailResponse.json();
-  return { keyField: detail.participant_source?.participant_key_field === 'document_id' ? 'document_id' : 'external_code', accessMode: detail.participant_source?.access_mode || 'legacy', participants: await participantsResponse.json() };
+  return { keyField: detail.participant_source?.participant_key_field === 'document_id' ? 'document_id' : 'external_code', accessMode: detail.participant_source?.access_mode || 'legacy', participants: await participantsResponse.json(), assignments: await assignmentsResponse.json() };
 }
 
 export async function startFormAssignment(templateId: string, participantId: string): Promise<void> {
@@ -139,7 +149,7 @@ export async function saveRuntimeRecord(params: {
   participantId?: string | null;
   versionId?: string | null;
   values: RuntimeFormValues;
-}): Promise<unknown> {
+}): Promise<{ id: string }> {
   const payload = {
     project_id: params.projectId,
     template_id: params.templateId,

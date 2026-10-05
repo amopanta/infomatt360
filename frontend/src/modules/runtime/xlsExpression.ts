@@ -28,6 +28,7 @@ function tokenize(expression: string): Token[] {
 }
 
 function numeric(value: unknown): number { const result = Number(value); return Number.isFinite(result) ? result : 0; }
+function localToday(): string { const date = new Date(); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
 function compare(left: unknown, right: unknown): number {
   if (typeof left === 'number' || typeof right === 'number') return numeric(left) - numeric(right);
   return String(left ?? '').localeCompare(String(right ?? ''));
@@ -64,6 +65,8 @@ export function evaluateXlsExpression(expression: string, values: RuntimeFormVal
           case 'if': left = args[0] ? args[1] : args[2]; break;
           case 'true': left = true; break;
           case 'false': left = false; break;
+          case 'today': left = localToday(); break;
+          case 'now': left = new Date().toISOString(); break;
           case 'not': left = !Boolean(args[0]); break;
           case 'pulldata': left = pulls[JSON.stringify(args.map((value) => String(value ?? '')))] ?? ''; break;
           default: throw new Error(`Función XLSForm no compatible: ${token.value}`);

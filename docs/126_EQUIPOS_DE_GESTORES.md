@@ -11,7 +11,9 @@ Un **equipo de gestores** reúne usuarios responsables y participantes dentro de
 5. Pulsar **Validar archivo** para ver equipos nuevos, integrantes nuevos, integrantes ya vinculados y errores por fila. **Confirmar carga masiva** solo queda disponible si no hay errores. La importación es atómica y repetir el mismo archivo no crea duplicados.
 6. Para asignar un formulario, abrir **Formularios → Configuración → Asignaciones por responsable → Asignar varios participantes**. Seleccionar un gestor miembro del equipo, elegir el método **Equipo de gestores**, validar la vista previa y confirmar.
 
-La asignación masiva respeta la fuente del formulario, el territorio del gestor y los registros ya protegidos. Ser miembro de un equipo por sí solo no concede acceso a respuestas o formularios. La autorización sigue dependiendo de la asignación explícita `Formulario + Participante + Responsable` y de los permisos del usuario.
+En **Fuente de participantes** se puede elegir el origen **Equipo de gestores**. La población elegible será la de ese equipo. Después se selecciona el responsable y se confirma la asignación del equipo al formulario; así aparece en **Mis formularios** para ese usuario. La asignación masiva respeta la fuente del formulario, el territorio del gestor y los registros ya protegidos. Ser miembro de un equipo por sí solo no concede acceso a respuestas o formularios. La autorización sigue dependiendo de la asignación explícita `Formulario + Participante + Responsable` y de los permisos del usuario.
+
+La aplicación de escritorio usa el mismo sitio de producción. Para ver las asignaciones se debe elegir el proyecto correcto en el selector superior. Este muestra el número de participantes asignados en cada proyecto. **Mis formularios** vuelve a consultar al recuperar el foco y ofrece **Actualizar asignaciones**. El resumen inicial consulta conteos y cinco pendientes en vez de cargar todas las asignaciones; la consulta completa evita una búsqueda adicional por respuesta.
 
 ## API y datos
 

@@ -13,8 +13,22 @@ export type MyFormAssignment = {
   record_id: string | null;
 };
 
+export type MyFormSummary = { assignment_count: number; form_count: number; pending: Array<Pick<MyFormAssignment, 'template_id' | 'template_name' | 'participant_id' | 'participant_name' | 'document_id'>> };
+
+export async function fetchMyFormSummary(projectId: string): Promise<MyFormSummary> {
+  const response = await fetch(`${API_BASE_URL}/form-assignments/mine/${projectId}/summary`, { headers: authorizationHeader() });
+  if (!response.ok) throw new Error('No fue posible consultar el resumen de formularios asignados.');
+  return response.json();
+}
+
 export async function fetchMyFormAssignments(projectId: string): Promise<MyFormAssignment[]> {
   const response = await fetch(`${API_BASE_URL}/form-assignments/mine/${projectId}`, { headers: authorizationHeader() });
   if (!response.ok) throw new Error('No fue posible consultar tus formularios asignados.');
+  return response.json();
+}
+
+export async function fetchMyProjectAssignmentCounts(): Promise<Record<string, number>> {
+  const response = await fetch(`${API_BASE_URL}/form-assignments/projects/my-assignment-counts`, { headers: authorizationHeader() });
+  if (!response.ok) throw new Error('No fue posible consultar los formularios por proyecto.');
   return response.json();
 }

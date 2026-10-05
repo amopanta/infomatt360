@@ -61,6 +61,11 @@ export default defineConfig({
         // conexion, en vez de servir siempre datos viejos.
         runtimeCaching: [
           {
+            urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith('/api/v1/form-assignments/') || url.pathname.startsWith('/api/v1/dashboard/'),
+            handler: 'NetworkFirst',
+            options: { cacheName: 'infomatt360-live-assignments', cacheableResponse: { statuses: [200] } },
+          },
+          {
             urlPattern: ({ url }: { url: URL }) => url.pathname.startsWith('/api/'),
             handler: 'NetworkFirst',
             options: {

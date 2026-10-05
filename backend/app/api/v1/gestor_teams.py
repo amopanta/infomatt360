@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.api.permissions import require_any_project_permission
-from app.core.permissions import IDENTITY_USERS_MANAGE
+from app.core.permissions import BUILDER_WRITE, IDENTITY_USERS_MANAGE
 from app.db.session import get_db
 from app.models.audit import AuditLog
 from app.models.gestor_team import GestorTeam, GestorTeamParticipant, GestorTeamUser
@@ -57,6 +57,12 @@ def _manage(db: Session, actor: User, project_id: str) -> None:
     require_any_project_permission(db, actor.id, project_id, {IDENTITY_USERS_MANAGE})
 
 
+def _view(db: Session, actor: User, project_id: str) -> None:
+    if not assignment_service.user_has_project_access(db, actor.id, project_id):
+        raise HTTPException(status_code=403, detail="Sin acceso al proyecto")
+    require_any_project_permission(db, actor.id, project_id, {IDENTITY_USERS_MANAGE, BUILDER_WRITE})
+
+
 def _team(db: Session, actor: User, team_id: str) -> GestorTeam:
     team = db.get(GestorTeam, team_id)
     if not team:
@@ -80,7 +86,7 @@ def list_teams(project_id: str, db: Session = Depends(get_db), actor: User = Dep
 
 @router.get("/project/{project_id}/summaries")
 def team_summaries(project_id: str, db: Session = Depends(get_db), actor: User = Depends(get_current_user)) -> list[dict]:
-    _manage(db, actor, project_id)
+    _view(db, actor, project_id)
     rows = db.query(GestorTeam).filter_by(project_id=project_id).order_by(GestorTeam.name).all()
     user_counts = dict(db.query(GestorTeamUser.team_id, func.count()).join(GestorTeam, GestorTeam.id == GestorTeamUser.team_id).filter(
         GestorTeam.project_id == project_id).group_by(GestorTeamUser.team_id).all())

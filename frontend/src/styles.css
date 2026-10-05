@@ -204,6 +204,7 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .record-status.synced { color: var(--info); background: var(--info-soft); }
 .record-status.voided { color: var(--danger); background: var(--danger-soft); }
 .record-detail { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 12px; margin: 4px 0; }
+.record-participant-summary { display: flex; flex-wrap: wrap; gap: 8px; margin: 10px 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
 .record-detail div { min-width: 0; padding: 10px; border-radius: var(--radius-md); background: var(--surface-muted); }
 .record-detail dt { color: var(--text-muted); font-size: 12px; font-weight: 800; }
 .record-detail dd { margin: 5px 0 0; overflow-wrap: anywhere; }

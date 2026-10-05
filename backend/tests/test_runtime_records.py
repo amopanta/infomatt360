@@ -15,6 +15,7 @@ from app.main import app
 from app.models.assignment import UserProjectAssignment
 from app.models.builder import BuilderTemplate
 from app.models.identity import Role, User
+from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord
 from app.schemas.runtime_record import RuntimeRecordCreate, RuntimeValueCreate
 from app.services.runtime_record_service import runtime_record_service
@@ -222,6 +223,36 @@ def test_runtime_records_search_paginates_and_filters(runtime_context):
     assert exported.status_code == 200
     assert "Ana" in exported.content.decode("utf-8")
     assert "Beatriz" not in exported.content.decode("utf-8")
+
+
+def test_record_grid_detail_search_and_csv_include_linked_participant(runtime_context):
+    client, testing_session, _ = runtime_context
+    template_id = "template-linked-participant-grid"
+    with testing_session() as db:
+        db.add(BuilderTemplate(id=template_id, project_id="project-runtime", name="Participant Grid"))
+        db.add(Participant(id="grid-participant", project_id="project-runtime", full_name="María Pérez", document_id="DOC-391", external_code="P-039", metadata_json=json.dumps({"municipality": "Soacha"})))
+        db.commit()
+
+    linked = client.post("/api/v1/runtime/save", json={"project_id": "project-runtime", "template_id": template_id, "values": [{"field_name": "respuesta", "field_value_json": json.dumps("Sí")}]})
+    unlinked = client.post("/api/v1/runtime/save", json={"project_id": "project-runtime", "template_id": template_id, "values": [{"field_name": "respuesta", "field_value_json": json.dumps("No")}]})
+    assert linked.status_code == unlinked.status_code == 200
+    with testing_session() as db:
+        db.get(RuntimeRecord, linked.json()["id"]).participant_id = "grid-participant"
+        db.commit()
+
+    detail = client.get(f"/api/v1/runtime/record/{linked.json()['id']}").json()
+    assert (detail["participant_name"], detail["participant_document_id"], detail["participant_external_code"], detail["participant_municipality"]) == ("María Pérez", "DOC-391", "P-039", "Soacha")
+    for term in ["María Pérez", "DOC-391", "P-039"]:
+        page = client.get(f"/api/v1/runtime/template/{template_id}/records/search", params={"search": term}).json()
+        assert page["total"] == 1
+        assert page["items"][0]["id"] == linked.json()["id"]
+    sorted_page = client.get(f"/api/v1/runtime/template/{template_id}/records/search", params={"sort_by": "participant_name"}).json()
+    assert sorted_page["items"][0]["participant_name"] == "María Pérez"
+    assert next(item for item in sorted_page["items"] if item["id"] == unlinked.json()["id"])["participant_name"] is None
+    rows = list(csv.DictReader(StringIO(client.get(f"/api/v1/runtime/template/{template_id}/records/export.csv").content.decode("utf-8-sig"))))
+    linked_row = next(row for row in rows if row["record_id"] == linked.json()["id"])
+    assert (linked_row["participante_nombre"], linked_row["participante_documento"], linked_row["participante_codigo"], linked_row["participante_municipio"]) == ("María Pérez", "DOC-391", "P-039", "Soacha")
+    assert next(row for row in rows if row["record_id"] == unlinked.json()["id"])["participante_nombre"] == ""
 
 
 def test_runtime_record_flags_possible_duplicate_on_identical_resubmission(runtime_context):

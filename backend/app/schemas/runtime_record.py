@@ -170,6 +170,10 @@ class RuntimeRecordRead(BaseModel):
     parent_record_id: str | None = None
     parent_field_name: str | None = None
     participant_id: str | None = None
+    participant_name: str | None = None
+    participant_document_id: str | None = None
+    participant_external_code: str | None = None
+    participant_municipality: str | None = None
     duplicate_flag: str = "none"
     lock_version: int = 1
     created_at: datetime

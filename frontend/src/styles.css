@@ -1352,3 +1352,16 @@ svg.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor
 .runtime-geo-polygon {
   fill: rgba(0, 194, 255, 0.18);
 }
+.teams-page { padding: 24px; max-width: 1500px; margin: 0 auto; }
+.teams-page h1 { margin-top: 0; }
+.teams-card { background: #fff; border: 1px solid #d8e1eb; border-radius: 12px; padding: 20px; margin: 16px 0; }
+.teams-layout { display: grid; grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.teams-inline { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin: 12px 0; }
+.teams-inline input { flex: 1; min-width: 180px; }
+.teams-item { display: block; width: 100%; text-align: left; margin: 8px 0; }
+.teams-item.selected { outline: 2px solid #168f92; }
+.teams-item small, .teams-options small { display: block; color: #586b82; }
+.teams-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; margin: 10px 0; }
+.teams-options label { display: flex; align-items: start; gap: 8px; padding: 8px; border: 1px solid #e0e7ef; border-radius: 6px; }
+.teams-people { max-height: 350px; overflow-y: auto; }
+@media (max-width: 760px) { .teams-layout { grid-template-columns: 1fr; } }

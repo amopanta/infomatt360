@@ -19,6 +19,7 @@ from app.db.session import get_db
 from app.models.audit import AuditLog
 from app.models.builder import BuilderTemplate
 from app.models.form_assignment import ParticipantFormAssignment
+from app.models.gestor_team import GestorTeam, GestorTeamParticipant, GestorTeamUser
 from app.models.identity import User
 from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord
@@ -193,6 +194,7 @@ async def bulk_assign_participants(
     responsible_user_id: str = Form(...),
     mode: str = Form(...),
     group_name: str = Form(default=""),
+    team_id: str = Form(default=""),
     preview_only: bool = Form(default=True),
     upload: UploadFile | None = File(default=None),
     db: Session = Depends(get_db),
@@ -218,6 +220,14 @@ async def bulk_assign_participants(
                 metadata = {}
             if isinstance(metadata, dict) and str(metadata.get("group_name") or "").strip().casefold() == wanted:
                 selected.append(person)
+    elif mode == "team":
+        team = db.query(GestorTeam).filter_by(id=team_id, project_id=template.project_id).first()
+        if not team:
+            raise HTTPException(status_code=422, detail="Selecciona un equipo de gestores del proyecto")
+        if not db.query(GestorTeamUser.id).filter_by(team_id=team.id, user_id=responsible_user_id).first():
+            raise HTTPException(status_code=422, detail="El responsable debe pertenecer al equipo")
+        member_ids = {row[0] for row in db.query(GestorTeamParticipant.participant_id).filter_by(team_id=team.id).all()}
+        selected = [person for person in candidates if person.id in member_ids]
     elif mode == "excel":
         if upload is None:
             raise HTTPException(status_code=422, detail="Selecciona el archivo Excel")
@@ -241,7 +251,7 @@ async def bulk_assign_participants(
             else:
                 selected.append(matches[0])
     else:
-        raise HTTPException(status_code=422, detail="Elige grupo o Excel")
+        raise HTTPException(status_code=422, detail="Elige grupo de importación, equipo o Excel")
     if not selected:
         issues.append("No hay participantes para asignar")
     existing = {row.participant_id: row for row in db.query(ParticipantFormAssignment).filter(

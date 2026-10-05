@@ -59,6 +59,8 @@ _NUMERIC_MIN_RE = re.compile(r"\.\s*>=\s*(-?\d+(?:\.\d+)?)")
 _NUMERIC_MAX_RE = re.compile(r"\.\s*<=\s*(-?\d+(?:\.\d+)?)")
 _NUMERIC_MIN_STRICT_RE = re.compile(r"\.\s*>\s*(-?\d+(?:\.\d+)?)")
 _NUMERIC_MAX_STRICT_RE = re.compile(r"\.\s*<\s*(-?\d+(?:\.\d+)?)")
+_RUNTIME_RELEVANT_RE = re.compile(r"^(?:\$\{[\w.-]+\}\s*(?:>=|<=|>|<)\s*-?\d+(?:\.\d+)?|selected\(\s*\$\{[\w.-]+\}\s*,\s*(['\"])[^'\"]*\1\s*\))$")
+_RUNTIME_CONSTRAINT_RE = re.compile(r"^(?:\.\s*<=\s*(?:today\(\)|\$\{[\w.-]+\})|string-length\(\.\)\s*=\s*\d+)$")
 
 
 def _normalize_header(value: object) -> str:
@@ -116,7 +118,9 @@ def _parse_relevant_expression(expression: str) -> tuple[dict | None, str | None
         field, value = (match.group(1), match.group(2)) if match.group(1) else (match.group(3), match.group(4))
         return {"field": field, "operator": "not_equals", "value": value}, None
 
-    return None, f"expresion 'relevant' no reconocida, se preservo el texto pero no se activo como condicion: {expression!r}"
+    if _RUNTIME_RELEVANT_RE.fullmatch(expression):
+        return None, None  # La expresión original se ejecuta en Runtime.
+    return None, f"expresion 'relevant' no compatible con Runtime; se preservo el texto para corregirla: {expression!r}"
 
 
 def _parse_constraint_expression(expression: str) -> tuple[dict, str | None]:
@@ -142,8 +146,8 @@ def _parse_constraint_expression(expression: str) -> tuple[dict, str | None]:
 
     leftover = re.sub(r"\s+and\s+|\s+", " ", remaining).strip()
     warning = None
-    if not fields or leftover:
-        warning = f"expresion 'constraint' no se tradujo por completo a validaciones nativas, se preservo el texto original: {expression!r}"
+    if (not fields or leftover) and not (_RUNTIME_CONSTRAINT_RE.fullmatch(expression) or _RUNTIME_RELEVANT_RE.fullmatch(expression)):
+        warning = f"expresion 'constraint' no compatible con Runtime; se preservo el texto para corregirla: {expression!r}"
     return fields, warning
 
 
@@ -299,6 +303,8 @@ class XlsformImportService:
         return XlsformImportResult(template_id=template_id, imported_fields=imported_fields, warnings=warnings, replaced=is_replace)
 
     def _resolve_type(self, base_type: str, parts: list[str], choices_by_list: dict[str, list[dict[str, str]]]) -> tuple[str, dict | None, str | None]:
+        if base_type == "photo":
+            return "IMAGE", None, None
         if base_type in LIST_TYPES_WITH_EMBEDDED_LIST:
             list_name = parts[1] if len(parts) > 1 else ""
             options = choices_by_list.get(list_name, [])

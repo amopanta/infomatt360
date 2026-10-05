@@ -13,6 +13,16 @@ describe('XLSForm expressions', () => {
     expect(evaluateXlsExpression('municipio = ${municipio}', values, { municipio: 'Soacha' })).toBe(false);
   });
 
+  it('evaluates MEAL date and household rules', () => {
+    const values = { personas_hogar: 4, tipo_beneficio: ['5'] };
+    expect(evaluateXlsExpression("selected(${tipo_beneficio}, '5')", values)).toBe(true);
+    expect(evaluateXlsExpression('${personas_hogar} > 1', values)).toBe(true);
+    expect(evaluateXlsExpression('. <= ${personas_hogar}', values, {}, 3)).toBe(true);
+    expect(evaluateXlsExpression('string-length(.) = 10', values, {}, 3001234567)).toBe(true);
+    expect(evaluateXlsExpression('. <= today()', values, {}, '2099-01-01')).toBe(false);
+    expect(evaluateXlsExpression('. <= today()', values, {}, '2000-01-01')).toBe(true);
+  });
+
   it('applies defaults, calculations, relevance and constraint messages', () => {
     const template: RuntimeTemplate = { template_id: 'one', name: 'Prueba', status: 'draft', pages: [{ id: 'p', title: 'P', sections: [{ id: 's', title: 'S', rows: [{ id: 'r', columns: [{ id: 'c', desktop_width: 12, tablet_width: 12, mobile_width: 12, components: [
       { id: '1', type: 'TEXT', name: 'visita', label: 'Visita', config_json: JSON.stringify({ default: 'si' }) },

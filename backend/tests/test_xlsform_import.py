@@ -234,7 +234,7 @@ def test_xlsform_import_preserves_unrecognized_relevant_and_constraint_expressio
             content = _build_xlsform(
                 survey_headers=headers,
                 survey_rows=[
-                    ["text", "campo_complejo", "Campo", "", "", "${a} > 5 and ${b} < 10", "selected(${lista}, 'x')"],
+                    ["text", "campo_complejo", "Campo", "", "", "${a} > 5 and ${b} < 10", "coalesce(., 'x')"],
                 ],
                 choices_rows=[],
             )
@@ -256,8 +256,41 @@ def test_xlsform_import_preserves_unrecognized_relevant_and_constraint_expressio
                 config = json.loads(component.config_json)
                 # El texto original se preserva aunque no se haya podido traducir a una condicion/validacion nativa.
                 assert config["relevant_expression"] == "${a} > 5 and ${b} < 10"
-                assert config["constraint_expression"] == "selected(${lista}, 'x')"
+                assert config["constraint_expression"] == "coalesce(., 'x')"
                 assert "relevant" not in config
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_xlsform_import_preserves_meal_rules_and_photo_without_false_warnings():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "xlsform-builder@example.com", "Builder12345!")
+            content = _build_xlsform(
+                survey_headers=["type", "name", "label", "relevant", "constraint"],
+                survey_rows=[
+                    ["date", "fecha", "Fecha", "", ". <= today()"],
+                    ["integer", "telefono", "Teléfono", "", "string-length(.) = 10"],
+                    ["integer", "personas_hogar", "Personas", "", ". > 0"],
+                    ["integer", "menores_hogar", "Menores", "${personas_hogar} > 1", ". <= ${personas_hogar}"],
+                    ["select_multiple beneficios", "tipo_beneficio", "Beneficios", "", ""],
+                    ["text", "otro_beneficio", "Otro", "selected(${tipo_beneficio}, '5')", ""],
+                    ["photo", "foto_fachada", "Foto", "", ""],
+                ],
+                choices_rows=[["beneficios", "5", "Otro"]],
+            )
+            preview = client.post("/api/v1/xlsform/preview", headers=headers, data={"project_id": "xlsform-project"}, files={"upload": ("meal.xlsx", content)})
+            assert preview.status_code == 200, preview.text
+            assert preview.json()["warnings"] == []
+            imported = client.post("/api/v1/xlsform/import", headers=headers, data={"project_id": "xlsform-project"}, files={"upload": ("meal.xlsx", content)})
+            assert imported.status_code == 200, imported.text
+            assert imported.json()["warnings"] == []
+            with sessions() as db:
+                components = {row.name: row for row in db.query(BuilderComponent).filter(BuilderComponent.template_id == imported.json()["template_id"])}
+                assert components["foto_fachada"].component_type == "IMAGE"
+                assert json.loads(components["otro_beneficio"].config_json)["relevant_expression"] == "selected(${tipo_beneficio}, '5')"
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

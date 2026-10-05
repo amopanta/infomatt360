@@ -22,9 +22,9 @@ export function ParticipantSourcePanel({ template, onUpdate }: { template: Templ
   const [responsibles, setResponsibles] = useState<Array<{ id: string; full_name: string }>>([]);
   const [assignParticipantId, setAssignParticipantId] = useState('');
   const [assignResponsibleId, setAssignResponsibleId] = useState('');
-  const [bulkMode, setBulkMode] = useState<'group' | 'team' | 'excel'>('group');
+  const [bulkMode, setBulkMode] = useState<'group' | 'team' | 'excel'>(source.mode === 'team' ? 'team' : 'group');
   const [teams, setTeams] = useState<GestorTeamSummary[]>([]);
-  const [bulkTeamId, setBulkTeamId] = useState('');
+  const [bulkTeamId, setBulkTeamId] = useState(source.team_id || '');
   const [bulkGroup, setBulkGroup] = useState(source.group_name || '');
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const [bulkPreview, setBulkPreview] = useState<BulkAssignmentPreview | null>(null);
@@ -44,7 +44,8 @@ export function ParticipantSourcePanel({ template, onUpdate }: { template: Templ
       fetch(`${API_BASE_URL}/builder/templates/${template.project_id}`, { headers: authorizationHeader() }).then((response) => response.json()),
       fetch(`${API_BASE_URL}/participants/project/${template.project_id}`, { headers: authorizationHeader() }).then((response) => response.json()),
       fetch(`${API_BASE_URL}/form-lookups/templates/${template.id}`, { headers: authorizationHeader() }).then((response) => response.json()),
-    ]).then(([templates, participants, files]) => { setForms(templates); setPeople(participants); setLookups(files); }).catch(() => setMessage('No fue posible cargar formularios, participantes o grupos Pull.'));
+      fetchGestorTeamSummaries(template.project_id),
+    ]).then(([templates, participants, files, teamRows]) => { setForms(templates); setPeople(participants); setLookups(files); setTeams(teamRows); }).catch(() => setMessage('No fue posible cargar formularios, participantes o equipos.'));
   }, [template.project_id]);
 
   async function refreshAssignments() {
@@ -72,6 +73,7 @@ export function ParticipantSourcePanel({ template, onUpdate }: { template: Templ
       const updated = await setParticipantSource(template.id, source);
       onUpdate(updated);
       if (source.mode === 'group') setBulkGroup(source.group_name || '');
+      if (source.mode === 'team') { setBulkMode('team'); setBulkTeamId(source.team_id || ''); }
       if (canManageAssignments) await refreshAssignments();
       setMessage('Fuente guardada. Se aplicará a las nuevas respuestas.');
     } catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible guardar.'); }
@@ -110,10 +112,11 @@ export function ParticipantSourcePanel({ template, onUpdate }: { template: Templ
   return <div className="forms-public-links"><h3>Fuente de participantes</h3><p>Define quién puede responder. La regla se verifica al guardar cada respuesta.</p>
     <label>Acceso al formulario<select value={source.access_mode || 'legacy'} onChange={(event) => setSource({ ...source, access_mode: event.target.value as ParticipantSource['access_mode'] })}><option value="legacy">Modo anterior (sin asignaciones individuales)</option><option value="open">Abierto: admite participantes nuevos con permiso</option><option value="closed">Cerrado: solo población previamente asignada</option></select></label>
     <label>Origen<select value={source.mode} onChange={(event) => setSource({ ...source, mode: event.target.value as ParticipantSource['mode'] })}>
-      <option value="all">Todos los participantes</option><option value="list">Lista seleccionada</option><option value="group">Grupo de participantes</option><option value="filter">Municipio</option><option value="pull">Grupo Pull</option><option value="form">Formulario anterior completado</option>
+      <option value="all">Todos los participantes</option><option value="list">Lista seleccionada</option><option value="group">Grupo de participantes importados</option><option value="team">Equipo de gestores</option><option value="filter">Municipio</option><option value="pull">Grupo Pull</option><option value="form">Formulario anterior completado</option>
     </select></label>
     {source.mode === 'list' && <div className="forms-participant-chooser"><strong>Elige los participantes de este formulario</strong><p>Marca cada persona que podrá responder. En la captura se elegirá a cuál de ellas corresponde cada respuesta.</p>{activePeople.length ? <><label>Buscar por nombre, documento, código o grupo<input type="search" value={participantSearch} onChange={(event) => setParticipantSearch(event.target.value)} placeholder="Buscar participante" /></label><div className="forms-participant-chooser-actions"><span>{source.participant_ids.length} seleccionado(s) · {visiblePeople.length} visible(s)</span><button type="button" onClick={() => setVisibleSelection(true)} disabled={!visiblePeople.length}>Seleccionar visibles</button><button type="button" onClick={() => setVisibleSelection(false)} disabled={!visiblePeople.length}>Quitar visibles</button></div><div className="forms-participant-options" role="group" aria-label="Participantes permitidos">{visiblePeople.map((person) => <label key={person.id}><input type="checkbox" checked={source.participant_ids.includes(person.id)} onChange={(event) => setSource((current) => ({ ...current, participant_ids: event.target.checked ? [...current.participant_ids, person.id] : current.participant_ids.filter((id) => id !== person.id) }))} /><span><strong>{person.full_name}</strong><small>{[person.document_id, person.external_code, person.group_name].filter(Boolean).join(' · ') || 'Sin identificador adicional'}</small></span></label>)}{!visiblePeople.length && <p>No hay participantes que coincidan con la búsqueda.</p>}</div></> : <p>No hay participantes activos en este proyecto. <a href="/participants">Agregar participantes</a> y vuelve a esta configuración.</p>}</div>}
     {source.mode === 'group' && <label>Grupo<select value={source.group_name || ''} onChange={(event) => setSource({ ...source, group_name: event.target.value })}><option value="">Selecciona un grupo</option>{Array.from(new Set(people.map((person) => person.group_name).filter((name): name is string => Boolean(name)))).sort().map((name) => <option key={name} value={name}>{name}</option>)}</select></label>}
+    {source.mode === 'team' && <><label>Equipo de gestores<select value={source.team_id || ''} onChange={(event) => setSource({ ...source, team_id: event.target.value })}><option value="">Selecciona un equipo</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name} · {team.participant_count} participantes · {team.user_count} gestores</option>)}</select></label><p>Guardar el origen define la población elegible. Después elige el responsable y confirma la asignación masiva para que el formulario aparezca en su escritorio.</p></>}
     {source.mode === 'filter' && <label>Municipio<input value={source.municipality || ''} onChange={(event) => setSource({ ...source, municipality: event.target.value })} /></label>}
     {source.mode === 'form' && <><label>Formulario anterior<select value={source.previous_template_id || ''} onChange={(event) => setSource({ ...source, previous_template_id: event.target.value || null })}><option value="">Selecciona un formulario</option>{forms.filter((form) => form.id !== template.id).map((form) => <option key={form.id} value={form.id}>{form.name}</option>)}</select></label><label>Estado requerido<select value={source.required_status} onChange={(event) => setSource({ ...source, required_status: event.target.value })}><option value="submitted">Enviado</option><option value="completed">Completado</option><option value="approved">Aprobado</option></select></label></>}
     {source.mode === 'pull' && <><label>Grupo Pull<select value={source.pull_name || ''} onChange={(event) => setSource({ ...source, pull_name: event.target.value, pull_key_column: '' })}><option value="">Selecciona un CSV</option>{lookups.map((lookup) => <option key={lookup.name} value={lookup.name}>{lookup.name}.csv</option>)}</select></label><label>Columna de relación<select value={source.pull_key_column || ''} onChange={(event) => setSource({ ...source, pull_key_column: event.target.value })}><option value="">Selecciona una columna</option>{lookups.find((lookup) => lookup.name === source.pull_name)?.columns.map((column) => <option key={column} value={column}>{column}</option>)}</select></label></>}

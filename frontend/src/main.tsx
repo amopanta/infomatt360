@@ -22,7 +22,7 @@ import { WhatsAppApp } from './modules/admin/WhatsAppApp';
 import { AuditApp } from './modules/audit/AuditApp';
 import { AuthGate } from './modules/auth/AuthGate';
 import { applyFallbackBranding, loadOrganizationBranding } from './modules/branding/brandingLoader';
-import { hasAnyCurrentProjectPermission } from './modules/auth/session';
+import { hasAnyCurrentProjectPermission, PROJECT_KEY } from './modules/auth/session';
 import { BuilderApp } from './modules/builder/BuilderApp';
 import { FormsApp } from './modules/builder/FormsApp';
 import { MyFormsApp } from './modules/builder/MyFormsApp';
@@ -57,11 +57,11 @@ function PermissionGate({ permissions, children }: { permissions: string[]; chil
 }
 
 function AppRouter() {
-  const [pathname, setPathname] = useState(window.location.pathname);
+  const [navigation, setNavigation] = useState({ pathname: window.location.pathname, revision: 0 });
 
   useEffect(() => {
     function syncPath() {
-      setPathname(window.location.pathname);
+      setNavigation((current) => ({ pathname: window.location.pathname, revision: current.revision + 1 }));
     }
 
     function interceptInternalLinks(event: MouseEvent) {
@@ -86,7 +86,7 @@ function AppRouter() {
     };
   }, []);
 
-  return renderRoute(resolveAppRoute(pathname));
+  return <React.Fragment key={localStorage.getItem(PROJECT_KEY) || navigation.pathname}>{renderRoute(resolveAppRoute(navigation.pathname))}</React.Fragment>;
 }
 
 function renderRoute(route: AppRoute) {

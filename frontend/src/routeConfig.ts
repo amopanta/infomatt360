@@ -39,8 +39,7 @@ export type AppRoute = {
 export const APP_NAVIGATION_EVENT = 'infomatt360:navigate';
 
 export function navigateTo(pathname: string): void {
-  if (window.location.pathname === pathname) return;
-  window.history.pushState({}, '', pathname);
+  if (window.location.pathname !== pathname) window.history.pushState({}, '', pathname);
   window.dispatchEvent(new Event(APP_NAVIGATION_EVENT));
 }
 

@@ -4,6 +4,8 @@ import { OfflineSyncStatus } from './OfflineSyncStatus';
 import { clearStoredSession, currentProjectPermissions, currentSessionProjects, PROJECT_KEY, storeSelectedProjectPermissions } from '../modules/auth/session';
 import { logout } from '../modules/auth/api';
 import { navigateTo } from '../routeConfig';
+import { useEffect, useState } from 'react';
+import { fetchMyProjectAssignmentCounts } from '../modules/builder/myFormsApi';
 
 type MenuItem = {
   label: string;
@@ -90,6 +92,8 @@ export function AppShell({ title, children }: Props) {
   const selectedProjectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const permissions = currentProjectPermissions();
   const currentPath = window.location.pathname;
+  const [projectCounts, setProjectCounts] = useState<Record<string, number>>({});
+  useEffect(() => { if (projects.length > 1) void fetchMyProjectAssignmentCounts().then(setProjectCounts).catch(() => undefined); }, [selectedProjectId]);
 
   function canSee(item: MenuItem) {
     return !item.permissions || item.permissions.some((permission) => permissions.has(permission));
@@ -173,7 +177,7 @@ export function AppShell({ title, children }: Props) {
               <label>
                 Proyecto
                 <select value={selectedProjectId} onChange={(event) => changeProject(event.target.value)}>
-                  {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                  {projects.map((project) => <option key={project.id} value={project.id}>{project.name}{projectCounts[project.id] ? ` · ${projectCounts[project.id]} asignados` : ''}</option>)}
                 </select>
               </label>
             ) : projects[0] ? <span>{projects[0].name}</span> : null}

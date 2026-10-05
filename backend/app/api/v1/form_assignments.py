@@ -12,7 +12,7 @@ from sqlalchemy import func
 from openpyxl import load_workbook
 
 from app.api.deps import get_current_user
-from app.api.permissions import allowed_form_participant_ids, participant_visible, require_any_project_permission
+from app.api.permissions import _matches_territory, allowed_form_participant_ids, get_project_permissions, participant_visible, require_any_project_permission
 from app.core.permissions import IDENTITY_USERS_MANAGE, PARTICIPANTS_CREATE, RECORDS_WRITE
 from app.core.time import utc_now
 from app.db.session import get_db
@@ -23,6 +23,7 @@ from app.models.gestor_team import GestorTeam, GestorTeamParticipant, GestorTeam
 from app.models.identity import User
 from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord
+from app.models.case_management import UserTerritory
 from app.schemas.participants import ParticipantRead
 from app.services.assignment_service import assignment_service
 from app.services.form_assignment_service import upsert_assignment, visible_assignment
@@ -120,17 +121,76 @@ def my_form_assignments(project_id: str, db: Session = Depends(get_db), user: Us
         Participant.status == "active",
         BuilderTemplate.status == "published",
     ).order_by(BuilderTemplate.name, Participant.full_name).all()
+    _, permissions = get_project_permissions(db, user.id, project_id)
+    territories = [] if IDENTITY_USERS_MANAGE in permissions else db.query(UserTerritory).filter_by(project_id=project_id, user_id=user.id).all()
+    rows = [(assignment, template, participant) for assignment, template, participant in rows
+            if not territories or _matches_territory(participant, territories)]
+    record_by_pair: dict[tuple[str, str], str] = {}
+    if rows:
+        participant_ids = {participant.id for _, _, participant in rows}
+        template_ids = {template.id for _, template, _ in rows}
+        records = db.query(RuntimeRecord.template_id, RuntimeRecord.participant_id, RuntimeRecord.id).filter(
+            RuntimeRecord.project_id == project_id, RuntimeRecord.template_id.in_(template_ids),
+            RuntimeRecord.participant_id.in_(participant_ids),
+            RuntimeRecord.status.notin_(["voided", "cancelled"])).order_by(RuntimeRecord.created_at.desc()).all()
+        for template_id, participant_id, record_id in records:
+            record_by_pair.setdefault((template_id, participant_id), record_id)
     result: list[MyFormAssignmentRead] = []
     for assignment, template, participant in rows:
-        if not participant_visible(db, user.id, participant):
-            continue
         result.append(MyFormAssignmentRead(
             template_id=template.id, template_name=template.name, template_status=template.status,
             participant_id=participant.id, participant_name=participant.full_name,
             document_id=participant.document_id, assignment_status=assignment.status,
-            record_id=_read(db, assignment).record_id,
+            record_id=record_by_pair.get((template.id, participant.id)),
         ))
     return result
+
+
+@router.get("/mine/{project_id}/summary")
+def my_form_summary(project_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> dict:
+    if not assignment_service.user_has_project_access(db, user.id, project_id):
+        raise HTTPException(status_code=403, detail="Sin acceso al proyecto")
+    require_any_project_permission(db, user.id, project_id, {RECORDS_WRITE})
+    base = db.query(ParticipantFormAssignment, BuilderTemplate, Participant).join(
+        BuilderTemplate, BuilderTemplate.id == ParticipantFormAssignment.template_id).join(
+        Participant, Participant.id == ParticipantFormAssignment.participant_id).filter(
+        ParticipantFormAssignment.project_id == project_id,
+        ParticipantFormAssignment.responsible_user_id == user.id,
+        Participant.status == "active", BuilderTemplate.status == "published")
+    _, permissions = get_project_permissions(db, user.id, project_id)
+    territories = [] if IDENTITY_USERS_MANAGE in permissions else db.query(UserTerritory).filter_by(project_id=project_id, user_id=user.id).all()
+    if territories:
+        rows = [(assignment, template, participant) for assignment, template, participant in base.all()
+                if _matches_territory(participant, territories)]
+        total = len(rows)
+        form_count = len({template.id for _, template, _ in rows})
+        pending = [(assignment, template, participant) for assignment, template, participant in rows
+                   if assignment.status in {"assigned", "in_progress"}][:5]
+    else:
+        total = base.count()
+        form_count = db.query(func.count(func.distinct(ParticipantFormAssignment.template_id))).join(
+            BuilderTemplate, BuilderTemplate.id == ParticipantFormAssignment.template_id).join(
+            Participant, Participant.id == ParticipantFormAssignment.participant_id).filter(
+            ParticipantFormAssignment.project_id == project_id, ParticipantFormAssignment.responsible_user_id == user.id,
+            Participant.status == "active", BuilderTemplate.status == "published").scalar() or 0
+        pending = base.filter(ParticipantFormAssignment.status.in_(["assigned", "in_progress"])).order_by(
+            ParticipantFormAssignment.created_at.desc()).limit(5).all()
+    return {"assignment_count": total, "form_count": form_count,
+            "pending": [{"template_id": template.id, "template_name": template.name,
+                         "participant_id": participant.id, "participant_name": participant.full_name,
+                         "document_id": participant.document_id} for _, template, participant in pending]}
+
+
+@router.get("/projects/my-assignment-counts")
+def my_project_assignment_counts(db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> dict[str, int]:
+    rows = db.query(ParticipantFormAssignment.project_id, func.count(ParticipantFormAssignment.id)).join(
+        BuilderTemplate, BuilderTemplate.id == ParticipantFormAssignment.template_id).join(
+        Participant, Participant.id == ParticipantFormAssignment.participant_id).filter(
+        ParticipantFormAssignment.responsible_user_id == user.id,
+        Participant.status == "active", BuilderTemplate.status == "published").group_by(
+        ParticipantFormAssignment.project_id).all()
+    return {project_id: int(count) for project_id, count in rows
+            if assignment_service.user_has_project_access(db, user.id, project_id)}
 
 
 @router.get("/templates/{template_id}", response_model=list[AssignmentRead])

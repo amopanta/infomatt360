@@ -83,3 +83,36 @@ def test_mass_import_previews_multiple_teams_and_is_idempotent():
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
+
+
+def test_team_source_assignments_are_visible_to_desktop_project():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            admin = auth(client, "assign-admin@example.com", "Admin12345!")
+            owner = auth(client, "assign-owner@example.com", "Owner12345!")
+            team = client.post("/api/v1/gestor-teams/project/assign-project", headers=admin,
+                               json={"name": "Equipo de campo"}).json()
+            saved = client.put(f"/api/v1/gestor-teams/{team['id']}/members", headers=admin,
+                json={"user_ids": ["assign-owner"], "participant_ids": ["assign-p1"]})
+            assert saved.status_code == 200, saved.text
+            source = client.patch("/api/v1/builder/templates/detail/closed-form/participant-source", headers=admin,
+                json={"source": {"mode": "team", "team_id": team["id"], "access_mode": "closed",
+                                 "participant_key_field": "document_id"}})
+            assert source.status_code == 200, source.text
+            candidates = client.get("/api/v1/form-assignments/templates/closed-form/candidates", headers=admin)
+            assert [row["id"] for row in candidates.json()] == ["assign-p1"]
+            preview = client.post("/api/v1/form-assignments/templates/closed-form/bulk-assign", headers=admin,
+                data={"responsible_user_id": "assign-owner", "mode": "team", "team_id": team["id"], "preview_only": "true"})
+            assert preview.status_code == 200 and preview.json()["to_assign"] == 1, preview.text
+            applied = client.post("/api/v1/form-assignments/templates/closed-form/bulk-assign", headers=admin,
+                data={"responsible_user_id": "assign-owner", "mode": "team", "team_id": team["id"], "preview_only": "false"})
+            assert applied.status_code == 200 and applied.json()["applied"] == 1, applied.text
+            summary = client.get("/api/v1/form-assignments/mine/assign-project/summary", headers=owner)
+            assert summary.status_code == 200 and summary.json()["assignment_count"] == 1, summary.text
+            assert summary.json()["pending"][0]["participant_id"] == "assign-p1"
+            assert client.get("/api/v1/form-assignments/projects/my-assignment-counts", headers=owner).json() == {"assign-project": 1}
+            assert [row["participant_id"] for row in client.get("/api/v1/form-assignments/mine/assign-project", headers=owner).json()] == ["assign-p1"]
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)

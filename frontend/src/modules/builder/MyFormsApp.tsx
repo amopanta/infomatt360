@@ -8,18 +8,24 @@ export function MyFormsApp() {
   const [assignments, setAssignments] = useState<MyFormAssignment[]>([]);
   const [message, setMessage] = useState('Cargando tus formularios...');
 
-  useEffect(() => {
+  async function refresh() {
     if (!projectId) { setMessage('Selecciona un proyecto para ver tus formularios.'); return; }
-    fetchMyFormAssignments(projectId)
-      .then((rows) => { setAssignments(rows); setMessage(''); })
-      .catch((error: Error) => setMessage(error.message));
+    try { setAssignments(await fetchMyFormAssignments(projectId)); setMessage(''); }
+    catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible cargar tus formularios.'); }
+  }
+
+  useEffect(() => {
+    void refresh();
+    const onFocus = () => { void refresh(); };
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
   }, [projectId]);
 
   const forms = Array.from(new Set(assignments.map((item) => item.template_id)));
   return <AppShell title="Mis formularios"><main className="forms-home">
-    <header className="forms-home-head"><div><h1>Mis formularios asignados</h1><p>Participantes que puedes atender en este proyecto.</p></div></header>
+    <header className="forms-home-head"><div><h1>Mis formularios asignados</h1><p>Participantes que puedes atender en este proyecto.</p></div><button type="button" onClick={() => void refresh()}>Actualizar asignaciones</button></header>
     {message && <p role="status">{message}</p>}
-    {!message && !assignments.length && <p>No tienes formularios publicados con participantes asignados. Pide al administrador que te asigne participantes en la configuración del formulario.</p>}
+    {!message && !assignments.length && <p>No hay formularios publicados con participantes asignados en este proyecto. Revisa el selector <strong>Proyecto</strong> de arriba; allí se muestra cuántos participantes tienes asignados en cada proyecto.</p>}
     {forms.map((templateId) => {
       const rows = assignments.filter((item) => item.template_id === templateId);
       return <section className="forms-detail-panel" key={templateId}>

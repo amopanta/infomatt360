@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.builder import BuilderTemplate
 from app.models.form_assignment import ParticipantFormAssignment
+from app.models.gestor_team import GestorTeam, GestorTeamParticipant
 from app.models.participants import Participant
 from app.models.form_lookup import FormLookup
 from app.models.runtime_record import RuntimeRecord
@@ -36,6 +37,10 @@ def validate_source(db: Session, template: BuilderTemplate, source: ParticipantS
         previous = db.get(BuilderTemplate, source.previous_template_id)
         if previous is None or previous.project_id != template.project_id or previous.id == template.id:
             raise HTTPException(status_code=422, detail="Selecciona otro formulario del mismo proyecto")
+    if source.mode == "team":
+        team = db.query(GestorTeam.id).filter_by(id=source.team_id, project_id=template.project_id).first()
+        if not team:
+            raise HTTPException(status_code=422, detail="Selecciona un equipo de gestores del proyecto")
     if source.mode == "pull":
         lookup = db.query(FormLookup).filter(FormLookup.template_id == template.id, FormLookup.name == source.pull_name).first()
         if lookup is None or source.pull_key_column not in json.loads(lookup.columns_json):
@@ -60,6 +65,9 @@ def eligible_participants(db: Session, template: BuilderTemplate, user_id: str |
             if isinstance(metadata, dict) and str(metadata.get("group_name") or "").strip().casefold() == wanted:
                 result.append(item)
         selected = result
+    elif source.mode == "team":
+        allowed = {row[0] for row in db.query(GestorTeamParticipant.participant_id).filter_by(team_id=source.team_id).all()}
+        selected = [item for item in rows if item.id in allowed]
     elif source.mode == "filter":
         wanted = (source.municipality or "").strip().casefold()
         selected = [item for item in rows if participant_municipality(item) == wanted]

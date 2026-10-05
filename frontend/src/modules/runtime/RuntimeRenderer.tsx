@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { RuntimeField } from './RuntimeField';
 import { RuntimeSectionNavigator } from './RuntimeSectionNavigator';
 import { RuntimeStepper } from './RuntimeStepper';
@@ -10,6 +11,9 @@ type Props = {
   values: RuntimeFormValues;
   onValueChange: (fieldName: string, value: RuntimeFormValue) => void;
   uploadsDisabled?: boolean;
+  participantSection?: ReactNode;
+  showQuestions?: boolean;
+  footerContent?: ReactNode;
 };
 
 function widthStyle(column: { desktop_width: number; tablet_width: number; mobile_width: number }) {
@@ -34,7 +38,7 @@ export function themeStyle(themeJson?: string | null) {
   }
 }
 
-export function RuntimeRenderer({ template, projectId, values, onValueChange, uploadsDisabled }: Props) {
+export function RuntimeRenderer({ template, projectId, values, onValueChange, uploadsDisabled, participantSection, showQuestions = true, footerContent }: Props) {
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [activeSectionIndex, setActiveSectionIndex] = useState(0);
   const activePage = template.pages[activePageIndex];
@@ -44,13 +48,19 @@ export function RuntimeRenderer({ template, projectId, values, onValueChange, up
     setActiveSectionIndex(0);
   }, [activePageIndex]);
 
-  if (!activePage) {
-    return <main className="runtime-shell" style={themeStyle(template.theme_json)}><h1>{template.name}</h1><p>Sin paginas configuradas.</p></main>;
+  if (!activePage || !showQuestions) {
+    return <main className="runtime-shell" style={themeStyle(template.theme_json)}>
+      <h1>{template.name}</h1>
+      {participantSection}
+      {showQuestions && !activePage && <p>Sin paginas configuradas.</p>}
+      {footerContent}
+    </main>;
   }
 
   return (
     <main className="runtime-shell" style={themeStyle(template.theme_json)}>
       <h1>{template.name}</h1>
+      {participantSection}
       <RuntimeStepper pages={template.pages} activePageIndex={activePageIndex} onSelect={setActivePageIndex} />
       <section key={activePage.id} className="runtime-page">
         <h2>{activePage.title}</h2>
@@ -76,6 +86,7 @@ export function RuntimeRenderer({ template, projectId, values, onValueChange, up
         <button disabled={activePageIndex === 0} onClick={() => setActivePageIndex((current) => current - 1)}>Anterior</button>
         <button disabled={activePageIndex >= template.pages.length - 1} onClick={() => setActivePageIndex((current) => current + 1)}>Siguiente</button>
       </div>
+      {footerContent}
     </main>
   );
 }

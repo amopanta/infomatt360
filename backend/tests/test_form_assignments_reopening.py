@@ -1,5 +1,7 @@
 """End-to-end access, capture and controlled reopening for assigned forms."""
 
+import json
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -135,6 +137,34 @@ def test_open_form_new_participant_requires_permission_and_closed_form_rejects_i
             eligible = client.get("/api/v1/builder/templates/detail/open-form/eligible-participants", headers=owner).json()
             assert [(row["id"], row["municipality"]) for row in eligible] == [(participant_id, "Soacha")]
             assert client.get("/api/v1/builder/templates/detail/open-form/eligible-participants", headers=other).json() == []
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_assigned_responsible_can_correct_phone_before_submission_with_audit():
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            admin = auth(client, "assign-admin@example.com", "Admin12345!")
+            owner = auth(client, "assign-owner@example.com", "Owner12345!")
+            other = auth(client, "assign-other@example.com", "Other12345!")
+            assigned = client.post("/api/v1/form-assignments/templates/closed-form", headers=admin,
+                json={"participant_id": "assign-p1", "responsible_user_id": "assign-owner"})
+            assert assigned.status_code == 200, assigned.text
+            path = "/api/v1/form-assignments/templates/closed-form/assign-p1/phone"
+            assert client.patch(path, headers=other, json={"phone": "3001234567"}).status_code == 404
+            assert client.patch(path, headers=owner, json={"phone": "123"}).status_code == 422
+            changed = client.patch(path, headers=owner, json={"phone": "3001234567"})
+            assert changed.status_code == 200, changed.text
+            assert json.loads(changed.json()["metadata_json"])["phone"] == "3001234567"
+            with sessions() as db:
+                audit = db.query(AuditLog).filter_by(entity_id="assign-p1", action="update_phone_from_form").one()
+                assert json.loads(audit.after_json)["phone"] == "3001234567"
+            saved = client.post("/api/v1/runtime/save", headers=owner,
+                json={"project_id": "assign-project", "template_id": "closed-form", "participant_id": "assign-p1", "values": []})
+            assert saved.status_code == 200, saved.text
+            assert client.patch(path, headers=owner, json={"phone": "3007654321"}).status_code == 403
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

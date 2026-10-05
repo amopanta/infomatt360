@@ -113,6 +113,14 @@ export async function startFormAssignment(templateId: string, participantId: str
   if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible iniciar la actividad.');
 }
 
+export async function updateAssignedParticipantPhone(templateId: string, participantId: string, phone: string): Promise<EligibleParticipant> {
+  const response = await fetch(`${API_BASE_URL}/form-assignments/templates/${templateId}/${participantId}/phone`, {
+    method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ phone }),
+  });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible actualizar el teléfono.');
+  return response.json();
+}
+
 export async function createParticipantInForm(templateId: string, payload: { full_name: string; document_id?: string; external_code?: string; department?: string; municipality?: string }): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/form-assignments/templates/${templateId}/participants`, { method: 'POST', headers: authHeaders(), body: JSON.stringify(payload) });
   if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible crear el participante.');

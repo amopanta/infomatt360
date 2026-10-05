@@ -7,6 +7,15 @@ const metadataLabels: Record<string, string> = {
   municipality: 'Municipio', municipio: 'Municipio',
   group_name: 'Grupo',
 };
+const phoneKeys = ['phone', 'telefono', 'teléfono', 'celular', 'mobile', 'phone_number'];
+
+export function participantPhone(person: EligibleParticipant): string {
+  try {
+    const metadata = JSON.parse(person.metadata_json || '{}');
+    if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return '';
+    return String(phoneKeys.map((key) => metadata[key]).find((value) => value !== null && value !== undefined && value !== '') || '');
+  } catch { return ''; }
+}
 
 function displayValue(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -19,7 +28,7 @@ function metadataColumns(person: EligibleParticipant): ParticipantColumn[] {
   let metadata: unknown;
   try { metadata = JSON.parse(person.metadata_json || '{}'); } catch { return []; }
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return [];
-  const ignored = new Set(['department', 'departamento', 'municipality', 'municipio', 'group_name']);
+  const ignored = new Set(['department', 'departamento', 'municipality', 'municipio', 'group_name', ...phoneKeys]);
   return Object.entries(metadata).filter(([key]) => !ignored.has(key)).map(([key, value]) => ({
     label: metadataLabels[key] || key.replace(/_/g, ' ').replace(/^./, (letter) => letter.toUpperCase()),
     value: displayValue(value),
@@ -31,6 +40,7 @@ export function ParticipantSummaryTable({ person, assignmentReady }: { person: E
     { label: 'Nombre completo', value: displayValue(person.full_name) },
     { label: 'Documento', value: displayValue(person.document_id) },
     { label: 'Código', value: displayValue(person.external_code) },
+    { label: 'Teléfono', value: displayValue(participantPhone(person)) },
     { label: 'Grupo', value: displayValue(person.group_name) },
     { label: 'Departamento', value: displayValue(person.department) },
     { label: 'Municipio', value: displayValue(person.municipality) },

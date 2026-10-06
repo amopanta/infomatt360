@@ -6,13 +6,25 @@ from app.api.permissions import require_project_permission
 from app.core.permissions import STORAGE_MANAGE
 from app.db.session import get_db
 from app.models.identity import User
-from app.schemas.storage import S3StorageProfileConnect, StorageDefaultSelection, StorageProfileCreate, StorageProfileRead
+from app.schemas.storage import GoogleDriveClientConfig, S3StorageProfileConnect, StorageDefaultSelection, StorageProfileCreate, StorageProfileRead
 from app.services.assignment_service import assignment_service
 from app.services.gdrive_storage_service import gdrive_storage_service
 from app.services.s3_storage_service import s3_storage_service
 from app.services.storage_service import storage_service
 
 router = APIRouter()
+
+
+@router.get("/gdrive/status", summary="Estado de configuración de Google Drive")
+def gdrive_status(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict[str, bool]:
+    require_project_permission(db, current_user.id, project_id, STORAGE_MANAGE)
+    return {"configured": gdrive_storage_service.is_configured(db, project_id)}
+
+
+@router.post("/gdrive/configure", response_model=StorageProfileRead, summary="Configurar cliente OAuth de Google Drive")
+def configure_gdrive(payload: GoogleDriveClientConfig, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> StorageProfileRead:
+    require_project_permission(db, current_user.id, payload.project_id, STORAGE_MANAGE)
+    return gdrive_storage_service.configure_client(db, payload.project_id, payload.client_id, payload.client_secret, payload.redirect_uri)
 
 
 @router.post("/project/{project_id}/default", response_model=StorageProfileRead, summary="Elegir el destino de nuevas evidencias")
@@ -24,13 +36,13 @@ def set_default_storage(project_id: str, payload: StorageDefaultSelection, db: S
 @router.get("/oauth/gdrive/authorize", summary="Iniciar autorizacion de Google Drive para un proyecto")
 def authorize_gdrive(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict[str, str]:
     require_project_permission(db, current_user.id, project_id, STORAGE_MANAGE)
-    return {"authorization_url": gdrive_storage_service.build_authorization_url(project_id)}
+    return {"authorization_url": gdrive_storage_service.build_authorization_url(db, project_id)}
 
 
 @router.get("/oauth/gdrive/callback", response_model=StorageProfileRead, summary="Callback de OAuth de Google Drive")
 def gdrive_oauth_callback(code: str, state: str, db: Session = Depends(get_db)) -> StorageProfileRead:
     project_id = gdrive_storage_service.verify_state(state)
-    tokens = gdrive_storage_service.exchange_code_for_tokens(code)
+    tokens = gdrive_storage_service.exchange_code_for_tokens(db, project_id, code)
     return gdrive_storage_service.connect_profile(db, project_id, tokens)
 
 

@@ -36,6 +36,7 @@ async function initQueue(dbPath) {
       id TEXT PRIMARY KEY,
       project_id TEXT NOT NULL,
       template_id TEXT NOT NULL,
+      participant_id TEXT,
       payload_json TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending',
       created_at TEXT NOT NULL,
@@ -43,6 +44,9 @@ async function initQueue(dbPath) {
       error TEXT
     )
   `);
+  if (!runQuery(db, "PRAGMA table_info(queued_records)").some((column) => column.name === "participant_id")) {
+    db.run("ALTER TABLE queued_records ADD COLUMN participant_id TEXT");
+  }
   // Ver auditoria tecnica de julio 2026, hallazgo SYNC-004: listPending ya
   // filtraba con WHERE en SQL (no un full scan en JS como IndexedDB), pero
   // sin indice sigue siendo un recorrido completo de la tabla a partir de
@@ -56,7 +60,9 @@ async function initQueue(dbPath) {
 
 function persist(queue) {
   if (queue.dbPath === ":memory:") return;
-  fs.writeFileSync(queue.dbPath, Buffer.from(queue.db.export()));
+  const nextPath = `${queue.dbPath}.tmp`;
+  fs.writeFileSync(nextPath, Buffer.from(queue.db.export()));
+  fs.renameSync(nextPath, queue.dbPath);
 }
 
 function close(queue) {
@@ -78,11 +84,11 @@ function runQuery(db, sql, params = []) {
  * el mismo formato que espera `RuntimeRecordCreate` en el backend, para que
  * `syncPending` pueda reenviarlo tal cual sin transformarlo de nuevo.
  */
-function enqueue(queue, { projectId, templateId, values }) {
+function enqueue(queue, { projectId, templateId, participantId = null, values }) {
   const id = crypto.randomUUID();
   queue.db.run(
-    "INSERT INTO queued_records (id, project_id, template_id, payload_json, created_at) VALUES (?, ?, ?, ?, ?)",
-    [id, projectId, templateId, JSON.stringify(values), new Date().toISOString()]
+    "INSERT INTO queued_records (id, project_id, template_id, participant_id, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+    [id, projectId, templateId, participantId, JSON.stringify(values), new Date().toISOString()]
   );
   persist(queue);
   return id;
@@ -174,6 +180,7 @@ async function syncPending(queue, { apiBaseUrl, accessToken, fetchImpl = fetch }
           records: group.map((row) => ({
             project_id: row.project_id,
             template_id: row.template_id,
+            participant_id: row.participant_id || null,
             status: "submitted",
             values: JSON.parse(row.payload_json),
           })),
@@ -186,14 +193,18 @@ async function syncPending(queue, { apiBaseUrl, accessToken, fetchImpl = fetch }
         continue;
       }
       const data = await response.json();
+      if (!Array.isArray(data.results)) throw new Error("Respuesta de sincronización incompleta");
+      const byIndex = new Map();
       for (const item of data.results) {
-        const row = group[item.index];
-        if (!row) continue;
-        if (item.status === "created") {
+        if (Number.isInteger(item.index) && item.index >= 0 && item.index < group.length && !byIndex.has(item.index)) byIndex.set(item.index, item);
+      }
+      for (const [index, row] of group.entries()) {
+        const item = byIndex.get(index);
+        if (item?.status === "created") {
           markSynced(queue, row.id);
           result.synced += 1;
         } else {
-          markFailed(queue, row.id, item.error || "Error desconocido al sincronizar");
+          markFailed(queue, row.id, item?.error || "El servidor no confirmó este registro");
           result.failed += 1;
         }
       }

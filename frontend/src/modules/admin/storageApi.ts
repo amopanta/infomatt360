@@ -9,6 +9,7 @@ export type StorageProfile = {
   max_file_size_mb: number;
   is_default: boolean;
   status: string;
+  connected?: boolean | null;
 };
 
 export type S3ConnectPayload = {
@@ -64,6 +65,22 @@ export async function connectS3Storage(payload: S3ConnectPayload): Promise<Stora
 export async function authorizeGoogleDrive(projectId: string): Promise<{ authorization_url: string }> {
   const response = await fetch(`${API_BASE_URL}/storage/oauth/gdrive/authorize?project_id=${encodeURIComponent(projectId)}`, { headers: headers() });
   return parseOrThrow(response, 'No fue posible iniciar la autorizacion de Google Drive.');
+}
+
+export function googleDriveCallbackUrl(): string {
+  return new URL(`${API_BASE_URL}/storage/oauth/gdrive/callback`, window.location.origin).href;
+}
+
+export async function fetchGoogleDriveStatus(projectId: string): Promise<{ configured: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/storage/gdrive/status?project_id=${encodeURIComponent(projectId)}`, { headers: headers() });
+  return parseOrThrow(response, 'No fue posible comprobar la configuración de Google Drive.');
+}
+
+export async function configureGoogleDrive(projectId: string, clientId: string, clientSecret: string, redirectUri: string): Promise<StorageProfile> {
+  const response = await fetch(`${API_BASE_URL}/storage/gdrive/configure`, {
+    method: 'POST', headers: headers(), body: JSON.stringify({ project_id: projectId, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri }),
+  });
+  return parseOrThrow(response, 'No fue posible guardar el cliente OAuth de Google Drive.');
 }
 
 export async function selectDefaultStorage(projectId: string, profileId: string): Promise<StorageProfile> {

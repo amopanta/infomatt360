@@ -32,6 +32,14 @@ La experiencia buscada es conectar, detectar y capturar sin configuraciones manu
 3. Integrar y probar el SDK del lector seleccionado; comparar un registro creado con cámara y otro con lector solo si el motor demuestra interoperabilidad.
 4. Comprobar permisos de capturador, aprobador y administrador; recuperación de cuenta; bloqueo de registros aprobados; y exportaciones sin exposición de datos biométricos por defecto.
 
+## Resultado de la revisión de integración
+
+La carga genérica de archivos existente no es una ruta adecuada para la nueva huella del participante: admite `FINGERPRINT` como tipo de archivo, pero el formulario usa ese nombre para verificar al gestor mediante WebAuthn. Además, la carga genérica permite crear archivos sin registro y el servicio de almacenamiento local escribe los bytes sin cifrado de aplicación. Antes de activar captura del participante se necesita una ruta dedicada que exija `template_id`, `component_id`, `participant_id`, consentimiento y asignación del responsable; cifre los bytes; asocie el archivo al registro; y limite lectura, exportación y descarga por permisos biométricos específicos.
+
+La aplicación de escritorio usa Electron y ya tiene un puente IPC para cola local e impresión. El nuevo punto de extensión para lectores debe vivir allí: `detectar()`, `capturar()`, `evaluar_calidad()` y `comparar()`. Cada adaptador recibe la versión del protocolo interno, devuelve identificador de fabricante/modelo y nunca ejecuta comandos enviados por el formulario. El mismo contrato lógico sirve en móvil mediante un módulo nativo; WebUSB/WebHID/Bluetooth solo se usan si el modelo y el navegador están probados. El contrato no constituye un controlador funcional: requiere SDK oficial, permisos y prueba física.
+
+El flujo de cámara debe utilizar un campo distinto de `FINGERPRINT`, con estado «evidencia visual» hasta que un motor de captura sin contacto valide calidad y comparación. No se debe marcar al participante como «verificado» por una fotografía ordinaria.
+
 ## Dependencia pendiente
 
 Seleccionar y probar los primeros lectores para poblar el catálogo de compatibilidad (marca, modelo, conexión USB/Bluetooth y sistemas operativos). Confirmar también los modelos de teléfono para seleccionar y validar el motor de captura sin contacto. Se pueden añadir adaptadores de otros fabricantes sin cambiar el formulario ni los registros existentes.

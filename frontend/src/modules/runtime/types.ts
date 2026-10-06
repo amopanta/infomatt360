@@ -63,6 +63,11 @@ export type RuntimeFileValue = {
   mime_type?: string | null;
   size_bytes: number;
 };
-export type RuntimeFormValue = RuntimeScalarValue | string[] | RepeatItem[] | RuntimeFileValue | RuntimeFileValue[] | RuntimeGeoValue;
+export type RuntimeDeviceVerificationValue = {
+  device_verification_id: string;
+  method: 'device_user_verification';
+  verified_at: string;
+};
+export type RuntimeFormValue = RuntimeScalarValue | string[] | RepeatItem[] | RuntimeFileValue | RuntimeFileValue[] | RuntimeDeviceVerificationValue | RuntimeGeoValue;
 export type RuntimeFormValues = Record<string, RuntimeFormValue>;
 import type { RuntimeGeoValue } from './geoEngine';

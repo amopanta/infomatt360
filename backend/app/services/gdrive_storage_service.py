@@ -12,7 +12,9 @@ backend livianas. Los tokens OAuth se guardan cifrados (Fernet) en
 import hashlib
 import hmac
 import json
+import secrets
 import time
+from urllib.parse import quote
 from urllib.parse import urlencode
 
 import httpx
@@ -28,6 +30,8 @@ from app.services.storage_service import to_read
 AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 TOKEN_URL = "https://oauth2.googleapis.com/token"
 UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart"
+RESUMABLE_URL = "https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable"
+DOWNLOAD_URL = "https://www.googleapis.com/drive/v3/files"
 DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file"
 TOKEN_EXPIRY_SAFETY_MARGIN_SECONDS = 60
 
@@ -93,6 +97,10 @@ class GoogleDriveStorageService:
         if profile is None:
             profile = StorageProfile(project_id=project_id, name="Google Drive", provider="gdrive")
             db.add(profile)
+        elif profile.oauth_tokens_encrypted and not tokens.get("refresh_token"):
+            previous = json.loads(decrypt_text(profile.oauth_tokens_encrypted))
+            if previous.get("refresh_token"):
+                tokens = {**tokens, "refresh_token": previous["refresh_token"]}
         profile.oauth_tokens_encrypted = encrypt_text(json.dumps(self._tokens_with_expiry(tokens)))
         profile.status = "active"
         db.commit()
@@ -102,20 +110,36 @@ class GoogleDriveStorageService:
     def upload_file(self, db: Session, profile: StorageProfile, filename: str, content: bytes, mime_type: str) -> dict[str, object]:
         self._require_configured()
         tokens = self._valid_access_tokens(db, profile)
-        metadata = json.dumps({"name": filename})
-        files = {
-            "metadata": (None, metadata, "application/json; charset=UTF-8"),
-            "file": (filename, content, mime_type or "application/octet-stream"),
-        }
-        response = httpx.post(
-            UPLOAD_URL,
-            headers={"Authorization": f"Bearer {tokens['access_token']}"},
-            files=files,
-            timeout=60,
-        )
+        media_type = mime_type or "application/octet-stream"
+        metadata = json.dumps({"name": filename}, ensure_ascii=False).encode("utf-8")
+        authorization = {"Authorization": f"Bearer {tokens['access_token']}"}
+        if len(content) <= 5 * 1024 * 1024:
+            boundary = f"infomatt360-{secrets.token_hex(12)}"
+            body = (f"--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n".encode()
+                    + metadata + f"\r\n--{boundary}\r\nContent-Type: {media_type}\r\n\r\n".encode()
+                    + content + f"\r\n--{boundary}--\r\n".encode())
+            response = httpx.post(UPLOAD_URL, headers={**authorization, "Content-Type": f"multipart/related; boundary={boundary}"}, content=body, timeout=60)
+        else:
+            initiation = httpx.post(RESUMABLE_URL, headers={**authorization, "Content-Type": "application/json; charset=UTF-8", "X-Upload-Content-Type": media_type, "X-Upload-Content-Length": str(len(content))}, content=metadata, timeout=30)
+            upload_url = initiation.headers.get("Location", "") if initiation.status_code == 200 else ""
+            if not upload_url.startswith("https://www.googleapis.com/"):
+                raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="No fue posible iniciar la subida a Google Drive")
+            response = httpx.put(upload_url, headers={**authorization, "Content-Type": media_type, "Content-Length": str(len(content))}, content=content, timeout=120)
         if response.status_code not in (200, 201):
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="No fue posible subir el archivo a Google Drive")
-        return response.json()
+        result = response.json()
+        if not isinstance(result.get("id"), str) or not result["id"]:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Google Drive no devolvió el identificador del archivo")
+        return result
+
+    def get_file(self, db: Session, profile: StorageProfile, file_id: str) -> bytes:
+        if not file_id or "/" in file_id:
+            raise HTTPException(status_code=404, detail="Archivo de Drive no encontrado")
+        tokens = self._valid_access_tokens(db, profile)
+        response = httpx.get(f"{DOWNLOAD_URL}/{quote(file_id, safe='')}", params={"alt": "media"}, headers={"Authorization": f"Bearer {tokens['access_token']}"}, timeout=60)
+        if response.status_code != 200:
+            raise HTTPException(status_code=502, detail="No fue posible descargar el archivo desde Google Drive")
+        return response.content
 
     def _tokens_with_expiry(self, tokens: dict[str, object]) -> dict[str, object]:
         expires_in = tokens.get("expires_in", 3600)
@@ -151,3 +175,4 @@ class GoogleDriveStorageService:
 
 
 gdrive_storage_service = GoogleDriveStorageService()
+

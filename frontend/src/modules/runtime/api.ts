@@ -6,7 +6,7 @@
  */
 
 import { authorizationHeader, jsonAuthHeaders } from '../auth/session';
-import type { RuntimeFileValue, RuntimeFormValues, RuntimeTemplate } from './types';
+import type { RuntimeDeviceVerificationValue, RuntimeFileValue, RuntimeFormValues, RuntimeTemplate } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
 
@@ -70,6 +70,28 @@ export async function uploadRuntimeFile(projectId: string, assetType: string, fi
   if (!response.ok) throw new Error('No fue posible cargar la evidencia.');
   const asset = await response.json();
   return { file_asset_id: asset.id, name: asset.original_name, mime_type: asset.mime_type, size_bytes: asset.size_bytes };
+}
+
+type DeviceVerificationOptions = {
+  verification_id: string;
+  operation: 'register' | 'authenticate';
+  public_key: Record<string, unknown>;
+};
+
+export async function beginDeviceVerification(templateId: string, componentId: string, registerThisDevice = false): Promise<DeviceVerificationOptions> {
+  const response = await fetch(`${API_BASE_URL}/device-verification/begin`, {
+    method: 'POST', headers: authHeaders(), body: JSON.stringify({ template_id: templateId, component_id: componentId, register_this_device: registerThisDevice }),
+  });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible iniciar la verificación del dispositivo.');
+  return response.json();
+}
+
+export async function finishDeviceVerification(verificationId: string, credential: Record<string, unknown>): Promise<RuntimeDeviceVerificationValue> {
+  const response = await fetch(`${API_BASE_URL}/device-verification/finish`, {
+    method: 'POST', headers: authHeaders(), body: JSON.stringify({ verification_id: verificationId, credential }),
+  });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'El dispositivo no confirmó la verificación.');
+  return response.json();
 }
 
 export async function fetchRuntimeTemplate(templateId: string): Promise<RuntimeTemplate> {

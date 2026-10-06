@@ -16,6 +16,7 @@ from app.models import form_lookup  # noqa: F401
 from app.models import case_management  # noqa: F401
 from app.models import form_assignment  # noqa: F401
 from app.models import gestor_team  # noqa: F401
+from app.models import device_verification  # noqa: F401
 
 config = context.config
 config.set_main_option("sqlalchemy.url", settings.database_url)

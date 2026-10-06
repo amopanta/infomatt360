@@ -128,6 +128,13 @@ export function RuntimeApp() {
         // Solo los fallos de transporte entran en la cola. Los rechazos de
         // validacion o permisos necesitan una correccion del usuario.
         if (!(error instanceof TypeError)) throw error;
+        const hasDeviceField = template.pages.flatMap((page) => page.sections)
+          .flatMap((section) => section.rows).flatMap((row) => row.columns)
+          .flatMap((column) => column.components)
+          .some((component) => component.type.toUpperCase() === 'FINGERPRINT');
+        if (hasDeviceField) {
+          throw new Error('Este formulario requiere verificar el dispositivo en línea; el envío sin conexión no está disponible. Conservamos tu borrador local.');
+        }
         await enqueueRecord({ projectId, templateId: template.template_id, participantId, values: toRuntimeValueList(resolved) });
         clearDraft();
         setParticipantKey('');

@@ -562,7 +562,7 @@ function LinkedSubformField({
       {adding && childTemplate ? (
         <div className="record-linked-subform-form">
           {childComponents.map((component) => (
-            <RuntimeField key={component.id} component={component} projectId={projectId} values={values} onChange={(name, value) => setValues((current) => ({ ...current, [name]: value }))} />
+            <RuntimeField key={component.id} component={component} templateId={childTemplateId} projectId={projectId} values={values} onChange={(name, value) => setValues((current) => ({ ...current, [name]: value }))} />
           ))}
           <button type="button" className="primary" disabled={saving} onClick={() => void submitChild()}>{saving ? 'Guardando...' : 'Guardar fila'}</button>
         </div>
@@ -963,6 +963,9 @@ function formatValue(raw?: string, detailed = false): string {
     if (value === null || value === '') return '—';
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
     if (typeof value === 'string' || typeof value === 'number') return String(value);
+    if (value && typeof value === 'object' && value.method === 'device_user_verification') {
+      return `Dispositivo verificado${value.verified_at ? ` · ${new Date(value.verified_at).toLocaleString()}` : ''}`;
+    }
     const text = JSON.stringify(value);
     return detailed ? text : `${text.slice(0, 60)}${text.length > 60 ? '…' : ''}`;
   } catch {

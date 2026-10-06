@@ -17,6 +17,7 @@ python-jose[cryptography]
 python-multipart
 email-validator
 cryptography
+webauthn>=2.6,<3
 qrcode[pil]
 openpyxl
 jinja2

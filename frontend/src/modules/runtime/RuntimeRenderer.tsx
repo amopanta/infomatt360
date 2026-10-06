@@ -73,7 +73,7 @@ export function RuntimeRenderer({ template, projectId, values, onValueChange, up
                 {row.columns.map((column) => (
                   <div key={column.id} className="runtime-column" style={widthStyle(column)}>
                     {column.components.map((component) => (
-                      <RuntimeField key={component.id} component={component} projectId={projectId} values={values} onChange={onValueChange} uploadsDisabled={uploadsDisabled} />
+                      <RuntimeField key={component.id} component={component} templateId={template.template_id} projectId={projectId} values={values} onChange={onValueChange} uploadsDisabled={uploadsDisabled} />
                     ))}
                   </div>
                 ))}

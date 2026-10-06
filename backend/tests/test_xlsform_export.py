@@ -291,9 +291,9 @@ def test_master_template_requires_permission_and_covers_every_field_type():
             survey_rows = [tuple(row) for row in workbook["survey"].iter_rows(values_only=True)]
             assert survey_rows[0][:3] == ("type", "name", "label")
             assert len(survey_rows) > 40  # un ejemplo por cada tipo de app.core.field_types (52 tipos)
-            fingerprint_row = next(row for row in survey_rows[1:] if row[1] == "huella_ejemplo")
-            assert fingerprint_row[0] == "image"
-            assert fingerprint_row[8] == "fingerprint"
+            fingerprint_row = next(row for row in survey_rows[1:] if row[1] == "verificacion_dispositivo_ejemplo")
+            assert fingerprint_row[0] == "text"
+            assert fingerprint_row[8] == "infomatt_device_verification"
 
             reimported = client.post(
                 "/api/v1/xlsform/import",
@@ -306,7 +306,7 @@ def test_master_template_requires_permission_and_covers_every_field_type():
             with _sessions() as db:
                 fingerprint = db.query(BuilderComponent).filter(
                     BuilderComponent.template_id == reimported.json()["template_id"],
-                    BuilderComponent.name == "huella_ejemplo",
+                    BuilderComponent.name == "verificacion_dispositivo_ejemplo",
                 ).one()
                 assert fingerprint.component_type == "FINGERPRINT"
     finally:

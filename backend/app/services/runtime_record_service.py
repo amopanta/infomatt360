@@ -22,6 +22,7 @@ from app.core.time import utc_now
 from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.audit import AuditLog
 from app.models.files import FileAsset
+from app.models.device_verification import DeviceVerification
 from app.models.bulk_import import BulkImportJob
 from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
@@ -151,6 +152,7 @@ class RuntimeRecordService:
             db.add(record)
             # flush asigna el id sin confirmar la cabecera por separado.
             db.flush()
+            self._consume_device_verifications(db, payload.template_id, payload.values, user_id, record.id, payload.status)
             for item in payload.values:
                 db.add(
                     RuntimeRecordValue(
@@ -728,6 +730,36 @@ class RuntimeRecordService:
             return {item for child in value for item in self._file_asset_ids(child)}
         return set()
 
+    def _consume_device_verifications(
+        self, db: Session, template_id: str, values: list[RuntimeValueCreate],
+        user_id: str | None, record_id: str, status: str, only_field: str | None = None,
+    ) -> None:
+        fields = db.query(BuilderComponent).filter_by(template_id=template_id, component_type="FINGERPRINT").all()
+        if not fields:
+            return
+        by_name = {item.field_name: json.loads(item.field_value_json) for item in values}
+        now = utc_now()
+        for field in fields:
+            if only_field is not None and field.name != only_field:
+                continue
+            proof = by_name.get(field.name)
+            config = json.loads(field.config_json or "{}")
+            if proof in (None, ""):
+                if status != "draft" and config.get("required"):
+                    raise ValueError(f"Falta verificar el dispositivo en «{field.label}»")
+                continue
+            if not isinstance(proof, dict) or proof.get("method") != "device_user_verification" or not isinstance(proof.get("device_verification_id"), str):
+                raise ValueError(f"Verificación de dispositivo inválida en «{field.label}»")
+            event = db.query(DeviceVerification).filter_by(id=proof["device_verification_id"]).with_for_update().first()
+            if (
+                event is None or user_id is None or event.user_id != user_id
+                or event.template_id != template_id or event.component_id != field.id
+                or event.verified_at is None or event.expires_at <= now
+                or event.consumed_record_id is not None
+            ):
+                raise ValueError(f"La verificación de «{field.label}» expiró o ya fue usada; verifica de nuevo en el móvil")
+            event.consumed_record_id = record_id
+
     def get_record(self, db: Session, record_id: str) -> RuntimeRecordRead | None:
         """Consulta una captura por identificador."""
         row = db.query(RuntimeRecord).filter(RuntimeRecord.id == record_id).first()
@@ -787,8 +819,13 @@ class RuntimeRecordService:
                 return value
 
             copied_values = []
+            fingerprint_names = {
+                field.name for field in db.query(BuilderComponent).filter_by(
+                    template_id=source.template_id, component_type="FINGERPRINT",
+                ).all()
+            }
             for value in values:
-                raw = json.dumps(remap(json.loads(value.field_value_json)), ensure_ascii=False)
+                raw = "null" if value.field_name in fingerprint_names else json.dumps(remap(json.loads(value.field_value_json)), ensure_ascii=False)
                 db.add(RuntimeRecordValue(record_id=clone.id, component_id=value.component_id, field_name=value.field_name, field_value_json=raw))
                 copied_values.append(RuntimeValueCreate(component_id=value.component_id, field_name=value.field_name, field_value_json=raw))
             clone.content_hash = _compute_content_hash(clone.project_id, clone.template_id, copied_values)
@@ -826,6 +863,15 @@ class RuntimeRecordService:
             )
 
         parsed_value = json.loads(payload.field_value_json)
+        fingerprint_field = db.query(BuilderComponent).filter_by(
+            template_id=record.template_id, name=payload.field_name, component_type="FINGERPRINT",
+        ).first()
+        if fingerprint_field is not None:
+            self._consume_device_verifications(
+                db, record.template_id,
+                [RuntimeValueCreate(field_name=payload.field_name, field_value_json=payload.field_value_json)],
+                user_id, record.id, record.status, only_field=payload.field_name,
+            )
         for file_id in self._file_asset_ids(parsed_value):
             asset = db.query(FileAsset).filter(FileAsset.id == file_id, FileAsset.project_id == record.project_id).first()
             if asset is None:

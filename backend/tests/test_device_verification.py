@@ -104,7 +104,13 @@ def test_unverified_and_missing_proofs_are_rejected(database):
     with database() as db:
         with pytest.raises(ValueError, match="Falta verificar"):
             runtime_record_service._consume_device_verifications(db, "device-template", [], "device-user", "record-1", "submitted")
-        with pytest.raises(ValueError, match="expiró o ya fue usada"):
+        with pytest.raises(ValueError, match="inválida"):
             runtime_record_service._consume_device_verifications(db, "device-template", [
                 RuntimeValueCreate(field_name="device_check", field_value_json=json.dumps({"device_verification_id": "made-up", "method": "device_user_verification"})),
+            ], "device-user", "record-1", "submitted")
+        with pytest.raises(ValueError, match="expiró o ya fue usada"):
+            runtime_record_service._consume_device_verifications(db, "device-template", [
+                RuntimeValueCreate(field_name="device_check", field_value_json=json.dumps({
+                    "device_verification_id": "made-up", "method": "device_user_verification", "verified_at": "2026-01-01T00:00:00Z",
+                })),
             ], "device-user", "record-1", "submitted")

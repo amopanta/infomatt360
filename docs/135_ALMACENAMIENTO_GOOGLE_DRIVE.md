@@ -2,7 +2,7 @@
 
 ## Configuración
 
-El servidor necesita `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` y `GOOGLE_OAUTH_REDIRECT_URI`. El URI de redirección debe apuntar al callback `/api/v1/storage/oauth/gdrive/callback` y estar autorizado en el cliente OAuth de Google. La cuenta que conecta Drive debe tener permiso `storage.manage` en el proyecto.
+El administrador del proyecto puede ingresar **Client ID**, **Client Secret** y **URL de retorno** en el módulo de almacenamiento. Esos datos se guardan cifrados y el secreto no vuelve a mostrarse. Como alternativa, el servidor admite `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` y `GOOGLE_OAUTH_REDIRECT_URI` como valores generales. El URI de redirección debe ser HTTPS, apuntar al callback `/api/v1/storage/oauth/gdrive/callback` y estar autorizado en el cliente OAuth de Google. La cuenta que conecta Drive debe tener permiso `storage.manage` en el proyecto.
 
 En **Administración → Almacenamiento → Google Drive**, conectar la cuenta. Al terminar la autorización, actualizar la lista y pulsar **Usar para nuevas subidas** en el destino Google Drive. Solo un destino por proyecto queda marcado como predeterminado. Las evidencias anteriores permanecen en su proveedor original y se pueden descargar desde ese proveedor.
 

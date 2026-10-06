@@ -49,6 +49,8 @@ class S3StorageService:
         profile.bucket_name = payload.bucket_name
         profile.endpoint_url = payload.endpoint_url or None
         profile.credentials_json = encrypt_text(json.dumps(credentials))
+        if payload.is_default:
+            db.query(StorageProfile).filter_by(project_id=payload.project_id).update({"is_default": "false"})
         profile.is_default = "true" if payload.is_default else "false"
         profile.status = "active"
         db.commit()
@@ -120,3 +122,4 @@ class S3StorageService:
 
 
 s3_storage_service = S3StorageService()
+

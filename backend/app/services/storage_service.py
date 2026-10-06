@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
 
 from app.models.storage import StorageProfile
+from fastapi import HTTPException
 from app.schemas.storage import StorageProfileCreate, StorageProfileRead
 
 
@@ -16,11 +17,28 @@ def to_read(row: StorageProfile) -> StorageProfileRead:
         max_file_size_mb=row.max_file_size_mb,
         is_default=row.is_default == "true",
         status=row.status,
+        connected=(bool(row.oauth_tokens_encrypted) if row.provider == "gdrive" else bool(row.credentials_json) if row.provider == "s3" else True),
     )
 
 
 class StorageService:
+    def set_default(self, db: Session, project_id: str, profile_id: str) -> StorageProfileRead:
+        profile = db.query(StorageProfile).filter_by(id=profile_id, project_id=project_id, status="active").first()
+        if profile is None:
+            raise HTTPException(status_code=404, detail="Destino de almacenamiento no encontrado o inactivo")
+        if profile.provider == "gdrive" and not profile.oauth_tokens_encrypted:
+            raise HTTPException(status_code=422, detail="Conecta Google Drive antes de activarlo")
+        if profile.provider == "s3" and not profile.credentials_json:
+            raise HTTPException(status_code=422, detail="Conecta S3 antes de activarlo")
+        db.query(StorageProfile).filter_by(project_id=project_id).update({"is_default": "false"})
+        profile.is_default = "true"
+        db.commit()
+        db.refresh(profile)
+        return to_read(profile)
+
     def create_profile(self, db: Session, payload: StorageProfileCreate) -> StorageProfileRead:
+        if payload.is_default:
+            db.query(StorageProfile).filter_by(project_id=payload.project_id).update({"is_default": "false"})
         row = StorageProfile(
             project_id=payload.project_id,
             name=payload.name,
@@ -41,3 +59,4 @@ class StorageService:
 
 
 storage_service = StorageService()
+

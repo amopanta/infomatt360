@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
-import { authorizeGoogleDrive, connectS3Storage, fetchStorageProfiles } from './storageApi';
+import { authorizeGoogleDrive, configureGoogleDrive, connectS3Storage, fetchGoogleDriveStatus, fetchStorageProfiles, googleDriveCallbackUrl, selectDefaultStorage } from './storageApi';
 import type { StorageProfile } from './storageApi';
 
 type Tab = 's3' | 'gdrive';
@@ -26,6 +26,12 @@ export function StorageApp() {
   const [connecting, setConnecting] = useState(false);
 
   const [authorizing, setAuthorizing] = useState(false);
+  const [selecting, setSelecting] = useState<string | null>(null);
+  const [driveConfigured, setDriveConfigured] = useState(false);
+  const [driveClientId, setDriveClientId] = useState('');
+  const [driveClientSecret, setDriveClientSecret] = useState('');
+  const [driveRedirectUri, setDriveRedirectUri] = useState(googleDriveCallbackUrl());
+  const [savingDrive, setSavingDrive] = useState(false);
 
   async function loadProfiles() {
     if (!projectId) return;
@@ -36,7 +42,25 @@ export function StorageApp() {
     }
   }
 
-  useEffect(() => { void loadProfiles(); }, [projectId]);
+  useEffect(() => {
+    void loadProfiles();
+    if (projectId) void fetchGoogleDriveStatus(projectId).then(({ configured }) => setDriveConfigured(configured)).catch(() => setDriveConfigured(false));
+  }, [projectId]);
+
+  async function saveDriveConfig() {
+    setSavingDrive(true);
+    try {
+      await configureGoogleDrive(projectId, driveClientId.trim(), driveClientSecret, driveRedirectUri.trim());
+      setDriveConfigured(true);
+      setDriveClientSecret('');
+      await loadProfiles();
+      setMessage('Cliente OAuth guardado. Ahora conecta y autoriza la cuenta de Google Drive.');
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No fue posible guardar la configuración.');
+    } finally {
+      setSavingDrive(false);
+    }
+  }
 
   async function submitConnectS3() {
     setConnecting(true);
@@ -57,14 +81,30 @@ export function StorageApp() {
 
   async function submitAuthorizeGdrive() {
     setAuthorizing(true);
+    const popup = window.open('', '_blank');
     try {
       const { authorization_url: authorizationUrl } = await authorizeGoogleDrive(projectId);
-      window.open(authorizationUrl, '_blank', 'noopener,noreferrer');
-      setMessage('Se abrio una pestaña nueva para autorizar Google Drive. Al terminar, presiona "Actualizar lista" para ver el destino conectado.');
+      if (popup) popup.location.href = authorizationUrl;
+      else window.location.assign(authorizationUrl);
+      setMessage('Autoriza Google Drive en la pestaña nueva y luego actualiza la lista. Después selecciona «Usar para nuevas subidas».');
     } catch (error) {
+      popup?.close();
       setMessage(error instanceof Error ? error.message : 'No fue posible iniciar la autorizacion de Google Drive.');
     } finally {
       setAuthorizing(false);
+    }
+  }
+
+  async function chooseDefault(profile: StorageProfile) {
+    setSelecting(profile.id);
+    try {
+      await selectDefaultStorage(projectId, profile.id);
+      await loadProfiles();
+      setMessage(`${providerLabel(profile.provider)} recibirá las nuevas evidencias del proyecto. Los archivos existentes conservan su destino.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No fue posible cambiar el destino.');
+    } finally {
+      setSelecting(null);
     }
   }
 
@@ -103,12 +143,20 @@ export function StorageApp() {
             <header>
               <div>
                 <h2>Conectar Google Drive</h2>
-                <p>Abre una pestaña de Google para autorizar el acceso a una cuenta de Drive como destino de las evidencias del proyecto (ver docs/79).</p>
+                <p>Configura un cliente OAuth del proyecto y autoriza una cuenta de Google Drive. Después activa el destino en la tabla para las nuevas evidencias.</p>
               </div>
-              <button className="primary" disabled={authorizing} onClick={() => void submitAuthorizeGdrive()}>
+              <button className="primary" disabled={authorizing || !driveConfigured} onClick={() => void submitAuthorizeGdrive()}>
                 {authorizing ? 'Abriendo…' : 'Conectar Google Drive'}
               </button>
             </header>
+            <p role="status">{driveConfigured ? 'Cliente OAuth configurado. Puedes autorizar la cuenta de Drive.' : 'Falta configurar el cliente OAuth para este proyecto.'}</p>
+            <div className="ai-analyze-inline">
+              <label>Client ID<input value={driveClientId} onChange={(event) => setDriveClientId(event.target.value)} placeholder="ID del cliente OAuth" autoComplete="off" /></label>
+              <label>Client Secret<input type="password" value={driveClientSecret} onChange={(event) => setDriveClientSecret(event.target.value)} placeholder="No se mostrará después de guardarlo" autoComplete="new-password" /></label>
+              <label>URL de retorno<input value={driveRedirectUri} onChange={(event) => setDriveRedirectUri(event.target.value)} /></label>
+              <button disabled={savingDrive || !driveClientId.trim() || !driveClientSecret.trim() || !driveRedirectUri.trim()} onClick={() => void saveDriveConfig()}>{savingDrive ? 'Guardando…' : 'Guardar cliente OAuth'}</button>
+            </div>
+            <small>Registra exactamente esta URL de retorno en la consola de Google Cloud. Cambiar el cliente desconecta la cuenta actual hasta volver a autorizarla.</small>
           </section>
         ) : null}
 
@@ -116,7 +164,7 @@ export function StorageApp() {
           <header>
             <div>
               <h2>Destinos conectados</h2>
-              <p>Solo el destino marcado como predeterminado por proveedor recibe subidas nuevas.</p>
+              <p>Solo un destino predeterminado recibe las subidas nuevas del proyecto. Cambiarlo no mueve los archivos anteriores.</p>
             </div>
             <button onClick={() => void loadProfiles()}>Actualizar lista</button>
           </header>
@@ -130,6 +178,7 @@ export function StorageApp() {
                   <th>Bucket / ruta</th>
                   <th>Predeterminado</th>
                   <th>Estado</th>
+                  <th>Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -139,7 +188,8 @@ export function StorageApp() {
                     <td>{providerLabel(profile.provider)}</td>
                     <td>{profile.bucket_name ?? profile.base_path ?? '—'}</td>
                     <td>{profile.is_default ? 'Si' : 'No'}</td>
-                    <td>{profile.status}</td>
+                    <td>{profile.connected === false ? 'Pendiente de conexión' : profile.status}</td>
+                    <td>{profile.is_default ? 'En uso' : <button disabled={selecting === profile.id || profile.status !== 'active' || profile.connected === false} onClick={() => void chooseDefault(profile)}>{selecting === profile.id ? 'Activando…' : 'Usar para nuevas subidas'}</button>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -150,3 +200,4 @@ export function StorageApp() {
     </AppShell>
   );
 }
+

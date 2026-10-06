@@ -17,6 +17,7 @@ from app.main import app
 from app.models.assignment import UserProjectAssignment
 from app.models.identity import Project, Role, User
 from app.models.storage import StorageProfile
+from app.core.security import encrypt_text
 
 
 class FakeResponse:
@@ -158,6 +159,8 @@ def test_upload_file_refreshes_expired_access_token(monkeypatch):
             return FakeResponse(200, {"access_token": "access-refreshed", "expires_in": 3600})
         if url == gdrive_module.UPLOAD_URL:
             assert kwargs["headers"]["Authorization"] == "Bearer access-refreshed"
+            assert kwargs["headers"]["Content-Type"].startswith("multipart/related;")
+            assert b"contenido" in kwargs["content"]
             return FakeResponse(200, {"id": "drive-file-id-1"})
         raise AssertionError(f"URL inesperada: {url}")
 
@@ -179,3 +182,106 @@ def test_upload_file_refreshes_expired_access_token(monkeypatch):
         _restore_gdrive_config(originals)
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
+
+
+def test_activate_drive_upload_and_download_without_moving_old_files(monkeypatch):
+    engine, sessions = setup_client()
+    originals = _enable_gdrive_config()
+    try:
+        with sessions() as db:
+            db.add_all([
+                StorageProfile(id="local-target", project_id="gdrive-project", name="Local", provider="local", is_default="true"),
+                StorageProfile(id="drive-target", project_id="gdrive-project", name="Google Drive", provider="gdrive", is_default="false", oauth_tokens_encrypted=encrypt_text(json.dumps({"access_token": "access", "refresh_token": "refresh", "expires_at": time.time() + 3600}))),
+            ])
+            db.commit()
+
+        monkeypatch.setattr(gdrive_module.gdrive_storage_service, "upload_file", lambda _db, _profile, _name, _content, _mime: {"id": "drive-file-test"})
+        monkeypatch.setattr(gdrive_module.gdrive_storage_service, "get_file", lambda _db, _profile, file_id: b"evidencia-drive" if file_id == "drive-file-test" else b"")
+        with TestClient(app) as client:
+            headers = auth(client, "gdrive-member@example.com", "Member12345!")
+            outsider = auth(client, "gdrive-outsider@example.com", "Outsider12345!")
+            forbidden = client.post("/api/v1/storage/project/gdrive-project/default", headers=outsider, json={"profile_id": "drive-target"})
+            assert forbidden.status_code == 403
+            chosen = client.post("/api/v1/storage/project/gdrive-project/default", headers=headers, json={"profile_id": "drive-target"})
+            assert chosen.status_code == 200
+            assert chosen.json()["is_default"] is True
+            uploaded = client.post("/api/v1/files/upload", data={"project_id": "gdrive-project", "asset_type": "IMAGE"}, files={"upload": ("foto.jpg", b"evidencia-drive", "image/jpeg")}, headers=headers)
+            assert uploaded.status_code == 201
+            asset = uploaded.json()
+            assert asset["storage_provider"] == "gdrive"
+            assert asset["storage_path"] == "gdrive://drive-target/drive-file-test"
+            downloaded = client.get(f"/api/v1/files/{asset['id']}/download", headers=headers)
+            assert downloaded.status_code == 200
+            assert downloaded.content == b"evidencia-drive"
+        with sessions() as db:
+            assert db.get(StorageProfile, "local-target").is_default == "false"
+    finally:
+        _restore_gdrive_config(originals)
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_large_drive_upload_uses_resumable_session(monkeypatch):
+    engine, sessions = setup_client()
+    originals = _enable_gdrive_config()
+    content = b"x" * (5 * 1024 * 1024 + 1)
+    calls = []
+
+    class Initiated:
+        status_code = 200
+        headers = {"Location": "https://www.googleapis.com/upload/drive/v3/files?upload_id=test"}
+
+    def fake_post(url, **kwargs):
+        calls.append(("post", url))
+        assert url == gdrive_module.RESUMABLE_URL
+        assert kwargs["headers"]["X-Upload-Content-Length"] == str(len(content))
+        return Initiated()
+
+    def fake_put(url, **kwargs):
+        calls.append(("put", url))
+        assert kwargs["content"] == content
+        return FakeResponse(200, {"id": "big-drive-file"})
+
+    monkeypatch.setattr(gdrive_module.httpx, "post", fake_post)
+    monkeypatch.setattr(gdrive_module.httpx, "put", fake_put)
+    try:
+        with sessions() as db:
+            profile = StorageProfile(project_id="gdrive-project", name="Google Drive", provider="gdrive", oauth_tokens_encrypted=encrypt_text(json.dumps({"access_token": "access", "expires_at": time.time() + 3600})))
+            db.add(profile)
+            db.commit()
+            assert gdrive_module.gdrive_storage_service.upload_file(db, profile, "large.bin", content, "application/octet-stream") == {"id": "big-drive-file"}
+            assert [kind for kind, _ in calls] == ["post", "put"]
+    finally:
+        _restore_gdrive_config(originals)
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_project_admin_can_configure_oauth_without_server_env():
+    engine, sessions = setup_client()
+    originals = (settings.google_oauth_client_id, settings.google_oauth_client_secret, settings.google_oauth_redirect_uri)
+    settings.google_oauth_client_id = settings.google_oauth_client_secret = settings.google_oauth_redirect_uri = ""
+    try:
+        with TestClient(app) as client:
+            member = auth(client, "gdrive-member@example.com", "Member12345!")
+            outsider = auth(client, "gdrive-outsider@example.com", "Outsider12345!")
+            payload = {"project_id": "gdrive-project", "client_id": "project-client", "client_secret": "project-secret", "redirect_uri": "https://example.com/api/v1/storage/oauth/gdrive/callback"}
+            assert client.post("/api/v1/storage/gdrive/configure", headers=outsider, json=payload).status_code == 403
+            configured = client.post("/api/v1/storage/gdrive/configure", headers=member, json=payload)
+            assert configured.status_code == 200
+            assert "project-secret" not in configured.text
+            assert configured.json()["connected"] is False
+            assert client.get("/api/v1/storage/gdrive/status", headers=member, params={"project_id": "gdrive-project"}).json() == {"configured": True}
+            authorized = client.get("/api/v1/storage/oauth/gdrive/authorize", headers=member, params={"project_id": "gdrive-project"})
+            assert authorized.status_code == 200
+            query = parse_qs(urlparse(authorized.json()["authorization_url"]).query)
+            assert query["client_id"] == ["project-client"]
+            assert query["redirect_uri"] == [payload["redirect_uri"]]
+        with sessions() as db:
+            profile = db.query(StorageProfile).filter_by(project_id="gdrive-project", provider="gdrive").one()
+            assert "project-secret" not in profile.credentials_json
+    finally:
+        settings.google_oauth_client_id, settings.google_oauth_client_secret, settings.google_oauth_redirect_uri = originals
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+

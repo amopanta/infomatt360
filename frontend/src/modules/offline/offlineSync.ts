@@ -26,7 +26,7 @@ function notifyQueueChanged(): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(OFFLINE_QUEUE_CHANGED_EVENT));
 }
 
-export async function enqueueRecord(record: { projectId: string; templateId: string; values: DesktopRecordValue[] }): Promise<string> {
+export async function enqueueRecord(record: { projectId: string; templateId: string; participantId?: string | null; values: DesktopRecordValue[] }): Promise<string> {
   const id = isDesktopApp() ? await window.desktopBridge!.enqueueRecord(record) : await indexedDbQueue.enqueue(record);
   notifyQueueChanged();
   return id;
@@ -103,6 +103,7 @@ export async function syncNow(credentials: { apiBaseUrl: string; accessToken: st
           records: group.map((record) => ({
             project_id: record.projectId,
             template_id: record.templateId,
+            participant_id: record.participantId ?? null,
             status: 'submitted',
             values: record.values,
           })),
@@ -115,14 +116,18 @@ export async function syncNow(credentials: { apiBaseUrl: string; accessToken: st
         continue;
       }
       const data = (await response.json()) as BulkSaveResponse;
+      const byIndex = new Map<number, BulkSaveResult>();
+      if (!Array.isArray(data.results)) throw new Error('Respuesta de sincronización incompleta');
       for (const item of data.results) {
-        const record = group[item.index];
-        if (!record) continue;
-        if (item.status === 'created') {
+        if (Number.isInteger(item.index) && item.index >= 0 && item.index < group.length && !byIndex.has(item.index)) byIndex.set(item.index, item);
+      }
+      for (const [index, record] of group.entries()) {
+        const item = byIndex.get(index);
+        if (item?.status === 'created') {
           await indexedDbQueue.markSynced(record.id);
           result.synced += 1;
         } else {
-          await indexedDbQueue.markFailed(record.id, item.error ?? 'Error desconocido al sincronizar');
+          await indexedDbQueue.markFailed(record.id, item?.error ?? 'El servidor no confirmó este registro');
           result.failed += 1;
         }
       }

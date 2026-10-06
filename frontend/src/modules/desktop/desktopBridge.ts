@@ -19,7 +19,7 @@ export type DesktopPrintResult = { success: boolean; failureReason: string | nul
 export type DesktopBatchPrintResult = { printed: number; failed: number; errors: Array<{ name: string; reason: string }> };
 
 export type DesktopBridge = {
-  enqueueRecord: (record: { projectId: string; templateId: string; values: DesktopRecordValue[] }) => Promise<string>;
+  enqueueRecord: (record: { projectId: string; templateId: string; participantId?: string | null; values: DesktopRecordValue[] }) => Promise<string>;
   getPendingCount: () => Promise<number>;
   syncNow: (credentials: { apiBaseUrl: string; accessToken: string }) => Promise<DesktopSyncResult>;
   purgeOldSynced: (retentionDays: number) => Promise<number>;

@@ -51,7 +51,24 @@ async function fetchRuntime(templateId: string): Promise<RuntimeTemplate> {
 
 export function FormsApp() {
   const templateId = window.location.pathname.match(/^\/builder\/form\/([^/]+)$/)?.[1];
-  return templateId ? <FormDetail templateId={templateId} /> : <FormList />;
+  if (templateId) return <FormDetail templateId={templateId} />;
+  if (window.location.pathname === '/builder/pull') return <PullAssignments />;
+  return <FormList />;
+}
+
+function PullAssignments() {
+  const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
+  const [templates, setTemplates] = useState<TemplateSummary[]>([]);
+  const [message, setMessage] = useState('Cargando formularios…');
+  useEffect(() => {
+    if (!projectId) { setMessage('Selecciona un proyecto para asignar Grupos Pull.'); return; }
+    fetchProjectTemplates(projectId).then((rows) => { setTemplates(rows); setMessage(''); }).catch((error: Error) => setMessage(error.message));
+  }, [projectId]);
+  return <AppShell title="Grupos Pull"><main className="forms-home">
+    <header className="forms-home-head"><div><h1>Grupos Pull</h1><p>Asigna una misma tabla CSV a varios formularios del proyecto.</p></div><a className="forms-secondary-link" href="/builder">Volver a formularios</a></header>
+    {message && <p role="status" className="forms-feedback">{message}</p>}
+    {!message && (templates.length ? <BulkPullPanel projectId={projectId} forms={templates} /> : <section className="forms-empty"><h2>No hay formularios disponibles</h2><p>Crea un formulario antes de asignar un Grupo Pull.</p></section>)}
+  </main></AppShell>;
 }
 
 function FormList() {
@@ -77,17 +94,16 @@ function FormList() {
   return <AppShell title="Formularios">
     <main className="forms-home">
       <header className="forms-home-head">
-        <div><h1>{title}</h1><p>Construye, publica, programa y consulta los envíos de cada formulario.</p></div>
-        <a className="forms-primary-link" href="/builder/new">+ Nuevo formulario</a>
+        <div><h1>{title}</h1><p>{view === 'drafts' ? 'Crea y prepara formularios antes de publicarlos.' : 'Consulta el estado y las respuestas de tus formularios.'}</p></div>
+        {view === 'drafts' && <a className="forms-primary-link" href="/builder/new">+ Nuevo formulario</a>}
       </header>
       <div className="forms-overview"><strong>{templates.length} formularios</strong><span>{active} activos o detenidos</span><span>{templates.filter((template) => template.status === 'draft').length} borradores</span><span>{templates.filter((template) => template.status === 'archived').length} archivados</span></div>
       <div className="forms-toolbar"><label>Buscar formulario<input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Nombre del formulario" /></label></div>
       {message ? <p role="status" className="forms-feedback">{message}</p> : null}
-      {!message && !templates.length ? <section className="forms-empty"><h2>Aún no hay formularios visuales</h2><p>El formulario de prueba del módulo clásico no aparece aquí. Crea uno en el constructor y publícalo cuando esté listo.</p><a className="forms-primary-link" href="/builder/new">Crear primer formulario</a></section> : null}
+      {!message && !templates.length ? <section className="forms-empty"><h2>Aún no hay formularios</h2><p>Empieza en En construcción para preparar el primer formulario del proyecto.</p><a className="forms-secondary-link" href="/builder/drafts">Ir a En construcción</a></section> : null}
       {!!visible.length && <div className="forms-table-wrap"><table className="forms-table"><thead><tr><th>Nombre del formulario</th><th>Estado</th><th>Propietario</th><th>Última edición</th><th>Inicio</th><th>Fin</th><th>Envíos</th></tr></thead><tbody>
         {visible.map((template) => <tr key={template.id}><td><a className="forms-name" href={`/builder/form/${template.id}`}>{template.name}</a><small>{template.description || 'Sin descripción'}</small></td><td><span className={`forms-status ${statusClass(template)}`}>{publicationLabel(template)}</span></td><td>{template.owner_name || '—'}</td><td>{displayDate(template.updated_at || template.created_at)}</td><td>{displayDate(template.starts_at)}</td><td>{displayDate(template.ends_at)}</td><td><span className="forms-count">{template.submissions_count ?? 0}</span></td></tr>)}
       </tbody></table></div>}
-      {!!templates.length && <BulkPullPanel projectId={projectId} forms={templates} />}
       {!!templates.length && !visible.length && <p className="forms-feedback">No hay formularios en esta sección que coincidan con la búsqueda.</p>}
     </main>
   </AppShell>;
@@ -207,3 +223,4 @@ function FormDetail({ templateId }: { templateId: string }) {
     {message && <p role="status" className="forms-feedback">{message}</p>}
   </main></AppShell>;
 }
+

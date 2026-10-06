@@ -1150,6 +1150,15 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .forms-home-head p, .forms-detail-head p, .forms-panel-head p { margin: 0; color: #60708a; }
 .forms-primary-link { display: inline-flex; align-items: center; justify-content: center; border-radius: 7px; padding: 10px 15px; background: #126488; color: white !important; text-decoration: none; font-weight: 700; white-space: nowrap; }
 .forms-primary-link:hover { background: #0e526f; }
+.forms-secondary-link { display: inline-flex; align-items: center; justify-content: center; border: 1px solid #bdd2e2; border-radius: 7px; padding: 10px 15px; background: #fff; color: #126488; text-decoration: none; font-weight: 700; }
+.forms-secondary-link:hover { background: #edf5fb; }
+.forms-pull-panel { margin-top: 24px; }
+.forms-pull-panel .forms-pull-upload { display: grid; gap: 9px; max-width: 520px; margin: 24px 0; font-weight: 700; }
+.forms-pull-panel .forms-pull-upload input { border: 1px dashed #a8c4d8; border-radius: 8px; padding: 16px; background: #f7fbfe; font-weight: 400; }
+.forms-pull-panel fieldset { border: 1px solid #dce5ef; border-radius: 9px; padding: 16px; margin: 0 0 20px; }
+.forms-pull-panel legend { padding: 0 7px; font-weight: 700; color: #274868; }
+.forms-pull-options { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+.forms-pull-panel .forms-pull-choice { margin: 0; padding: 11px 12px; border: 1px solid #e3ebf2; border-radius: 7px; background: #fbfdff; }
 .forms-participant-chooser { display: grid; gap: 10px; padding: 16px; border: 1px solid var(--border); border-radius: 10px; }
 .forms-participant-chooser > p { margin: 0; }
 .forms-participant-chooser-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }

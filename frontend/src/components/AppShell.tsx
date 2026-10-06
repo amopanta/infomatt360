@@ -134,6 +134,7 @@ export function AppShell({ title, children }: Props) {
             <a href="/builder/drafts" className={currentPath === '/builder/drafts' || currentPath === '/builder/new' ? 'active' : undefined}>En construcción</a>
             <a href="/builder/active" className={currentPath === '/builder/active' ? 'active' : undefined}>Formularios activos</a>
             <a href="/builder/archived" className={currentPath === '/builder/archived' ? 'active' : undefined}>Formularios archivados</a>
+            <a href="/builder/pull" className={currentPath === '/builder/pull' ? 'active' : undefined}>Grupos Pull</a>
           </div>
         </details>
       );
@@ -190,3 +191,4 @@ export function AppShell({ title, children }: Props) {
     </div>
   );
 }
+

@@ -256,3 +256,32 @@ def test_large_drive_upload_uses_resumable_session(monkeypatch):
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
 
+
+def test_project_admin_can_configure_oauth_without_server_env():
+    engine, sessions = setup_client()
+    originals = (settings.google_oauth_client_id, settings.google_oauth_client_secret, settings.google_oauth_redirect_uri)
+    settings.google_oauth_client_id = settings.google_oauth_client_secret = settings.google_oauth_redirect_uri = ""
+    try:
+        with TestClient(app) as client:
+            member = auth(client, "gdrive-member@example.com", "Member12345!")
+            outsider = auth(client, "gdrive-outsider@example.com", "Outsider12345!")
+            payload = {"project_id": "gdrive-project", "client_id": "project-client", "client_secret": "project-secret", "redirect_uri": "https://example.com/api/v1/storage/oauth/gdrive/callback"}
+            assert client.post("/api/v1/storage/gdrive/configure", headers=outsider, json=payload).status_code == 403
+            configured = client.post("/api/v1/storage/gdrive/configure", headers=member, json=payload)
+            assert configured.status_code == 200
+            assert "project-secret" not in configured.text
+            assert configured.json()["connected"] is False
+            assert client.get("/api/v1/storage/gdrive/status", headers=member, params={"project_id": "gdrive-project"}).json() == {"configured": True}
+            authorized = client.get("/api/v1/storage/oauth/gdrive/authorize", headers=member, params={"project_id": "gdrive-project"})
+            assert authorized.status_code == 200
+            query = parse_qs(urlparse(authorized.json()["authorization_url"]).query)
+            assert query["client_id"] == ["project-client"]
+            assert query["redirect_uri"] == [payload["redirect_uri"]]
+        with sessions() as db:
+            profile = db.query(StorageProfile).filter_by(project_id="gdrive-project", provider="gdrive").one()
+            assert "project-secret" not in profile.credentials_json
+    finally:
+        settings.google_oauth_client_id, settings.google_oauth_client_secret, settings.google_oauth_redirect_uri = originals
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+

@@ -33,3 +33,8 @@ class S3StorageProfileConnect(BaseModel):
     access_key_id: str
     secret_access_key: str
     is_default: bool = True
+
+
+class StorageDefaultSelection(BaseModel):
+    profile_id: str
+

@@ -17,7 +17,7 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const ASSET_TYPE_LABELS: Record<string, string> = {
-  FILE: 'Archivo', PDF: 'PDF', MULTIFILE: 'Múltiples archivos', IMAGE: 'Imagen',
+  FILE: 'Archivo', PDF: 'PDF', MULTIFILE: 'Múltiples archivos', IMAGE: 'Imagen', FINGERPRINT: 'Huella dactilar',
   AUDIO: 'Audio', VIDEO: 'Video', SIGNATURE: 'Firma',
 };
 

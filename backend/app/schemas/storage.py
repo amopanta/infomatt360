@@ -22,6 +22,7 @@ class StorageProfileRead(BaseModel):
     max_file_size_mb: int
     is_default: bool
     status: str
+    connected: bool | None = None
 
 
 class S3StorageProfileConnect(BaseModel):
@@ -37,4 +38,11 @@ class S3StorageProfileConnect(BaseModel):
 
 class StorageDefaultSelection(BaseModel):
     profile_id: str
+
+
+class GoogleDriveClientConfig(BaseModel):
+    project_id: str
+    client_id: str
+    client_secret: str
+    redirect_uri: str
 

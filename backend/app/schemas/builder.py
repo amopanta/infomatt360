@@ -39,6 +39,7 @@ class ParticipantSource(BaseModel):
     municipality: str | None = None
     group_name: str | None = None
     team_id: str | None = None
+    team_ids: list[str] = Field(default_factory=list)
     previous_template_id: str | None = None
     required_status: str = "submitted"
     pull_name: str | None = None
@@ -53,7 +54,7 @@ class ParticipantSource(BaseModel):
             raise ValueError("Indica el municipio")
         if self.mode == "group" and not self.group_name:
             raise ValueError("Selecciona un grupo de participantes")
-        if self.mode == "team" and not self.team_id:
+        if self.mode == "team" and not (self.team_ids or self.team_id):
             raise ValueError("Selecciona un equipo de gestores")
         if self.mode == "form" and not self.previous_template_id:
             raise ValueError("Selecciona el formulario anterior")
@@ -124,3 +125,4 @@ class BuilderVersionCreate(BaseModel):
 
 class BuilderVersionRead(BuilderVersionCreate):
     id: str
+

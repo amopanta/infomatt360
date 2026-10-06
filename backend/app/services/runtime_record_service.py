@@ -748,7 +748,7 @@ class RuntimeRecordService:
                 if status != "draft" and config.get("required"):
                     raise ValueError(f"Falta verificar el dispositivo en «{field.label}»")
                 continue
-            if not isinstance(proof, dict) or proof.get("method") != "device_user_verification" or not isinstance(proof.get("device_verification_id"), str):
+            if not isinstance(proof, dict) or set(proof) != {"device_verification_id", "method", "verified_at"} or proof.get("method") != "device_user_verification" or not isinstance(proof.get("device_verification_id"), str):
                 raise ValueError(f"Verificación de dispositivo inválida en «{field.label}»")
             event = db.query(DeviceVerification).filter_by(id=proof["device_verification_id"]).with_for_update().first()
             if (
@@ -758,6 +758,8 @@ class RuntimeRecordService:
                 or event.consumed_record_id is not None
             ):
                 raise ValueError(f"La verificación de «{field.label}» expiró o ya fue usada; verifica de nuevo en el móvil")
+            if proof.get("verified_at") != event.verified_at.isoformat() + "Z":
+                raise ValueError(f"La fecha de verificación de «{field.label}» no coincide con el servidor")
             event.consumed_record_id = record_id
 
     def get_record(self, db: Session, record_id: str) -> RuntimeRecordRead | None:

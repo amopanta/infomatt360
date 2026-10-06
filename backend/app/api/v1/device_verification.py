@@ -160,4 +160,4 @@ def finish_verification(payload: FinishRequest, db: Session = Depends(get_db), u
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="No se pudo validar el autenticador del dispositivo") from exc
     event.verified_at = utc_now()
     db.commit()
-    return {"device_verification_id": event.id, "method": "device_user_verification", "verified_at": event.verified_at.isoformat()}
+    return {"device_verification_id": event.id, "method": "device_user_verification", "verified_at": event.verified_at.isoformat() + "Z"}

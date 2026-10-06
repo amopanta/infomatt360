@@ -179,7 +179,7 @@ export function RuntimeField(props: Props) {
     );
   }
 
-  const fileTypes = ['FILE', 'PDF', 'MULTIFILE', 'IMAGE', 'PHOTO', 'AUDIO', 'VIDEO', 'OCR'];
+  const fileTypes = ['FILE', 'PDF', 'MULTIFILE', 'IMAGE', 'PHOTO', 'FINGERPRINT', 'AUDIO', 'VIDEO', 'OCR'];
   if (fileTypes.includes(type)) {
     if (uploadsDisabled) {
       return (
@@ -190,7 +190,7 @@ export function RuntimeField(props: Props) {
       );
     }
     const multiple = type === 'MULTIFILE';
-    const accept = type === 'IMAGE' || type === 'PHOTO' || type === 'OCR' ? 'image/*' : type === 'AUDIO' ? 'audio/*' : type === 'VIDEO' ? 'video/*' : type === 'PDF' ? 'application/pdf' : undefined;
+    const accept = type === 'IMAGE' || type === 'PHOTO' || type === 'FINGERPRINT' || type === 'OCR' ? 'image/*' : type === 'AUDIO' ? 'audio/*' : type === 'VIDEO' ? 'video/*' : type === 'PDF' ? 'application/pdf' : undefined;
     const uploaded = Array.isArray(value) ? value as RuntimeFileValue[] : value && typeof value === 'object' ? [value as RuntimeFileValue] : [];
 
     async function uploadFiles(files: FileList | null) {

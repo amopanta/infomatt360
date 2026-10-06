@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY } from '../auth/session';
-import { authorizeGoogleDrive, connectS3Storage, fetchStorageProfiles } from './storageApi';
+import { authorizeGoogleDrive, connectS3Storage, fetchStorageProfiles, selectDefaultStorage } from './storageApi';
 import type { StorageProfile } from './storageApi';
 
 type Tab = 's3' | 'gdrive';
@@ -26,6 +26,7 @@ export function StorageApp() {
   const [connecting, setConnecting] = useState(false);
 
   const [authorizing, setAuthorizing] = useState(false);
+  const [selecting, setSelecting] = useState<string | null>(null);
 
   async function loadProfiles() {
     if (!projectId) return;
@@ -57,14 +58,30 @@ export function StorageApp() {
 
   async function submitAuthorizeGdrive() {
     setAuthorizing(true);
+    const popup = window.open('', '_blank');
     try {
       const { authorization_url: authorizationUrl } = await authorizeGoogleDrive(projectId);
-      window.open(authorizationUrl, '_blank', 'noopener,noreferrer');
-      setMessage('Se abrio una pestaña nueva para autorizar Google Drive. Al terminar, presiona "Actualizar lista" para ver el destino conectado.');
+      if (popup) popup.location.href = authorizationUrl;
+      else window.location.assign(authorizationUrl);
+      setMessage('Autoriza Google Drive en la pestaña nueva y luego actualiza la lista. Después selecciona «Usar para nuevas subidas».');
     } catch (error) {
+      popup?.close();
       setMessage(error instanceof Error ? error.message : 'No fue posible iniciar la autorizacion de Google Drive.');
     } finally {
       setAuthorizing(false);
+    }
+  }
+
+  async function chooseDefault(profile: StorageProfile) {
+    setSelecting(profile.id);
+    try {
+      await selectDefaultStorage(projectId, profile.id);
+      await loadProfiles();
+      setMessage(`${providerLabel(profile.provider)} recibirá las nuevas evidencias del proyecto. Los archivos existentes conservan su destino.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'No fue posible cambiar el destino.');
+    } finally {
+      setSelecting(null);
     }
   }
 
@@ -103,7 +120,7 @@ export function StorageApp() {
             <header>
               <div>
                 <h2>Conectar Google Drive</h2>
-                <p>Abre una pestaña de Google para autorizar el acceso a una cuenta de Drive como destino de las evidencias del proyecto (ver docs/79).</p>
+                <p>Autoriza una cuenta de Google Drive para este proyecto. Después actívala en «Destinos conectados» para que reciba las nuevas evidencias. Los archivos anteriores permanecen donde se guardaron.</p>
               </div>
               <button className="primary" disabled={authorizing} onClick={() => void submitAuthorizeGdrive()}>
                 {authorizing ? 'Abriendo…' : 'Conectar Google Drive'}
@@ -116,7 +133,7 @@ export function StorageApp() {
           <header>
             <div>
               <h2>Destinos conectados</h2>
-              <p>Solo el destino marcado como predeterminado por proveedor recibe subidas nuevas.</p>
+              <p>Solo un destino predeterminado recibe las subidas nuevas del proyecto. Cambiarlo no mueve los archivos anteriores.</p>
             </div>
             <button onClick={() => void loadProfiles()}>Actualizar lista</button>
           </header>
@@ -130,6 +147,7 @@ export function StorageApp() {
                   <th>Bucket / ruta</th>
                   <th>Predeterminado</th>
                   <th>Estado</th>
+                  <th>Acción</th>
                 </tr>
               </thead>
               <tbody>
@@ -140,6 +158,7 @@ export function StorageApp() {
                     <td>{profile.bucket_name ?? profile.base_path ?? '—'}</td>
                     <td>{profile.is_default ? 'Si' : 'No'}</td>
                     <td>{profile.status}</td>
+                    <td>{profile.is_default ? 'En uso' : <button disabled={selecting === profile.id || profile.status !== 'active'} onClick={() => void chooseDefault(profile)}>{selecting === profile.id ? 'Activando…' : 'Usar para nuevas subidas'}</button>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -150,3 +169,4 @@ export function StorageApp() {
     </AppShell>
   );
 }
+

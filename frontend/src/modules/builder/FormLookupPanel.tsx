@@ -58,9 +58,10 @@ export function BulkPullPanel({ projectId, forms }: { projectId: string; forms: 
     finally { setBusy(false); }
   }
 
-  return <section className="forms-detail-panel"><h2>Asignación masiva de grupo Pull</h2><p>Carga un CSV y selecciona los formularios que usarán la misma tabla. Si ya existe un CSV con ese nombre, se actualizará en esos formularios.</p>
-    <label>Archivo CSV UTF-8<input type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>
-    <fieldset><legend>Formularios de destino</legend>{forms.map((form) => <label key={form.id} className="forms-pull-choice"><input type="checkbox" checked={selected.includes(form.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, form.id] : current.filter((id) => id !== form.id))} /> {form.name}</label>)}</fieldset>
+  return <section className="forms-detail-panel forms-pull-panel"><h2>Asignación masiva</h2><p>Carga un CSV y selecciona los formularios que usarán la misma tabla. Si ya existe un CSV con ese nombre, se actualizará en esos formularios.</p>
+    <label className="forms-pull-upload">Archivo CSV UTF-8<input type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] || null)} /></label>
+    <fieldset><legend>Formularios de destino · {selected.length} seleccionados</legend><div className="forms-pull-options">{forms.map((form) => <label key={form.id} className="forms-pull-choice"><input type="checkbox" checked={selected.includes(form.id)} onChange={(event) => setSelected((current) => event.target.checked ? [...current, form.id] : current.filter((id) => id !== form.id))} /> {form.name}</label>)}</div></fieldset>
     <button type="button" disabled={!file || !selected.length || busy} onClick={() => void assign()}>{busy ? 'Asignando…' : 'Asignar a formularios'}</button>{message && <p role="status">{message}</p>}
   </section>;
 }
+

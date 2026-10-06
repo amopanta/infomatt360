@@ -46,7 +46,7 @@ EXPORT_TYPE_MAP: dict[str, str] = {
     "DATE": "date", "TIME": "time", "DATETIME": "dateTime",
     "YEAR": "integer", "MONTH": "text", "WEEK": "text",
     "PERCENTAGE": "decimal", "CURRENCY": "decimal",
-    "IMAGE": "image", "FINGERPRINT": "image", "FILE": "file", "PDF": "file", "MULTIFILE": "file",
+    "IMAGE": "image", "FINGERPRINT": "text", "FILE": "file", "PDF": "file", "MULTIFILE": "file",
     "AUDIO": "audio", "VIDEO": "video", "SIGNATURE": "image",
     "GPS": "geopoint", "GEOTRACE": "geotrace", "GEOSHAPE": "geoshape",
     "MATRIX": "text",
@@ -96,7 +96,7 @@ MASTER_TEMPLATE_FIELDS: list[tuple[str, str, str, dict]] = [
     ("PERCENTAGE", "porcentaje_ejemplo", "Porcentaje", {}),
     ("CURRENCY", "moneda_ejemplo", "Valor monetario", {}),
     ("IMAGE", "imagen_ejemplo", "Fotografia", {}),
-    ("FINGERPRINT", "huella_ejemplo", "Imagen de huella dactilar", {"appearance": "fingerprint"}),
+    ("FINGERPRINT", "verificacion_dispositivo_ejemplo", "Verificación del usuario en el móvil", {"appearance": "infomatt_device_verification"}),
     ("FILE", "archivo_ejemplo", "Archivo adjunto (PDF, DOCX, etc.)", {}),
     ("PDF", "pdf_ejemplo", "Documento PDF", {}),
     ("MULTIFILE", "archivos_multiples_ejemplo", "Varios archivos", {}),
@@ -285,7 +285,7 @@ class XlsformExportService:
                 return
 
             if comp_type == "FINGERPRINT":
-                config = {**config, "appearance": "fingerprint"}
+                config = {**config, "appearance": "infomatt_device_verification"}
             survey_sheet.append(_build_row(EXPORT_TYPE_MAP.get(comp_type, "text"), name, label, config, comp_type))
 
         for comp_type, name, label, config in field_specs:

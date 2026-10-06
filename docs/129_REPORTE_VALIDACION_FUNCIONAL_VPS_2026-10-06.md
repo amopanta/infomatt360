@@ -71,3 +71,11 @@ No se recibió una sesión de pruebas activa para ejecutar en producción: crear
 
 **Conclusión:** las baterías automatizadas y la infraestructura básica pasan; la preparación de asignaciones vigentes, la alineación de workers y el recorrido autenticado de extremo a extremo son las condiciones pendientes para afirmar que todas las funcionalidades operan correctamente en producción.
 
+## Revalidación posterior de los hallazgos
+
+Se repitieron las consultas de solo lectura en el VPS y se obtuvieron los mismos resultados: 1 formulario borrador, 1 publicado, 8 eliminados; las 41 asignaciones pertenecen a formularios eliminados; 5 registros carecen de participante enlazado. Las 41 asignaciones están a nombre de la cuenta de prueba de escritorio indicada por el usuario. La ruta `GET /form-assignments/mine/{project_id}` filtra explícitamente `BuilderTemplate.status == "published"`, por lo que esas 41 asignaciones no pueden aparecer en su escritorio. Este punto queda confirmado como causa concreta de la ausencia de formularios asignados, no solo como sospecha basada en recuentos.
+
+También se verificó que los contenedores `worker-bulk` y `worker-scheduler` no incluyen el módulo `gestor_teams.py`, presente en el backend actual. Esto confirma que ejecutan una versión anterior; no demuestra por sí solo que todas sus tareas fallen. La API de preparación siguió respondiendo HTTP 200 y los backend, balanceador, PostgreSQL y Redis permanecieron saludables.
+
+El usuario pospuso el inicio de sesión en el navegador integrado. Por ese motivo permanecen pendientes las pruebas visuales de captura, revisión, actas, exportación y sincronización con una cuenta autenticada. No se alteraron datos de producción durante esta revalidación.
+

@@ -132,6 +132,21 @@ test("syncPending maneja un error de red (fetch rechaza) sin lanzar", async () =
   assert.match(listPending(queue)[0].error, /ECONNREFUSED/);
 });
 
+test("syncPending conserva el participante y no pierde resultados omitidos", async () => {
+  const queue = await initQueue(":memory:");
+  enqueue(queue, { projectId: "p1", templateId: "t1", participantId: "persona-1", values: sampleValues("Ana") });
+  enqueue(queue, { projectId: "p1", templateId: "t1", participantId: "persona-2", values: sampleValues("Beatriz") });
+  let sent;
+  const fetchImpl = async (_url, options) => {
+    sent = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ results: [{ index: 0, status: "created" }] }) };
+  };
+  const result = await syncPending(queue, { apiBaseUrl: "http://api.test/api/v1", accessToken: "token", fetchImpl });
+  assert.deepEqual(sent.records.map((record) => record.participant_id), ["persona-1", "persona-2"]);
+  assert.deepEqual(result, { attempted: 2, synced: 1, failed: 1 });
+  assert.equal(countPending(queue), 1);
+});
+
 test("purgeOldSynced borra los sincronizados vencidos y conserva los recientes y los pendientes", async () => {
   const queue = await initQueue(":memory:");
   const oldId = enqueue(queue, { projectId: "p1", templateId: "t1", values: sampleValues("Antiguo") });

@@ -17,6 +17,7 @@ def to_read(row: StorageProfile) -> StorageProfileRead:
         max_file_size_mb=row.max_file_size_mb,
         is_default=row.is_default == "true",
         status=row.status,
+        connected=(bool(row.oauth_tokens_encrypted) if row.provider == "gdrive" else bool(row.credentials_json) if row.provider == "s3" else True),
     )
 
 

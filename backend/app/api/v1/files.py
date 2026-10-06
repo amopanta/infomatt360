@@ -17,7 +17,7 @@ from app.services.assignment_service import assignment_service
 from app.services.file_service import file_service
 
 router = APIRouter()
-UPLOAD_ASSET_TYPES = {"FILE", "PDF", "MULTIFILE", "IMAGE", "AUDIO", "VIDEO", "SIGNATURE"}
+UPLOAD_ASSET_TYPES = {"FILE", "PDF", "MULTIFILE", "IMAGE", "FINGERPRINT", "AUDIO", "VIDEO", "SIGNATURE"}
 
 
 def validate_asset_relations(db: Session, project_id: str, participant_id: str | None, record_id: str | None) -> None:

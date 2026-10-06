@@ -1,16 +1,18 @@
 import { useEffect, useState } from 'react';
 import { RuntimeRepeat } from './RuntimeRepeat';
 import { RuntimeSignature } from './RuntimeSignature';
+import { RuntimeDeviceVerification } from './RuntimeDeviceVerification';
 import { RuntimeGeoField } from './RuntimeGeoField';
 import { searchLinkableRecords, uploadRuntimeFile } from './api';
 import { normalizeOptions, parseFieldConfig, parseNumberInput } from './fieldConfig';
 import { isFieldVisible } from './formLogic';
 import { evaluateXlsExpression } from './xlsExpression';
-import type { RepeatItem, RuntimeComponent, RuntimeFileValue, RuntimeFormValue, RuntimeFormValues, RuntimeScalarValue } from './types';
+import type { RepeatItem, RuntimeComponent, RuntimeDeviceVerificationValue, RuntimeFileValue, RuntimeFormValue, RuntimeFormValues, RuntimeScalarValue } from './types';
 import type { RuntimeGeoValue } from './geoEngine';
 
 type Props = {
   component: RuntimeComponent;
+  templateId: string;
   projectId: string;
   values: RuntimeFormValues;
   onChange: (fieldName: string, value: RuntimeFormValue) => void;
@@ -101,7 +103,7 @@ function RuntimeParentChildField({ fieldId, label, config, value, required, onCh
 }
 
 export function RuntimeField(props: Props) {
-  const { component, projectId, values, onChange, uploadsDisabled } = props;
+  const { component, templateId, projectId, values, onChange, uploadsDisabled } = props;
   const [uploadStatus, setUploadStatus] = useState('');
   const value = values[component.name] ?? '';
   const type = component.type.toUpperCase();
@@ -179,7 +181,17 @@ export function RuntimeField(props: Props) {
     );
   }
 
-  const fileTypes = ['FILE', 'PDF', 'MULTIFILE', 'IMAGE', 'PHOTO', 'FINGERPRINT', 'AUDIO', 'VIDEO', 'OCR'];
+  if (type === 'FINGERPRINT') {
+    if (uploadsDisabled) return <div className="runtime-field-group"><RuntimeQuestionLabel label={component.label} config={config} /><small>La verificación del dispositivo requiere iniciar sesión.</small></div>;
+    return <RuntimeDeviceVerification
+      id={fieldId} componentId={component.id} templateId={templateId}
+      label={component.label} required={config.required ?? false}
+      value={value && typeof value === 'object' && !Array.isArray(value) && 'method' in value && value.method === 'device_user_verification' ? value as RuntimeDeviceVerificationValue : null}
+      onChange={(proof) => onChange(component.name, proof)}
+    />;
+  }
+
+  const fileTypes = ['FILE', 'PDF', 'MULTIFILE', 'IMAGE', 'PHOTO', 'AUDIO', 'VIDEO', 'OCR'];
   if (fileTypes.includes(type)) {
     if (uploadsDisabled) {
       return (

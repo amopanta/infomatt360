@@ -3,6 +3,8 @@ import time
 from urllib.parse import parse_qs, urlparse
 
 import httpx
+import pytest
+from fastapi import HTTPException
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -17,6 +19,7 @@ from app.main import app
 from app.models.assignment import UserProjectAssignment
 from app.models.identity import Project, Role, User
 from app.models.storage import StorageProfile
+from app.models.files import FileAsset
 from app.core.security import encrypt_text
 
 
@@ -282,6 +285,29 @@ def test_project_admin_can_configure_oauth_without_server_env():
             assert "project-secret" not in profile.credentials_json
     finally:
         settings.google_oauth_client_id, settings.google_oauth_client_secret, settings.google_oauth_redirect_uri = originals
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_existing_drive_evidence_blocks_client_change_and_wrong_account(monkeypatch):
+    engine, sessions = setup_client()
+    originals = _enable_gdrive_config()
+    try:
+        with sessions() as db:
+            profile = StorageProfile(id="drive-protected", project_id="gdrive-project", name="Drive", provider="gdrive", credentials_json=encrypt_text(json.dumps({"client_id": "old", "client_secret": "old-secret", "redirect_uri": "https://example.com/api/v1/storage/oauth/gdrive/callback"})), oauth_tokens_encrypted=encrypt_text(json.dumps({"access_token": "old-token", "refresh_token": "old-refresh", "expires_at": time.time() + 3600})))
+            db.add_all([profile, FileAsset(id="drive-evidence", project_id="gdrive-project", asset_type="IMAGE", original_name="foto.jpg", storage_provider="gdrive", storage_path="gdrive://drive-protected/existing-file", size_bytes=3)])
+            db.commit()
+            with pytest.raises(HTTPException) as captured:
+                gdrive_module.gdrive_storage_service.configure_client(db, "gdrive-project", "new", "new-secret", "https://example.com/api/v1/storage/oauth/gdrive/callback")
+            assert "ya contiene evidencias" in str(captured.value.detail)
+            monkeypatch.setattr(gdrive_module.httpx, "get", lambda *_args, **_kwargs: FakeResponse(404, {}))
+            with pytest.raises(HTTPException) as wrong:
+                gdrive_module.gdrive_storage_service.connect_profile(db, "gdrive-project", {"access_token": "different-account", "refresh_token": "new-refresh", "expires_in": 3600})
+            assert "cuenta original" in str(wrong.value.detail)
+            db.refresh(profile)
+            assert json.loads(decrypt_text(profile.oauth_tokens_encrypted))["access_token"] == "old-token"
+    finally:
+        _restore_gdrive_config(originals)
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
 

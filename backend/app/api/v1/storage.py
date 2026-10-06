@@ -6,13 +6,19 @@ from app.api.permissions import require_project_permission
 from app.core.permissions import STORAGE_MANAGE
 from app.db.session import get_db
 from app.models.identity import User
-from app.schemas.storage import S3StorageProfileConnect, StorageProfileCreate, StorageProfileRead
+from app.schemas.storage import S3StorageProfileConnect, StorageDefaultSelection, StorageProfileCreate, StorageProfileRead
 from app.services.assignment_service import assignment_service
 from app.services.gdrive_storage_service import gdrive_storage_service
 from app.services.s3_storage_service import s3_storage_service
 from app.services.storage_service import storage_service
 
 router = APIRouter()
+
+
+@router.post("/project/{project_id}/default", response_model=StorageProfileRead, summary="Elegir el destino de nuevas evidencias")
+def set_default_storage(project_id: str, payload: StorageDefaultSelection, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> StorageProfileRead:
+    require_project_permission(db, current_user.id, project_id, STORAGE_MANAGE)
+    return storage_service.set_default(db, project_id, payload.profile_id)
 
 
 @router.get("/oauth/gdrive/authorize", summary="Iniciar autorizacion de Google Drive para un proyecto")
@@ -45,3 +51,4 @@ def list_storage_profiles(project_id: str, db: Session = Depends(get_db), curren
     if not assignment_service.user_has_project_access(db, current_user.id, project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
     return storage_service.list_profiles(db, project_id)
+

@@ -266,6 +266,8 @@ class XlsformImportService:
                 continue
 
             mapped_type, config, warning = self._resolve_type(base_type, parts, choices_by_list)
+            if base_type in ("image", "photo") and _cell(row, appearance_col).lower() == "fingerprint":
+                mapped_type = "FINGERPRINT"
             if warning:
                 warnings.append(f"Campo '{field_name}': {warning}")
 

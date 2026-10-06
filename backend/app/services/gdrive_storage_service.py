@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.security import decrypt_text, encrypt_text
+from app.models.files import FileAsset
 from app.models.storage import StorageProfile
 from app.schemas.storage import StorageProfileRead
 from app.services.storage_service import to_read
@@ -67,6 +68,12 @@ class GoogleDriveStorageService:
         replacement = {"client_id": client_id.strip(), "client_secret": client_secret.strip(), "redirect_uri": redirect_uri.strip()}
         previous = json.loads(decrypt_text(profile.credentials_json)) if profile.credentials_json else None
         if previous != replacement:
+            if profile.id and db.query(FileAsset.id).filter(
+                FileAsset.project_id == project_id,
+                FileAsset.storage_provider == "gdrive",
+                FileAsset.storage_path.like(f"gdrive://{profile.id}/%"),
+            ).first():
+                raise HTTPException(status_code=409, detail="Este Drive ya contiene evidencias. No cambies el cliente OAuth; vuelve a autorizar la misma cuenta si la conexión venció.")
             profile.oauth_tokens_encrypted = None  # una aplicación OAuth distinta exige nueva autorización
             if profile.is_default == "true":
                 profile.is_default = "false"
@@ -136,6 +143,22 @@ class GoogleDriveStorageService:
             previous = json.loads(decrypt_text(profile.oauth_tokens_encrypted))
             if previous.get("refresh_token"):
                 tokens = {**tokens, "refresh_token": previous["refresh_token"]}
+        if profile.id and profile.oauth_tokens_encrypted:
+            existing_file = db.query(FileAsset.storage_path).filter(
+                FileAsset.project_id == project_id,
+                FileAsset.storage_provider == "gdrive",
+                FileAsset.storage_path.like(f"gdrive://{profile.id}/%"),
+            ).first()
+            if existing_file:
+                file_id = existing_file[0].rsplit("/", 1)[-1]
+                access_token = tokens.get("access_token")
+                if not access_token:
+                    raise HTTPException(status_code=409, detail="La nueva autorización no permite comprobar las evidencias existentes")
+                check = httpx.get(f"{DOWNLOAD_URL}/{quote(file_id, safe='')}", params={"fields": "id"}, headers={"Authorization": f"Bearer {access_token}"}, timeout=15)
+                if check.status_code >= 500:
+                    raise HTTPException(status_code=502, detail="Google Drive no pudo comprobar las evidencias existentes; intenta más tarde")
+                if check.status_code != 200:
+                    raise HTTPException(status_code=409, detail="La cuenta autorizada no puede abrir las evidencias existentes; autoriza de nuevo la cuenta original")
         profile.oauth_tokens_encrypted = encrypt_text(json.dumps(self._tokens_with_expiry(tokens)))
         profile.status = "active"
         db.commit()

@@ -21,6 +21,7 @@ export type QueuedRecord = {
   id: string;
   projectId: string;
   templateId: string;
+  participantId?: string | null;
   values: QueuedValue[];
   status: 'pending' | 'synced';
   createdAt: string;
@@ -62,12 +63,13 @@ async function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStor
   }
 }
 
-export async function enqueue(record: { projectId: string; templateId: string; values: QueuedValue[] }): Promise<string> {
+export async function enqueue(record: { projectId: string; templateId: string; participantId?: string | null; values: QueuedValue[] }): Promise<string> {
   const id = crypto.randomUUID();
   const entry: QueuedRecord = {
     id,
     projectId: record.projectId,
     templateId: record.templateId,
+    participantId: record.participantId ?? null,
     values: record.values,
     status: 'pending',
     createdAt: new Date().toISOString(),

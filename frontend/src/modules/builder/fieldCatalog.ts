@@ -23,6 +23,7 @@ export const FIELD_CATALOG: BuilderPaletteItem[] = [
   { category: 'Fecha y hora', type: 'MONTH', label: 'Mes', description: 'Periodo mensual' },
   { category: 'Fecha y hora', type: 'WEEK', label: 'Semana', description: 'Periodo semanal' },
   { category: 'Multimedia', type: 'IMAGE', label: 'Fotografia', description: 'Evidencia fotografica' },
+  { category: 'Multimedia', type: 'FINGERPRINT', label: 'Huella dactilar', description: 'Adjuntar imagen de huella dactilar' },
   { category: 'Multimedia', type: 'AUDIO', label: 'Audio', description: 'Grabacion de voz' },
   { category: 'Multimedia', type: 'VIDEO', label: 'Video', description: 'Registro audiovisual' },
   { category: 'Multimedia', type: 'FILE', label: 'Archivo', description: 'Documento adjunto' },

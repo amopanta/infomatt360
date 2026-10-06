@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
-import { createParticipantInForm, fetchCaptureParticipants, fetchRuntimeTemplate, saveRuntimeRecord, startFormAssignment } from './api';
+import { createParticipantInForm, fetchCaptureParticipants, fetchRuntimeTemplate, saveRuntimeRecord, startFormAssignment, toRuntimeValueList } from './api';
+import { enqueueRecord } from '../offline/offlineSync';
 import type { CaptureAssignment, EligibleParticipant } from './api';
 import { ParticipantSummaryTable } from './ParticipantSummaryTable';
 import { ParticipantPhoneCheck } from './ParticipantPhoneCheck';
@@ -32,6 +33,7 @@ export function RuntimeApp() {
   const [newMunicipality, setNewMunicipality] = useState('');
   const [newDepartment, setNewDepartment] = useState('');
   const [creatingParticipant, setCreatingParticipant] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const templateId = getTemplateIdFromPath();
   const isPreview = new URLSearchParams(window.location.search).get('preview') === '1';
@@ -104,11 +106,13 @@ export function RuntimeApp() {
   }
 
   async function save() {
+    if (saving) return;
     if (!template || !projectId) {
       setStatus('Falta proyecto activo en la sesion o plantilla runtime.');
       return;
     }
 
+    setSaving(true);
     try {
       if (!participantsReady) { setStatus('Espera a que se carguen los participantes asociados.'); return; }
       if (!selectedParticipant) { setStatus('Ingresa una llave que identifique a un solo participante habilitado.'); return; }
@@ -117,20 +121,27 @@ export function RuntimeApp() {
       const resolved = resolveFormValues(template, values, pulls);
       const invalid = validateFormValues(template, resolved);
       if (invalid) { setStatus(invalid); return; }
-      const saved = await saveRuntimeRecord({ projectId, templateId: template.template_id, participantId: participantId || null, values: resolved });
+      let saved: { id: string };
+      try {
+        saved = await saveRuntimeRecord({ projectId, templateId: template.template_id, participantId, values: resolved });
+      } catch (error) {
+        // Solo los fallos de transporte entran en la cola. Los rechazos de
+        // validacion o permisos necesitan una correccion del usuario.
+        if (!(error instanceof TypeError)) throw error;
+        await enqueueRecord({ projectId, templateId: template.template_id, participantId, values: toRuntimeValueList(resolved) });
+        clearDraft();
+        setParticipantKey('');
+        setStatus('Respuesta guardada en este dispositivo. Se enviará al recuperar la conexión; verifica el estado de sincronización.');
+        return;
+      }
       setAssignments((current) => current.map((assignment) => assignment.participant_id === participantId ? { ...assignment, status: 'completed', record_id: saved.id } : assignment));
       clearDraft();
       setParticipantKey('');
       setStatus('Respuesta guardada y asociada correctamente.');
     } catch (error) {
-      // TypeError = fetch no pudo conectarse (sin red); un error HTTP real
-      // (validacion, permisos, etc.) no se debe encolar porque volveria a
-      // fallar igual al sincronizar.
-      if (error instanceof TypeError) {
-        setStatus('Sin conexión: conserva el formulario abierto. Para mantener la asociación con el participante, guarda la respuesta cuando vuelva la red.');
-        return;
-      }
       setStatus(error instanceof Error ? error.message : 'No fue posible guardar la respuesta.');
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -178,7 +189,7 @@ export function RuntimeApp() {
               onUpdated={(updated) => setParticipants((current) => current.map((person) => person.id === updated.id ? updated : person))} />}
           </section>}
           footerContent={<div className="runtime-actions">
-            {!isPreview && selectedParticipant && assignmentReady && <button onClick={save}>Guardar respuesta</button>}
+            {!isPreview && selectedParticipant && assignmentReady && <button disabled={saving} onClick={save}>{saving ? 'Guardando...' : 'Guardar respuesta'}</button>}
             {status ? <p>{status}</p> : null}{pullError && <p role="alert">{pullError}</p>}
           </div>} />
       </div>

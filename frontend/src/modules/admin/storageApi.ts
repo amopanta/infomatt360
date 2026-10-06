@@ -65,3 +65,11 @@ export async function authorizeGoogleDrive(projectId: string): Promise<{ authori
   const response = await fetch(`${API_BASE_URL}/storage/oauth/gdrive/authorize?project_id=${encodeURIComponent(projectId)}`, { headers: headers() });
   return parseOrThrow(response, 'No fue posible iniciar la autorizacion de Google Drive.');
 }
+
+export async function selectDefaultStorage(projectId: string, profileId: string): Promise<StorageProfile> {
+  const response = await fetch(`${API_BASE_URL}/storage/project/${encodeURIComponent(projectId)}/default`, {
+    method: 'POST', headers: headers(), body: JSON.stringify({ profile_id: profileId }),
+  });
+  return parseOrThrow(response, 'No fue posible activar el destino de almacenamiento.');
+}
+

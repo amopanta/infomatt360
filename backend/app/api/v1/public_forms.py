@@ -17,7 +17,7 @@ from app.api.deps import get_current_user
 from app.api.permissions import require_project_permission
 from app.core.permissions import BUILDER_WRITE
 from app.db.session import get_db
-from app.models.builder import BuilderTemplate
+from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.identity import User
 from app.schemas.builder_public_link import BuilderPublicLinkCreate, BuilderPublicLinkIssued, BuilderPublicLinkRead
 from app.schemas.public_form import PublicFormSubmitRequest, PublicFormSubmitResponse
@@ -31,6 +31,11 @@ from app.services.runtime_service import runtime_service
 router = APIRouter()
 
 
+def _require_no_device_verification(db: Session, template_id: str) -> None:
+    if db.query(BuilderComponent.id).filter_by(template_id=template_id, component_type="FINGERPRINT").first():
+        raise HTTPException(status_code=422, detail="Este formulario requiere sesión y verificación del dispositivo; no admite enlace público")
+
+
 def _client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
@@ -41,6 +46,7 @@ def create_public_link(payload: BuilderPublicLinkCreate, db: Session = Depends(g
     if template is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plantilla no encontrada")
     require_project_permission(db, current_user.id, template.project_id, BUILDER_WRITE)
+    _require_no_device_verification(db, template.id)
     try:
         return builder_public_link_service.create_link(db, payload, current_user.id)
     except ValueError as exc:
@@ -78,6 +84,7 @@ def get_public_form(token: str, request: Request, db: Session = Depends(get_db))
             raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Demasiados intentos. Intenta nuevamente mas tarde") from exc
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     auth_throttle_service.clear(db, "public-form-ip", ip_address)
+    _require_no_device_verification(db, link.template_id)
     return runtime_service.build_template_runtime(db, link.template_id)
 
 
@@ -94,6 +101,7 @@ def submit_public_form(token: str, payload: PublicFormSubmitRequest, request: Re
             raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Demasiados intentos. Intenta nuevamente mas tarde") from exc
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     auth_throttle_service.clear(db, "public-form-submit-ip", ip_address)
+    _require_no_device_verification(db, link.template_id)
 
     try:
         builder_public_link_service.reserve_submission_slot(db, link)

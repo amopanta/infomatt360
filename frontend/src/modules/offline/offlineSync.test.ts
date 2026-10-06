@@ -105,4 +105,18 @@ describe('offlineSync (modo navegador, sin desktopBridge)', () => {
     expect(result).toEqual({ attempted: 1, synced: 0, failed: 1 });
     expect(await getPendingCount()).toBe(1);
   });
+
+  it('conserva el participante y deja pendiente un resultado omitido por el servidor', async () => {
+    await enqueueRecord({ projectId: 'p1', templateId: 't1', participantId: 'persona-1', values: sampleValues('Ana') });
+    await enqueueRecord({ projectId: 'p1', templateId: 't1', participantId: 'persona-2', values: sampleValues('Beatriz') });
+    let sent: { records: { participant_id: string }[] } | null = null;
+    vi.stubGlobal('fetch', async (_url: string, options: RequestInit) => {
+      sent = JSON.parse(options.body as string);
+      return { ok: true, json: async () => ({ results: [{ index: 0, status: 'created' }] }) };
+    });
+    const result = await syncNow({ apiBaseUrl: 'http://api.test/api/v1', accessToken: 'token' });
+    expect(sent!.records.map((record) => record.participant_id).sort()).toEqual(['persona-1', 'persona-2']);
+    expect(result).toEqual({ attempted: 2, synced: 1, failed: 1 });
+    expect(await getPendingCount()).toBe(1);
+  });
 });

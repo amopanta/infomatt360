@@ -16,6 +16,7 @@ import secrets
 import time
 from urllib.parse import quote
 from urllib.parse import urlencode
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import HTTPException, status
@@ -37,12 +38,46 @@ TOKEN_EXPIRY_SAFETY_MARGIN_SECONDS = 60
 
 
 class GoogleDriveStorageService:
-    def is_configured(self) -> bool:
-        return bool(settings.google_oauth_client_id and settings.google_oauth_client_secret and settings.google_oauth_redirect_uri)
+    def _client_config(self, db: Session, project_id: str) -> dict[str, str]:
+        profile = db.query(StorageProfile).filter_by(project_id=project_id, provider="gdrive").first()
+        if profile and profile.credentials_json:
+            return json.loads(decrypt_text(profile.credentials_json))
+        return {"client_id": settings.google_oauth_client_id, "client_secret": settings.google_oauth_client_secret, "redirect_uri": settings.google_oauth_redirect_uri}
 
-    def _require_configured(self) -> None:
-        if not self.is_configured():
+    def is_configured(self, db: Session, project_id: str) -> bool:
+        config = self._client_config(db, project_id)
+        return all(config.get(key) for key in ("client_id", "client_secret", "redirect_uri"))
+
+    def _require_configured(self, db: Session, project_id: str) -> dict[str, str]:
+        config = self._client_config(db, project_id)
+        if not all(config.get(key) for key in ("client_id", "client_secret", "redirect_uri")):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="El conector de Google Drive no esta configurado en este servidor")
+        return config
+
+    def configure_client(self, db: Session, project_id: str, client_id: str, client_secret: str, redirect_uri: str) -> StorageProfileRead:
+        parsed = urlparse(redirect_uri.strip())
+        if parsed.scheme != "https" or not parsed.netloc or not parsed.path.endswith("/api/v1/storage/oauth/gdrive/callback"):
+            raise HTTPException(status_code=422, detail="La URL de retorno debe ser HTTPS y terminar en /api/v1/storage/oauth/gdrive/callback")
+        if not client_id.strip() or not client_secret.strip():
+            raise HTTPException(status_code=422, detail="Client ID y Client Secret son obligatorios")
+        profile = db.query(StorageProfile).filter_by(project_id=project_id, provider="gdrive").first()
+        if profile is None:
+            profile = StorageProfile(project_id=project_id, name="Google Drive", provider="gdrive", is_default="false")
+            db.add(profile)
+        replacement = {"client_id": client_id.strip(), "client_secret": client_secret.strip(), "redirect_uri": redirect_uri.strip()}
+        previous = json.loads(decrypt_text(profile.credentials_json)) if profile.credentials_json else None
+        if previous != replacement:
+            profile.oauth_tokens_encrypted = None  # una aplicación OAuth distinta exige nueva autorización
+            if profile.is_default == "true":
+                profile.is_default = "false"
+                local = db.query(StorageProfile).filter_by(project_id=project_id, provider="local", status="active").first()
+                if local:
+                    local.is_default = "true"
+        profile.credentials_json = encrypt_text(json.dumps(replacement))
+        profile.status = "active"
+        db.commit()
+        db.refresh(profile)
+        return to_read(profile)
 
     def sign_state(self, project_id: str) -> str:
         signature = hmac.new(settings.secret_key.encode("utf-8"), project_id.encode("utf-8"), hashlib.sha256).hexdigest()
@@ -58,11 +93,11 @@ class GoogleDriveStorageService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Estado de autorizacion invalido")
         return project_id
 
-    def build_authorization_url(self, project_id: str) -> str:
-        self._require_configured()
+    def build_authorization_url(self, db: Session, project_id: str) -> str:
+        config = self._require_configured(db, project_id)
         params = {
-            "client_id": settings.google_oauth_client_id,
-            "redirect_uri": settings.google_oauth_redirect_uri,
+            "client_id": config["client_id"],
+            "redirect_uri": config["redirect_uri"],
             "response_type": "code",
             "scope": DRIVE_SCOPE,
             "access_type": "offline",
@@ -71,15 +106,15 @@ class GoogleDriveStorageService:
         }
         return f"{AUTHORIZE_URL}?{urlencode(params)}"
 
-    def exchange_code_for_tokens(self, code: str) -> dict[str, object]:
-        self._require_configured()
+    def exchange_code_for_tokens(self, db: Session, project_id: str, code: str) -> dict[str, object]:
+        config = self._require_configured(db, project_id)
         response = httpx.post(
             TOKEN_URL,
             data={
                 "code": code,
-                "client_id": settings.google_oauth_client_id,
-                "client_secret": settings.google_oauth_client_secret,
-                "redirect_uri": settings.google_oauth_redirect_uri,
+                "client_id": config["client_id"],
+                "client_secret": config["client_secret"],
+                "redirect_uri": config["redirect_uri"],
                 "grant_type": "authorization_code",
             },
             timeout=15,
@@ -108,7 +143,7 @@ class GoogleDriveStorageService:
         return to_read(profile)
 
     def upload_file(self, db: Session, profile: StorageProfile, filename: str, content: bytes, mime_type: str) -> dict[str, object]:
-        self._require_configured()
+        self._require_configured(db, profile.project_id)
         tokens = self._valid_access_tokens(db, profile)
         media_type = mime_type or "application/octet-stream"
         metadata = json.dumps({"name": filename}, ensure_ascii=False).encode("utf-8")
@@ -157,8 +192,8 @@ class GoogleDriveStorageService:
         response = httpx.post(
             TOKEN_URL,
             data={
-                "client_id": settings.google_oauth_client_id,
-                "client_secret": settings.google_oauth_client_secret,
+                "client_id": self._client_config(db, profile.project_id)["client_id"],
+                "client_secret": self._client_config(db, profile.project_id)["client_secret"],
                 "refresh_token": refresh_token,
                 "grant_type": "refresh_token",
             },

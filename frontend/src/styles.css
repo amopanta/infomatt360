@@ -1374,3 +1374,16 @@ svg.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor
 .teams-options label { display: flex; align-items: start; gap: 8px; padding: 8px; border: 1px solid #e0e7ef; border-radius: 6px; }
 .teams-people { max-height: 350px; overflow-y: auto; }
 @media (max-width: 760px) { .teams-layout { grid-template-columns: 1fr; } }
+.my-forms-eyebrow { margin: 16px 0 2px; color: #64748b; font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
+.my-forms-journey .forms-detail-panel { max-width: 820px; }
+.my-forms-journey input[type="search"] { width: min(100%, 360px); margin: 8px 0 14px; }
+.my-forms-heading { display: flex; justify-content: space-between; align-items: start; gap: 16px; }
+.my-forms-heading h2 { margin: 0; }
+.my-forms-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; width: 100%; padding: 14px; margin: 8px 0; border: 1px solid #dce3eb; border-radius: 10px; background: #fff; text-align: left; }
+.my-forms-row small { display: block; margin-top: 5px; color: #47865c; }
+.my-forms-row button, .my-forms-row a { margin-left: 8px; }
+.my-forms-participant { cursor: pointer; color: inherit; font: inherit; }
+.my-forms-participant:hover { border-color: #237db0; background: #f5faff; }
+.my-forms-values { margin: 14px 0; border: 1px solid #dce3eb; border-radius: 10px; overflow: hidden; }
+.my-forms-values > div { display: grid; grid-template-columns: minmax(150px, 1fr) 1fr; gap: 12px; padding: 12px; border-bottom: 1px solid #dce3eb; overflow-wrap: anywhere; }
+.my-forms-values > div:last-child { border-bottom: 0; }

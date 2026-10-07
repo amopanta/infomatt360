@@ -56,9 +56,11 @@ class MyFormAssignmentRead(BaseModel):
     template_id: str
     template_name: str
     template_status: str
+    access_mode: str
     participant_id: str
     participant_name: str
     document_id: str | None = None
+    external_code: str | None = None
     assignment_status: str
     record_id: str | None = None
 
@@ -139,8 +141,10 @@ def my_form_assignments(project_id: str, db: Session = Depends(get_db), user: Us
     for assignment, template, participant in rows:
         result.append(MyFormAssignmentRead(
             template_id=template.id, template_name=template.name, template_status=template.status,
+            access_mode=configured_source(template).access_mode,
             participant_id=participant.id, participant_name=participant.full_name,
-            document_id=participant.document_id, assignment_status=assignment.status,
+            document_id=participant.document_id, external_code=participant.external_code,
+            assignment_status=assignment.status,
             record_id=record_by_pair.get((template.id, participant.id)),
         ))
     return result

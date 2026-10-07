@@ -6,9 +6,11 @@ export type MyFormAssignment = {
   template_id: string;
   template_name: string;
   template_status: string;
+  access_mode: 'legacy' | 'open' | 'closed';
   participant_id: string;
   participant_name: string;
   document_id: string | null;
+  external_code: string | null;
   assignment_status: string;
   record_id: string | null;
 };

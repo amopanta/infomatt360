@@ -115,6 +115,9 @@ def test_reopening_reverses_erp_and_reapproval_settles_corrected_quantity_once()
             with sessions() as db:
                 assert db.get(ErpInventoryItem, "erp-item-kit").quantity_on_hand == 10
                 assert db.query(ErpPayrollEntry).filter_by(reference_record_id="erp-record-reopen", status="reversed").count() == 1
+                reversed_entry = db.query(ErpPayrollEntry).filter_by(reference_record_id="erp-record-reopen", status="reversed").one()
+                reversed_id = reversed_entry.id
+            assert client.patch(f"/api/v1/erp/payroll/{reversed_id}/mark-paid", headers=manager).status_code == 409
             corrected = client.patch("/api/v1/runtime/record/erp-record-reopen/correction", headers=manager,
                 json={"field_name": "cantidad", "field_value_json": '"2"', "expected_lock_version": 1})
             assert corrected.status_code == 200, corrected.text

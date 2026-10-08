@@ -1,9 +1,28 @@
-export type AdminUser = { id: string; full_name: string; email: string; status: string; must_change_password: boolean; mfa_enabled: boolean };
+export type AdminUser = { id: string; full_name: string; email: string; status: string; must_change_password: boolean; mfa_enabled: boolean; role_id?: string | null; role_name?: string | null; assignment_status?: string; permissions?: string[]; inherited_permissions?: string[] };
+export type AdminRole = { id: string; name: string; permissions: string[] };
 
 import { jsonAuthHeaders } from '../auth/session';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
 function headers() { return jsonAuthHeaders(); }
+
+async function managementRequest<T>(projectId: string, path: string, method = 'GET', body?: unknown): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}/security/admin/projects/${projectId}/${path}`, {
+    method, headers: headers(), ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const result = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(typeof result?.detail === 'string' ? result.detail : 'No fue posible completar la gestión de usuarios.');
+  return result;
+}
+
+export const fetchAdminRoles = (projectId: string) => managementRequest<AdminRole[]>(projectId, 'roles');
+export const fetchGrantablePermissions = (projectId: string) => managementRequest<string[]>(projectId, 'grantable-permissions');
+export const createAdminRole = (projectId: string, name: string, permissions: string[], adminPassword: string) =>
+  managementRequest<AdminRole>(projectId, 'roles', 'POST', { name, permissions, admin_password: adminPassword });
+export const createAdminUser = (projectId: string, data: { full_name: string; document_id: string; email: string; role_id: string }, adminPassword: string) =>
+  managementRequest<{ user: AdminUser; temporary_password: string }>(projectId, 'users', 'POST', { ...data, admin_password: adminPassword });
+export const updateAdminAccess = (projectId: string, userId: string, roleId: string, assignmentStatus: string, adminPassword: string) =>
+  managementRequest<AdminUser>(projectId, `users/${userId}/access`, 'PATCH', { role_id: roleId, assignment_status: assignmentStatus, admin_password: adminPassword });
 
 export async function fetchAdminUsers(projectId: string): Promise<AdminUser[]> {
   const response = await fetch(`${API_BASE_URL}/security/admin/projects/${projectId}/users`, { headers: headers() });

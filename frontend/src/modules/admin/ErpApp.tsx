@@ -1,3 +1,4 @@
+import { formatOperationalDate, operationalStatusLabel } from '../../lib/operationalFormat';
 import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
@@ -16,7 +17,7 @@ import type { ErpInventoryItem, ErpInventoryMovement, ErpPayrollEntry, ErpTempla
 type Tab = 'inventory' | 'payroll' | 'config';
 
 function formatDate(value?: string | null) {
-  return value ? new Date(value).toLocaleString() : '—';
+  return formatOperationalDate(value);
 }
 
 export function ErpApp() {
@@ -174,7 +175,7 @@ export function ErpApp() {
                   {movements.length ? movements.map((movement) => (
                     <article className="erp-movement-card" key={movement.id}>
                       <strong>{Number(movement.quantity_delta) > 0 ? '+' : ''}{movement.quantity_delta}</strong>
-                      <span>{movement.reason}</span>
+                      <span>{operationalStatusLabel(movement.reason)}</span>
                       <small>{formatDate(movement.created_at)}{movement.reference_record_id ? ` · registro ${movement.reference_record_id}` : ''}</small>
                     </article>
                   )) : <p>Este item aun no tiene movimientos.</p>}
@@ -198,10 +199,10 @@ export function ErpApp() {
                 <article className={`erp-payroll-card ${entry.status}`} key={entry.id}>
                   <div>
                     <strong>${entry.amount}</strong>
-                    <span>Gestor: {entry.gestor_user_id}</span>
+                    <span>Gestor: {entry.gestor_name || entry.gestor_user_id}</span>
                     <small>{formatDate(entry.created_at)}{entry.reference_record_id ? ` · registro ${entry.reference_record_id}` : ''}</small>
                   </div>
-                  {entry.status === 'accrued' ? <button onClick={() => void markPaid(entry.id)}>Marcar pagado</button> : <span className="erp-paid-badge">Pagado {formatDate(entry.paid_at)}</span>}
+                  {entry.status === 'accrued' ? <button onClick={() => void markPaid(entry.id)}>Marcar pagado</button> : <span className="erp-paid-badge">{operationalStatusLabel(entry.status)}{entry.status === 'paid' ? ` ${formatDate(entry.paid_at)}` : ''}</span>}
                 </article>
               )) : <p>No hay honorarios registrados.</p>}
             </div>

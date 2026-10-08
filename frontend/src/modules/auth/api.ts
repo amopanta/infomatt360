@@ -39,7 +39,16 @@ export async function fetchSession(token = currentAccessToken()): Promise<AuthSe
   return response.json();
 }
 
-export async function refreshAccessToken(): Promise<string> {
+let refreshInFlight: Promise<string> | null = null;
+
+export function refreshAccessToken(): Promise<string> {
+  if (!refreshInFlight) {
+    refreshInFlight = performRefresh().finally(() => { refreshInFlight = null; });
+  }
+  return refreshInFlight;
+}
+
+async function performRefresh(): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

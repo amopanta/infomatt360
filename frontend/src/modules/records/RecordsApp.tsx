@@ -1,3 +1,4 @@
+import { formatOperationalDate, operationalStatusLabel } from '../../lib/operationalFormat';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
@@ -291,7 +292,7 @@ function ReviewPanel({
             <article key={`${item.action}-${item.to_status}`}>
               <strong>Aprobación parcial: {item.label}</strong>
               <span>{item.approved_count} de {item.required_count} aprobadores completados · faltan {item.pending_count}</span>
-              <small>Destino: {item.to_status}</small>
+              <small>Destino: {operationalStatusLabel(item.to_status)}</small>
             </article>
           ))}
         </div>
@@ -322,7 +323,7 @@ function ReviewPanel({
         {history.length ? (
           history.map((item) => (
             <p key={item.id}>
-              {item.created_at ? new Date(item.created_at).toLocaleString() : ''} · {item.action}: {item.from_status || '—'} → {item.to_status}
+              {item.created_at ? formatOperationalDate(item.created_at) : ''} · {operationalStatusLabel(item.action)}: {operationalStatusLabel(item.from_status)} → {operationalStatusLabel(item.to_status)}
               {item.approval_flow_version ? ` · flujo v${item.approval_flow_version}` : ''}
               {item.notes ? ` · ${item.notes}` : ''}
               {item.rejected_field_name ? ` · Campo: ${item.rejected_field_name}` : ''}
@@ -376,7 +377,7 @@ function TemplateList() {
             <a className="record-template-card" key={template.id} href={`/records/${template.id}`}>
               <strong>{template.name}</strong>
               <span>{template.description || 'Sin descripción'}</span>
-              <small>{template.status}</small>
+              <small>{operationalStatusLabel(template.status)}</small>
             </a>
           ))}
         </div>
@@ -667,7 +668,7 @@ function DeepLinkedRecordCard({
       </div>
       <header>
         <strong>{editMode ? 'Editar respuesta' : 'Respuesta completa'}</strong>
-        <span className={`record-status ${record.status}`}>{record.status}</span>
+        <span className={`record-status ${record.status}`}>{operationalStatusLabel(record.status)}</span>
       </header>
       <div className="record-participant-summary">
         <strong>Participante asociado</strong>
@@ -937,9 +938,9 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
                     <td>{record.participant_document_id || '—'}</td>
                     <td>{record.participant_external_code || '—'}</td>
                     <td>{record.participant_municipality || '—'}</td>
-                    <td>{new Date(record.created_at).toLocaleString()}</td>
-                    <td><span className={`record-status ${record.status}`}>{record.status}</span></td>
-                    <td title={record.submitted_by ?? ''}>{record.submitted_by || '—'}</td>
+                    <td>{formatOperationalDate(record.created_at)}</td>
+                    <td><span className={`record-status ${record.status}`}>{operationalStatusLabel(record.status)}</span></td>
+                    <td title={record.submitted_by ?? ''}>{record.submitted_by_name || record.submitted_by || '—'}</td>
                     {fields.map((field) => {
                       const value = formatValue(record.values.find((item) => item.field_name === field.name)?.field_value_json, true);
                       return <td key={field.name} title={value}>{value}</td>;
@@ -964,7 +965,7 @@ function formatValue(raw?: string, detailed = false): string {
     if (typeof value === 'boolean') return value ? 'Sí' : 'No';
     if (typeof value === 'string' || typeof value === 'number') return String(value);
     if (value && typeof value === 'object' && value.method === 'device_user_verification') {
-      return `Dispositivo verificado${value.verified_at ? ` · ${new Date(value.verified_at).toLocaleString()}` : ''}`;
+      return `Dispositivo verificado${value.verified_at ? ` · ${formatOperationalDate(value.verified_at)}` : ''}`;
     }
     const text = JSON.stringify(value);
     return detailed ? text : `${text.slice(0, 60)}${text.length > 60 ? '…' : ''}`;

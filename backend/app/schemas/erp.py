@@ -51,6 +51,7 @@ class ErpPayrollEntryRead(BaseModel):
     id: str
     project_id: str
     gestor_user_id: str
+    gestor_name: str | None = None
     amount: Decimal
     reference_record_id: str | None = None
     status: str

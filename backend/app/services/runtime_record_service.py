@@ -25,6 +25,7 @@ from app.models.files import FileAsset
 from app.models.device_verification import DeviceVerification
 from app.models.bulk_import import BulkImportJob
 from app.models.participants import Participant
+from app.models.identity import User
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
 from app.schemas.external_api import ExternalRecordTabularPage, ExternalRecordTabularRow
 from app.schemas.runtime_record import RuntimeBulkJobDetail, RuntimeBulkJobRead, RuntimeBulkJobSummary, RuntimeBulkSaveItemResult, RuntimeBulkSaveRequest, RuntimeBulkSaveResponse, RuntimeRecordCreate, RuntimeRecordFieldCorrection, RuntimeRecordPage, RuntimeRecordRead, RuntimeValueCreate, RuntimeValueRead
@@ -50,11 +51,13 @@ def value_to_read(row: RuntimeRecordValue) -> RuntimeValueRead:
     )
 
 
-def record_to_read(db: Session, row: RuntimeRecord) -> RuntimeRecordRead:
+def record_to_read(db: Session, row: RuntimeRecord, submitter_names: dict[str, str] | None = None) -> RuntimeRecordRead:
     """Convierte la cabecera y sus valores en una respuesta consolidada."""
     values = db.query(RuntimeRecordValue).filter(RuntimeRecordValue.record_id == row.id).all()
     participant = db.get(Participant, row.participant_id) if row.participant_id else None
     participant_metadata = json.loads(participant.metadata_json or "{}") if participant else {}
+    submitter = db.get(User, row.submitted_by) if submitter_names is None and row.submitted_by else None
+    submitter_name = submitter_names.get(row.submitted_by) if submitter_names is not None else (submitter.full_name if submitter else None)
     return RuntimeRecordRead(
         id=row.id,
         project_id=row.project_id,
@@ -64,6 +67,7 @@ def record_to_read(db: Session, row: RuntimeRecord) -> RuntimeRecordRead:
         approval_flow_version=row.approval_flow_version,
         status=row.status,
         submitted_by=row.submitted_by,
+        submitted_by_name=submitter_name,
         device_id=row.device_id,
         ip_address=row.ip_address,
         parent_record_id=row.parent_record_id,
@@ -91,6 +95,12 @@ def _compute_content_hash(project_id: str, template_id: str, values) -> str:
     canonical = sorted((item.field_name, item.field_value_json) for item in values)
     raw = json.dumps({"project_id": project_id, "template_id": template_id, "values": canonical}, sort_keys=True)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def records_to_read(db: Session, rows: list[RuntimeRecord]) -> list[RuntimeRecordRead]:
+    user_ids = {row.submitted_by for row in rows if row.submitted_by}
+    names = dict(db.query(User.id, User.full_name).filter(User.id.in_(user_ids)).all()) if user_ids else {}
+    return [record_to_read(db, row, names) for row in rows]
 
 
 class RuntimeRecordService:
@@ -291,7 +301,7 @@ class RuntimeRecordService:
             RuntimeRecord.parent_record_id == parent_record_id,
             RuntimeRecord.parent_field_name == field_name,
         ).order_by(RuntimeRecord.created_at.asc()).all()
-        return [record_to_read(db, row) for row in rows]
+        return records_to_read(db, rows)
 
     def save_records_bulk(self, db: Session, payload: RuntimeBulkSaveRequest, user_id: str | None) -> RuntimeBulkSaveResponse:
         """Guarda registros por lotes para integraciones de alto volumen.
@@ -914,7 +924,7 @@ class RuntimeRecordService:
         if allowed_participant_ids is not None:
             query = query.filter(RuntimeRecord.participant_id.in_(allowed_participant_ids))
         rows = query.order_by(RuntimeRecord.created_at.desc()).all()
-        return [record_to_read(db, row) for row in rows]
+        return records_to_read(db, rows)
 
     def search_template_records(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, limit: int = 25, offset: int = 0, unlinked_only: bool = False, field_filters: dict[str, str] | None = None, sort_by: str = "created_at", sort_dir: str = "desc", allowed_participant_ids: list[str] | None = None) -> RuntimeRecordPage:
         """Consulta paginada de registros Runtime con filtros seguros para uso operativo.
@@ -954,7 +964,7 @@ class RuntimeRecordService:
             sort_column = sort_columns.get(sort_by, RuntimeRecord.created_at)
         direction = sort_column.asc() if sort_dir == "asc" else sort_column.desc()
         rows = query.order_by(direction, RuntimeRecord.id.asc()).offset(offset).limit(limit).all()
-        return RuntimeRecordPage(items=[record_to_read(db, row) for row in rows], total=total, limit=limit, offset=offset)
+        return RuntimeRecordPage(items=records_to_read(db, rows), total=total, limit=limit, offset=offset)
 
     def export_template_csv(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, allowed_participant_ids: list[str] | None = None) -> str:
         query = self._filtered_records_query(db, template_id, search, status)

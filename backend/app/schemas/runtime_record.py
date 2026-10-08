@@ -165,6 +165,7 @@ class RuntimeRecordRead(BaseModel):
     approval_flow_version: str | None = None
     status: str
     submitted_by: str | None = None
+    submitted_by_name: str | None = None
     device_id: str | None = None
     ip_address: str | None = None
     parent_record_id: str | None = None

@@ -34,7 +34,7 @@ def setup_client():
         template_a2 = BuilderTemplate(id="orgtest-template-a2", project_id=project_a2.id, name="Plantilla A2", status="published")
         template_b1 = BuilderTemplate(id="orgtest-template-b1", project_id=project_b1.id, name="Plantilla B1", status="published")
 
-        national_role = Role(id="orgtest-national-role", name="Administrador nacional", permissions="projects.read,records.read,records.write,records.review,records.approve,organizations.manage,identity.users.manage")
+        national_role = Role(id="orgtest-national-role", name="Administrador nacional", permissions="projects.read,records.read,records.write,records.review,records.approve,organizations.manage,identity.users.manage,gis.read,messages.read,reports.export")
         auditor_role = Role(id="orgtest-auditor-role", name="Auditor/Consulta", permissions="projects.read,records.read,gis.read,messages.read,reports.export")
         no_manage_role = Role(id="orgtest-no-manage-role", name="Sin gestion de organizacion", permissions="records.read")
 

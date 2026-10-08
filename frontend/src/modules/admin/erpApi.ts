@@ -21,6 +21,7 @@ export type ErpPayrollEntry = {
   id: string;
   project_id: string;
   gestor_user_id: string;
+  gestor_name?: string | null;
   amount: string;
   reference_record_id?: string | null;
   status: string;

@@ -1,0 +1,29 @@
+{
+  "name": "infomatt360-mobile",
+  "version": "1.0.0",
+  "description": "InfoMatt360 - API + SPA movil para recoleccion de datos en campo",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "seed": "node src/utils/seed.js",
+    "docker:build": "docker build -t infomatt360-mobile .",
+    "docker:run": "docker run -p 3000:3000 --env-file .env -v $(pwd)/data:/app/data infomatt360-mobile"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["infomatt", "campo", "encuestas", "mobile", "offline"],
+  "author": "InfoMatt Colombia SAS",
+  "license": "ISC",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.6",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.4.0",
+    "uuid": "^14.0.2"
+  }
+}

@@ -1,0 +1,1578 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>InfoMatt360 Mobile</title>
+<link rel="icon" type="image/svg+xml" href="/img/favicon.svg">
+<link rel="apple-touch-icon" href="/img/favicon.svg">
+<meta name="theme-color" content="#0A2540">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    /* InfoMatt brand palette */
+    --bg: #EFF3F8;
+    --surface: #FFFFFF;
+    --primary: #0066CC;
+    --primary-dark: #0A2540;
+    --primary-light: #00C2FF;
+    --accent: #00C2FF;
+    --success: #00B87A;
+    --warning: #E6A817;
+    --error: #DC3545;
+    --text: #0A2540;
+    --text-secondary: #4A6A8A;
+    --text-on-primary: #FFFFFF;
+    --border: #D0DCE8;
+    --disabled: #B0C0D0;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --radius-full: 999px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #060E1A; --surface: #0A2540; --primary: #0066CC; --primary-dark: #051829;
+      --primary-light: #00C2FF; --accent: #00C2FF; --text: #E8F0F8; --text-secondary: #7A9BB8;
+      --text-on-primary: #FFFFFF; --border: #163050; --disabled: #2A4A68;
+      --success: #00D48A; --warning: #F0B830; --error: #F05060;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #060E1A; --surface: #0A2540; --primary: #0066CC; --primary-dark: #051829;
+    --primary-light: #00C2FF; --accent: #00C2FF; --text: #E8F0F8; --text-secondary: #7A9BB8;
+    --text-on-primary: #FFFFFF; --border: #163050; --disabled: #2A4A68;
+    --success: #00D48A; --warning: #F0B830; --error: #F05060;
+    color-scheme: dark;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, sans-serif;
+    display: flex; justify-content: center; align-items: flex-start;
+    min-height: 100vh; padding-block: 16px;
+  }
+
+  .phone-frame {
+    width: 390px; max-width: 100%; min-height: 780px; background: var(--bg);
+    border-radius: 24px; overflow: hidden;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.12), 0 0 0 1px var(--border);
+    display: flex; flex-direction: column; position: relative;
+  }
+  @media (max-width: 420px) {
+    body { padding-block: 0; }
+    .phone-frame { border-radius: 0; box-shadow: none; min-height: 100vh; }
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%);
+    color: var(--text-on-primary);
+    padding: 14px 16px; display: flex; align-items: center; gap: 12px;
+    min-height: 56px; position: relative; z-index: 10;
+  }
+  .header-back {
+    width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; border-radius: 50%; border: none; background: transparent;
+    color: var(--text-on-primary); font-size: 20px; flex-shrink: 0;
+  }
+  .header-back:hover { background: rgba(255,255,255,0.15); }
+  .header-title { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+
+  /* Screens */
+  .screen { display: none; flex-direction: column; flex: 1; overflow: hidden; animation: fadeIn 0.2s ease; }
+  .screen.active { display: flex; }
+  .screen-body { flex: 1; overflow-y: auto; }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Tab Bar — 6 tabs */
+  .tab-bar {
+    display: flex; background: var(--surface); border-top: 1px solid var(--border);
+    padding: 4px 0; flex-shrink: 0;
+  }
+  .tab-item {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 1px;
+    padding: 4px 0; cursor: pointer; border: none; background: transparent;
+    color: var(--text-secondary); font-family: inherit;
+  }
+  .tab-item.active { color: var(--primary); }
+  .tab-item .tab-icon { font-size: 18px; line-height: 1; }
+  .tab-item .tab-label { font-size: 9px; font-weight: 500; }
+  .tab-item.active .tab-label { font-weight: 600; }
+  .tab-badge {
+    position: absolute; top: -2px; right: -8px; background: var(--warning);
+    border-radius: 8px; min-width: 14px; height: 14px; display: flex;
+    align-items: center; justify-content: center; padding: 0 3px;
+    font-size: 9px; font-weight: 700; color: #FFF;
+  }
+
+  /* Search */
+  .search-bar { background: var(--surface); padding: 12px 16px 8px; border-bottom: 1px solid var(--border); }
+  .search-input {
+    width: 100%; padding: 10px 14px; border: 1px solid var(--border);
+    border-radius: var(--radius-sm); font-size: 14px; font-family: inherit;
+    background: var(--bg); color: var(--text); outline: none;
+  }
+  .search-input:focus { border-color: var(--primary); }
+  .search-input::placeholder { color: var(--text-secondary); }
+  .search-count { font-size: 12px; color: var(--text-secondary); margin-top: 4px; }
+
+  /* Cards */
+  .card {
+    display: flex; align-items: center; background: var(--surface);
+    border-radius: var(--radius); padding: 14px; margin: 0 16px 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06); cursor: pointer;
+    border: none; width: calc(100% - 32px); text-align: left;
+    font-family: inherit; color: var(--text);
+  }
+  .card:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .avatar {
+    width: 44px; height: 44px; border-radius: 50%; background: var(--primary);
+    color: var(--text-on-primary); display: flex; align-items: center;
+    justify-content: center; font-size: 18px; font-weight: 700;
+    flex-shrink: 0; margin-right: 12px;
+  }
+  .card-content { flex: 1; min-width: 0; }
+  .card-name { font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card-doc { font-size: 13px; color: var(--text-secondary); margin-top: 2px; }
+  .card-code { font-size: 12px; color: var(--primary); font-weight: 500; margin-top: 2px; }
+  .card-chevron { font-size: 22px; color: var(--text-secondary); margin-left: 8px; flex-shrink: 0; }
+
+  /* Detail header */
+  .detail-header { background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary) 100%); padding: 16px 16px 20px; color: var(--text-on-primary); }
+  .detail-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.6px; opacity: 0.8; font-weight: 600; margin-bottom: 4px; }
+  .detail-name { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+  .detail-doc { font-size: 14px; opacity: 0.9; }
+  .detail-extra { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+
+  /* Progress */
+  .progress-section { background: var(--surface); padding: 14px 16px; border-bottom: 1px solid var(--border); }
+  .progress-label { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+  .progress-track { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+  .progress-fill { height: 100%; background: var(--success); border-radius: 3px; }
+
+  /* Form status cards */
+  .form-card { display: flex; align-items: center; background: var(--surface); border-radius: var(--radius); padding: 14px; margin: 0 16px 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .form-card-content { flex: 1; min-width: 0; }
+  .form-card-name { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .status-row { display: flex; align-items: center; gap: 8px; }
+  .badge { display: inline-flex; align-items: center; padding: 2px 10px; border-radius: var(--radius-full); font-size: 11px; font-weight: 600; }
+  .badge-applied { background: rgba(46,125,50,0.12); color: var(--success); }
+  .badge-pending { background: rgba(117,117,117,0.1); color: var(--text-secondary); font-weight: 500; }
+  .applied-date { font-size: 11px; color: var(--text-secondary); }
+  .form-actions { display: flex; flex-direction: column; gap: 4px; margin-left: 8px; flex-shrink: 0; }
+
+  .btn-sm {
+    padding: 6px 14px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 600;
+    border: none; cursor: pointer; text-align: center; font-family: inherit;
+  }
+  .btn-sm:hover { opacity: 0.85; }
+  .btn-view { background: rgba(0,102,204,0.1); color: var(--primary); }
+  .btn-acta { background: rgba(16,185,129,0.1); color: var(--success); }
+  .btn-capture { background: rgba(0,194,255,0.1); color: var(--accent); }
+
+  /* Record detail */
+  .record-section { padding: 16px; }
+  .record-section-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); font-weight: 600; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .field-row { display: flex; justify-content: space-between; align-items: flex-start; padding: 8px 0; gap: 12px; }
+  .field-row + .field-row { border-top: 1px solid var(--border); }
+  .field-label { font-size: 13px; color: var(--text-secondary); flex-shrink: 0; max-width: 40%; }
+  .field-value { font-size: 13px; font-weight: 500; text-align: right; min-width: 0; word-break: break-word; }
+
+  /* Evidence grid */
+  .evidence-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 0 16px 16px; }
+  .evidence-thumb { aspect-ratio: 1; border-radius: var(--radius-sm); background: var(--border); display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; font-size: 32px; }
+  .evidence-badge { position: absolute; bottom: 4px; left: 4px; background: rgba(0,0,0,0.7); color: white; font-size: 9px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+
+  /* Status tags */
+  .status-tag { display: inline-flex; align-items: center; gap: 4px; padding: 4px 12px; border-radius: var(--radius-full); font-size: 12px; font-weight: 600; }
+  .status-synced { background: rgba(46,125,50,0.12); color: var(--success); }
+  .status-pending { background: rgba(245,127,23,0.12); color: var(--warning); }
+  .gps-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--text-secondary); margin-top: 8px; }
+
+  /* Acta */
+  .acta-success { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 24px; text-align: center; flex: 1; }
+  .acta-check { font-size: 64px; margin-bottom: 16px; }
+  .acta-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; }
+  .acta-subtitle { font-size: 14px; color: var(--text-secondary); margin-bottom: 24px; line-height: 1.5; }
+  .acta-list { text-align: left; margin-bottom: 24px; font-size: 13px; color: var(--text-secondary); line-height: 1.8; }
+
+  .btn-primary {
+    background: var(--primary); color: var(--text-on-primary); padding: 14px 32px;
+    border-radius: var(--radius-sm); font-size: 15px; font-weight: 600;
+    border: none; cursor: pointer; font-family: inherit; width: 100%; max-width: 280px;
+  }
+  .btn-primary:hover { opacity: 0.9; }
+
+  /* Form list */
+  .form-list-card { display: flex; align-items: center; background: var(--surface); border-radius: var(--radius); padding: 14px; margin: 0 16px 8px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .form-list-icon { width: 40px; height: 40px; border-radius: var(--radius-sm); background: rgba(0,102,204,0.08); display: flex; align-items: center; justify-content: center; font-size: 18px; margin-right: 12px; flex-shrink: 0; }
+  .form-list-content { flex: 1; min-width: 0; }
+  .form-list-name { font-size: 14px; font-weight: 600; }
+  .form-list-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .form-list-meta { font-size: 11px; color: var(--primary); font-weight: 500; margin-top: 4px; }
+
+  /* Empty state */
+  .empty-state { display: flex; flex-direction: column; align-items: center; padding: 48px 24px; text-align: center; }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .empty-sub { font-size: 13px; color: var(--text-secondary); }
+
+  .list-pad { padding-top: 12px; padding-bottom: 16px; }
+  .offline-banner { background: linear-gradient(90deg, #0A2540, #0066CC); color: #FFFFFF; font-size: 12px; font-weight: 600; text-align: center; padding: 6px 16px; letter-spacing: 0.3px; }
+
+  /* ── Login screen ── */
+  .login-container {
+    flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 24px 16px;
+    background: linear-gradient(160deg, #0A2540 0%, #0C2E4A 40%, #0066CC 100%);
+    position: relative; overflow: hidden;
+  }
+  .login-container::before {
+    content: ''; position: absolute; top: -60%; right: -40%; width: 500px; height: 500px;
+    background: radial-gradient(circle, rgba(0,194,255,0.15) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .login-container::after {
+    content: ''; position: absolute; bottom: -30%; left: -20%; width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(59,130,246,0.2) 0%, transparent 70%);
+    border-radius: 50%;
+  }
+  .login-card {
+    background: rgba(255,255,255,0.95); backdrop-filter: blur(16px);
+    border: 1px solid rgba(255,255,255,0.3); border-radius: 20px;
+    padding: 32px 24px; width: 100%;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.1);
+    position: relative; z-index: 1;
+  }
+  .login-logo { text-align: center; margin-bottom: 16px; }
+  .login-title { font-size: 26px; font-weight: 700; color: var(--primary-dark); text-align: center; margin-bottom: 2px; letter-spacing: 2px; }
+  .login-subtitle { font-size: 11px; color: #00C2FF; text-align: center; margin-bottom: 24px; letter-spacing: 1.5px; text-transform: uppercase; font-weight: 600; }
+  .login-input {
+    width: 100%; padding: 13px 14px; border: 1.5px solid #E5E7EB;
+    border-radius: 10px; font-size: 14px; font-family: inherit;
+    background: #F9FAFB; color: #111827; outline: none; margin-bottom: 12px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .login-input:focus { border-color: #0066CC; box-shadow: 0 0 0 3px rgba(0,102,204,0.15); background: #FFF; }
+  .login-input::placeholder { color: #9CA3AF; }
+  .login-btn {
+    width: 100%; padding: 14px; background: linear-gradient(135deg, #0066CC 0%, #00C2FF 100%);
+    color: #FFFFFF; border: none; border-radius: 10px; font-size: 15px;
+    font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 4px;
+    letter-spacing: 0.5px; box-shadow: 0 4px 14px rgba(0,194,255,0.35);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .login-btn:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,194,255,0.4); }
+
+  /* Server config */
+  .server-indicator {
+    display: flex; justify-content: space-between; align-items: center;
+    background: #F3F4F6; border-radius: 10px; padding: 10px 12px;
+    margin-bottom: 12px; border: 1px solid #E5E7EB; cursor: pointer;
+    transition: background 0.2s;
+  }
+  .server-indicator:hover { background: #E5E7EB; }
+  .server-indicator-label { font-size: 12px; color: #6B7280; }
+  .server-panel {
+    background: #F9FAFB; border-radius: 10px; padding: 12px;
+    margin-bottom: 12px; border: 1px solid rgba(0,102,204,0.2);
+  }
+  .server-panel-label { font-size: 11px; font-weight: 600; color: #0066CC; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .server-panel-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .server-panel-btn {
+    flex: 1; padding: 8px; border-radius: 8px; font-size: 12px;
+    font-weight: 600; border: none; cursor: pointer; font-family: inherit; text-align: center;
+  }
+  .server-panel-btn.primary { background: #0066CC; color: #FFFFFF; }
+  .server-panel-btn.secondary { background: transparent; border: 1px solid #D1D5DB; color: #6B7280; }
+  .server-hint { font-size: 10px; color: #9CA3AF; font-style: italic; margin-top: 6px; }
+
+  /* ── Stats ── */
+  .stats-section { padding: 16px; }
+  .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .stat-card {
+    background: var(--surface); border-radius: var(--radius); padding: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06); text-align: center;
+  }
+  .stat-value { font-size: 24px; font-weight: 700; color: var(--primary); }
+  .stat-label { font-size: 11px; color: var(--text-secondary); margin-top: 4px; font-weight: 500; }
+
+  .coverage-card {
+    background: var(--surface); border-radius: var(--radius); padding: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 12px;
+  }
+  .coverage-header { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  .coverage-row { display: flex; align-items: center; gap: 16px; }
+  .coverage-circle {
+    width: 80px; height: 80px; border-radius: 50%; position: relative;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .coverage-pct { font-size: 20px; font-weight: 700; color: var(--primary); }
+  .coverage-details { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+  .coverage-detail { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-secondary); }
+  .coverage-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Chart card */
+  .chart-card {
+    background: var(--surface); border-radius: var(--radius); padding: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 12px;
+  }
+  .chart-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  .chart-bars { display: flex; align-items: flex-end; gap: 4px; height: 120px; padding-bottom: 20px; position: relative; }
+  .chart-bar-group { flex: 1; display: flex; flex-direction: column; align-items: center; position: relative; height: 100%; justify-content: flex-end; }
+  .chart-bar {
+    width: 100%; max-width: 28px; border-radius: 4px 4px 0 0; position: relative;
+    display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden;
+  }
+  .chart-bar-synced { background: var(--success); }
+  .chart-bar-pending { background: var(--warning); }
+  .chart-bar-count { font-size: 9px; font-weight: 600; color: var(--text-secondary); text-align: center; margin-bottom: 2px; }
+  .chart-bar-label { font-size: 9px; color: var(--text-secondary); text-align: center; margin-top: 4px; position: absolute; bottom: -18px; white-space: nowrap; }
+  .chart-legend { display: flex; gap: 16px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+  .chart-legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--text-secondary); }
+  .chart-legend-dot { width: 8px; height: 8px; border-radius: 2px; }
+
+  /* Hourly chart */
+  .hourly-bars { display: flex; align-items: flex-end; gap: 2px; height: 80px; padding-bottom: 18px; position: relative; }
+  .hourly-bar-group { flex: 1; display: flex; flex-direction: column; align-items: center; height: 100%; justify-content: flex-end; position: relative; }
+  .hourly-bar { width: 100%; max-width: 16px; border-radius: 3px 3px 0 0; background: var(--primary); }
+  .hourly-label { font-size: 8px; color: var(--text-secondary); position: absolute; bottom: -14px; }
+  .hourly-count { font-size: 8px; color: var(--text-secondary); margin-bottom: 2px; }
+
+  /* Profile menu items */
+  .profile-menu-item {
+    display: flex; align-items: center; background: var(--surface);
+    border-radius: var(--radius); padding: 14px; margin: 0 16px 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06); cursor: pointer;
+    border: none; width: calc(100% - 32px); text-align: left;
+    font-family: inherit; color: var(--text); gap: 12px;
+  }
+  .profile-menu-item:hover { background: var(--bg); }
+  .profile-menu-icon { font-size: 20px; flex-shrink: 0; }
+  .profile-menu-label { font-size: 14px; font-weight: 500; flex: 1; }
+  .profile-menu-chevron { font-size: 18px; color: var(--text-secondary); }
+
+  /* Settings */
+  .settings-section { padding: 16px; }
+  .settings-group { margin-bottom: 20px; }
+  .settings-group-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-secondary); font-weight: 600; margin-bottom: 8px; }
+  .settings-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px; background: var(--surface); border-radius: var(--radius-sm);
+    margin-bottom: 4px; min-height: 48px;
+  }
+  .settings-row-label { font-size: 14px; font-weight: 500; }
+  .settings-row-value { font-size: 13px; color: var(--text-secondary); }
+  .settings-badge {
+    display: inline-flex; padding: 2px 8px; border-radius: var(--radius-full);
+    font-size: 10px; font-weight: 600;
+  }
+  .settings-badge-default { background: rgba(0,102,204,0.1); color: var(--primary); }
+  .settings-badge-custom { background: rgba(0,194,255,0.1); color: var(--accent); }
+
+  /* Map placeholder */
+  .map-placeholder {
+    flex: 1; min-height: 400px; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; position: relative; overflow: hidden;
+    background: linear-gradient(180deg, #DBEAFE 0%, #EEF2FF 40%, #E0E7FF 100%);
+  }
+  .map-placeholder::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      linear-gradient(90deg, rgba(0,102,204,0.06) 1px, transparent 1px),
+      linear-gradient(rgba(0,102,204,0.06) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .map-pin { position: absolute; font-size: 28px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2)); z-index: 2; }
+  .map-bottom {
+    position: absolute; bottom: 0; left: 0; right: 0; z-index: 3;
+    background: var(--surface); padding: 14px 16px; border-radius: var(--radius) var(--radius) 0 0;
+    box-shadow: 0 -4px 12px rgba(0,0,0,0.1);
+  }
+
+  /* Date filter */
+  .date-filter-card {
+    background: var(--surface); border-radius: var(--radius); padding: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 12px;
+  }
+  .date-filter-title {
+    font-size: 11px; font-weight: 700; color: var(--primary); text-transform: uppercase;
+    letter-spacing: 0.5px; margin-bottom: 8px;
+  }
+  .date-filter-row { display: flex; align-items: center; gap: 8px; }
+  .date-field {
+    flex: 1; display: flex; flex-direction: column; background: var(--bg);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: 6px 10px; position: relative;
+  }
+  .date-field:focus-within { border-color: var(--primary); }
+  .date-field-label { font-size: 10px; color: var(--text-secondary); margin-bottom: 2px; }
+  .date-field input[type="date"] {
+    border: none; background: transparent; font-size: 14px; font-weight: 600;
+    color: var(--text); font-family: inherit; outline: none; width: 100%;
+    padding: 0; -webkit-appearance: none; cursor: pointer;
+  }
+  .date-field input[type="date"]::-webkit-calendar-picker-indicator {
+    opacity: 0.5; cursor: pointer;
+  }
+  .date-separator { font-size: 16px; color: var(--text-secondary); }
+  .quick-filters { display: flex; gap: 6px; margin-top: 8px; }
+  .quick-filter-btn {
+    flex: 1; padding: 6px 0; border-radius: var(--radius-full);
+    background: rgba(0,102,204,0.08); border: none; cursor: pointer;
+    font-size: 12px; color: var(--primary); font-weight: 600; font-family: inherit;
+    text-align: center;
+  }
+  .quick-filter-btn.active { background: var(--primary); color: var(--text-on-primary); }
+  .quick-filter-btn:hover { opacity: 0.85; }
+
+  /* Report buttons */
+  .report-card {
+    background: var(--surface); border-radius: var(--radius); padding: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06); margin-bottom: 12px;
+  }
+  .report-desc { font-size: 12px; color: var(--text-secondary); text-align: center; margin-bottom: 10px; }
+  .report-actions { display: flex; gap: 8px; }
+  .report-btn {
+    flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 12px; border-radius: var(--radius-sm); border: none; cursor: pointer;
+    font-size: 14px; font-weight: 600; font-family: inherit;
+  }
+  .report-btn:hover { opacity: 0.85; }
+  .report-btn-csv { background: var(--primary); color: var(--text-on-primary); }
+  .report-btn-json { background: transparent; border: 1.5px solid var(--primary); color: var(--primary); }
+
+  /* Drafts card */
+  .draft-card {
+    display: flex; align-items: center; background: var(--surface);
+    border-radius: var(--radius); padding: 14px; margin: 0 16px 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06); cursor: pointer;
+    border: none; width: calc(100% - 32px); text-align: left;
+    font-family: inherit; color: var(--text);
+  }
+  .draft-icon { font-size: 20px; margin-right: 12px; flex-shrink: 0; }
+  .draft-content { flex: 1; min-width: 0; }
+  .draft-name { font-size: 14px; font-weight: 600; }
+  .draft-meta { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+  .draft-status { font-size: 11px; color: var(--accent); font-weight: 500; margin-top: 2px; }
+</style>
+
+<div class="phone-frame" id="app">
+  <div class="offline-banner">⚡ Modo offline — datos locales</div>
+
+  <!-- ═══ LOGIN ═══ -->
+  <div class="screen" id="screen-login">
+    <div class="login-container">
+      <div class="login-card">
+        <div class="login-logo">
+          <img src="/img/logo.svg" alt="InfoMatt" width="80" height="88" style="display:block;margin:0 auto">
+        </div>
+        <div class="login-title">INFOMATT</div>
+        <div class="login-subtitle">Tecnología que impulsa resultados</div>
+
+        <div class="server-indicator" onclick="toggleServerPanel()">
+          <span class="server-indicator-label" id="server-label">Servidor: Por defecto</span>
+          <span class="server-indicator-label" id="server-arrow">▼</span>
+        </div>
+
+        <div id="server-panel" style="display:none">
+          <div class="server-panel">
+            <div class="server-panel-label">URL del servidor</div>
+            <input class="login-input" id="server-url-input" placeholder="https://infomatt360.tecnomatt.com/api/v1" style="margin-bottom:4px">
+            <div class="server-panel-actions">
+              <button class="server-panel-btn primary" onclick="saveServerUrl()">Guardar</button>
+              <button class="server-panel-btn secondary" onclick="resetServerUrl()">Usar defecto</button>
+            </div>
+            <div class="server-hint">Ejemplo: https://miservidor.com/api/v1</div>
+          </div>
+        </div>
+
+        <input class="login-input" placeholder="Organizacion (opcional)">
+        <input class="login-input" placeholder="Correo electronico" type="email">
+        <input class="login-input" placeholder="Contrasena" type="password">
+        <button class="login-btn" onclick="doLogin()">Iniciar Sesion</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FORMULARIOS ═══ -->
+  <div class="screen active" id="screen-forms">
+    <div class="header">
+      <img src="/img/favicon.svg" alt="" width="24" height="24" style="border-radius:4px;flex-shrink:0">
+      <span class="header-title">Formularios</span>
+    </div>
+    <div class="screen-body list-pad" id="forms-list"></div>
+    <div class="tab-bar" data-tabs></div>
+  </div>
+
+  <!-- ═══ PARTICIPANTES ═══ -->
+  <div class="screen" id="screen-participants">
+    <div class="header"><img src="/img/favicon.svg" alt="" width="24" height="24" style="border-radius:4px;flex-shrink:0"><span class="header-title">Participantes</span></div>
+    <div class="search-bar">
+      <input class="search-input" placeholder="Buscar por nombre, cedula o codigo" id="search-input" oninput="filterParticipants()">
+      <div class="search-count" id="search-count">6 de 6 participantes</div>
+    </div>
+    <div class="screen-body list-pad" id="participant-list"></div>
+    <div class="tab-bar" data-tabs></div>
+  </div>
+
+  <!-- ═══ PARTICIPANTE DETALLE ═══ -->
+  <div class="screen" id="screen-detail">
+    <div class="header">
+      <button class="header-back" onclick="goBack('screen-participants')">‹</button>
+      <img src="/img/favicon.svg" alt="" width="24" height="24" style="border-radius:4px;flex-shrink:0">
+      <span class="header-title">Participante</span>
+    </div>
+    <div class="screen-body">
+      <div class="detail-header" id="detail-header"></div>
+      <div class="progress-section" id="progress-section"></div>
+      <div class="list-pad" id="form-status-list"></div>
+    </div>
+  </div>
+
+  <!-- ═══ REGISTRO DETALLE ═══ -->
+  <div class="screen" id="screen-record">
+    <div class="header">
+      <button class="header-back" onclick="goBack('screen-detail')">‹</button>
+      <img src="/img/favicon.svg" alt="" width="24" height="24" style="border-radius:4px;flex-shrink:0">
+      <span class="header-title">Respuestas enviadas</span>
+    </div>
+    <div class="screen-body" id="record-body"></div>
+  </div>
+
+  <!-- ═══ ACTA ═══ -->
+  <div class="screen" id="screen-acta">
+    <div class="header">
+      <button class="header-back" onclick="goBack('screen-detail')">‹</button>
+      <img src="/img/favicon.svg" alt="" width="24" height="24" style="border-radius:4px;flex-shrink:0">
+      <span class="header-title">Generar Acta</span>
+    </div>
+    <div class="screen-body">
+      <div class="acta-success">
+        <div class="acta-check">✅</div>
+        <div class="acta-title">Acta PDF generada exitosamente</div>
+        <div class="acta-subtitle" id="acta-participant-name"></div>
+        <div class="acta-list">El documento incluye:<br>• Datos del participante<br>• Respuestas del formulario<br>• Huellas dactilares visibles<br>• Firma digital<br>• Ubicacion GPS</div>
+        <button class="btn-primary" onclick="showToast('Compartiendo acta...')">📤 Compartir Acta PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ BORRADORES ═══ -->
+  <div class="screen" id="screen-drafts">
+    <div class="header"><img src="/img/favicon.svg" alt="" width="24" height="24" style="border-radius:4px;flex-shrink:0"><span class="header-title">Borradores</span></div>
+    <div class="screen-body list-pad" id="drafts-list"></div>
+    <div class="tab-bar" data-tabs></div>
+  </div>
+
+  <!-- ═══ MAPA ═══ -->
+  <div class="screen" id="screen-map">
+    <div class="header"><img src="/img/favicon.svg" alt="" width="24" height="24" style="border-radius:4px;flex-shrink:0"><span class="header-title">Mapa de registros</span></div>
+    <div class="screen-body" style="display:flex;flex-direction:column">
+      <div class="empty-state" style="padding-top:120px">
+        <div class="empty-icon">🗺️</div>
+        <div class="empty-title">Cargando mapa...</div>
+      </div>
+    </div>
+    <div class="tab-bar" data-tabs></div>
+  </div>
+
+  <!-- ═══ SYNC ═══ -->
+  <div class="screen" id="screen-sync">
+    <div class="header"><img src="/img/favicon.svg" alt="" width="24" height="24" style="border-radius:4px;flex-shrink:0"><span class="header-title">Sincronizacion</span></div>
+    <div class="screen-body">
+      <div class="empty-state" style="padding-top:80px">
+        <div class="empty-icon">🔄</div>
+        <div class="empty-title">Cargando...</div>
+      </div>
+    </div>
+    <div class="tab-bar" data-tabs></div>
+  </div>
+
+  <!-- ═══ PERFIL ═══ -->
+  <div class="screen" id="screen-profile">
+    <div class="header"><img src="/img/favicon.svg" alt="" width="24" height="24" style="border-radius:4px;flex-shrink:0"><span class="header-title">Perfil</span></div>
+    <div class="screen-body">
+      <div style="padding:24px 16px;text-align:center">
+        <div style="width:72px;height:72px;border-radius:50%;background:var(--primary);color:var(--text-on-primary);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;margin:0 auto 12px">CM</div>
+        <div style="font-size:18px;font-weight:700">Carlos Martinez</div>
+        <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">carlos@infomatt.co</div>
+        <div style="font-size:12px;color:var(--primary);font-weight:500;margin-top:4px">Encuestador</div>
+      </div>
+      <div style="padding:0 16px">
+        <div class="card" style="margin:0 0 8px;cursor:default;width:100%">
+          <span style="margin-right:12px;font-size:18px">🏢</span>
+          <div class="card-content"><div class="card-name" style="font-size:13px">Organizacion</div><div class="card-doc">InfoMatt Colombia SAS</div></div>
+        </div>
+        <div class="card" style="margin:0 0 8px;cursor:default;width:100%">
+          <span style="margin-right:12px;font-size:18px">📊</span>
+          <div class="card-content"><div class="card-name" style="font-size:13px">Proyecto activo</div><div class="card-doc">Censo Rural Cundinamarca 2026</div></div>
+        </div>
+        <div class="card" style="margin:0 0 8px;cursor:default;width:100%">
+          <span style="margin-right:12px;font-size:18px">📈</span>
+          <div class="card-content"><div class="card-name" style="font-size:13px">Registros capturados</div><div class="card-doc">127 total · 124 sincronizados</div></div>
+        </div>
+      </div>
+      <div style="padding:8px 0 16px">
+        <button class="profile-menu-item" onclick="showScreen('screen-stats');initDateInputs();loadStats()">
+          <span class="profile-menu-icon">📊</span>
+          <span class="profile-menu-label">Estadisticas</span>
+          <span class="profile-menu-chevron">›</span>
+        </button>
+        <button class="profile-menu-item" onclick="showScreen('screen-settings')">
+          <span class="profile-menu-icon">⚙️</span>
+          <span class="profile-menu-label">Configuracion</span>
+          <span class="profile-menu-chevron">›</span>
+        </button>
+        <button class="profile-menu-item" onclick="showScreen('screen-crashlogs')">
+          <span class="profile-menu-icon">🐛</span>
+          <span class="profile-menu-label">Registro de errores</span>
+          <span class="profile-menu-chevron">›</span>
+        </button>
+        <button class="profile-menu-item" onclick="doLogout()">
+          <span class="profile-menu-icon">🚪</span>
+          <span class="profile-menu-label" style="color:var(--error)">Cerrar sesion</span>
+          <span class="profile-menu-chevron">›</span>
+        </button>
+      </div>
+    </div>
+    <div class="tab-bar" data-tabs></div>
+  </div>
+
+  <!-- ═══ ESTADISTICAS ═══ -->
+  <div class="screen" id="screen-stats">
+    <div class="header">
+      <button class="header-back" onclick="goBack('screen-profile')">‹</button>
+      <img src="/img/favicon.svg" alt="" width="24" height="24" style="border-radius:4px;flex-shrink:0">
+      <span class="header-title">Estadisticas</span>
+    </div>
+    <div class="screen-body">
+      <div class="stats-section">
+        <!-- Filtro de fechas -->
+        <div class="date-filter-card">
+          <div class="date-filter-title">Periodo</div>
+          <div class="date-filter-row">
+            <div class="date-field">
+              <span class="date-field-label">Desde</span>
+              <input type="date" id="date-from-input" onchange="onDateChange()">
+            </div>
+            <span class="date-separator">—</span>
+            <div class="date-field">
+              <span class="date-field-label">Hasta</span>
+              <input type="date" id="date-to-input" onchange="onDateChange()">
+            </div>
+          </div>
+          <div class="quick-filters">
+            <button class="quick-filter-btn" onclick="setQuickFilter(7,this)">7 dias</button>
+            <button class="quick-filter-btn active" onclick="setQuickFilter(30,this)">30 dias</button>
+            <button class="quick-filter-btn" onclick="setQuickFilter(90,this)">90 dias</button>
+            <button class="quick-filter-btn" onclick="setQuickFilter(0,this)">Todo</button>
+          </div>
+        </div>
+
+        <!-- Stats grid -->
+        <div class="stats-grid" id="stats-grid"></div>
+
+        <!-- Tasa de envio -->
+        <div class="chart-card" style="margin-bottom:12px" id="send-rate-card"></div>
+
+        <!-- Cobertura -->
+        <div class="coverage-card" id="coverage-card"></div>
+
+        <!-- Actividad diaria -->
+        <div class="chart-card">
+          <div class="chart-title">Actividad diaria</div>
+          <div class="chart-bars" id="daily-chart"></div>
+          <div class="chart-legend">
+            <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--success)"></div>Enviados</div>
+            <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--warning)"></div>Pendientes</div>
+          </div>
+        </div>
+
+        <!-- Horas de actividad -->
+        <div class="chart-card">
+          <div class="chart-title">Horas de mayor actividad</div>
+          <div class="hourly-bars" id="hourly-chart"></div>
+        </div>
+
+        <!-- Info adicional -->
+        <div id="extra-stats" style="display:flex;background:var(--surface);border-radius:var(--radius);padding:12px;box-shadow:0 1px 4px rgba(0,0,0,0.06);margin-bottom:12px"></div>
+
+        <!-- Desglose por plantilla -->
+        <div class="chart-card">
+          <div class="chart-title">Desglose por formulario</div>
+          <div id="template-breakdown"></div>
+        </div>
+
+        <!-- Generar informe -->
+        <div style="font-size:15px;font-weight:700;color:var(--text);margin:16px 0 8px">Generar informe</div>
+        <div class="report-card">
+          <div class="report-desc">Exportar registros enviados del 07 sep 2026 al 07 oct 2026</div>
+          <div class="report-actions">
+            <button class="report-btn report-btn-csv" onclick="exportData('csv')">📄 CSV</button>
+            <button class="report-btn report-btn-json" onclick="exportData('json')">📋 JSON</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ SETTINGS ═══ -->
+  <div class="screen" id="screen-settings">
+    <div class="header">
+      <button class="header-back" onclick="goBack('screen-profile')">‹</button>
+      <img src="/img/favicon.svg" alt="" width="24" height="24" style="border-radius:4px;flex-shrink:0">
+      <span class="header-title">Configuracion</span>
+    </div>
+    <div class="screen-body">
+      <div class="settings-section">
+        <div class="settings-group">
+          <div class="settings-group-title">Servidor API</div>
+          <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <span class="settings-row-label">URL actual</span>
+              <span class="settings-badge settings-badge-default" id="settings-server-badge">POR DEFECTO</span>
+            </div>
+            <div style="font-size:12px;color:var(--text-secondary);word-break:break-all" id="settings-server-url">https://infomatt360.tecnomatt.com/api/v1</div>
+            <button class="btn-sm btn-view" onclick="showToast('Abrir editor de servidor...')" style="align-self:flex-start">Cambiar servidor</button>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">Seguridad</div>
+          <div class="settings-row">
+            <span class="settings-row-label">PIN de acceso</span>
+            <span class="settings-row-value" style="color:var(--success)">Activado</span>
+          </div>
+          <div class="settings-row">
+            <span class="settings-row-label">Biometria</span>
+            <span class="settings-row-value">No disponible</span>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">Sincronizacion</div>
+          <div class="settings-row">
+            <span class="settings-row-label">Auto-sync</span>
+            <span class="settings-row-value" style="color:var(--success)">Activado</span>
+          </div>
+          <div class="settings-row">
+            <span class="settings-row-label">Solo WiFi</span>
+            <span class="settings-row-value">No</span>
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <div class="settings-group-title">Datos</div>
+          <div class="settings-row">
+            <span class="settings-row-label">Cache local</span>
+            <span class="settings-row-value">4.2 MB</span>
+          </div>
+          <div class="settings-row">
+            <span class="settings-row-label">Evidencias</span>
+            <span class="settings-row-value">127.8 MB</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ CRASH LOGS ═══ -->
+  <div class="screen" id="screen-crashlogs">
+    <div class="header">
+      <button class="header-back" onclick="goBack('screen-profile')">‹</button>
+      <img src="/img/favicon.svg" alt="" width="24" height="24" style="border-radius:4px;flex-shrink:0">
+      <span class="header-title">Registro de errores</span>
+    </div>
+    <div class="screen-body">
+      <div class="empty-state">
+        <div class="empty-icon">✅</div>
+        <div class="empty-title">Sin errores recientes</div>
+        <div class="empty-sub">La aplicacion funciona correctamente</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast" style="position:fixed;bottom:80px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--text);color:var(--bg);padding:10px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;opacity:0;transition:all 0.3s;pointer-events:none;z-index:100"></div>
+
+<script>
+// ══════════════════════════════════════════
+// InfoMatt360 — Frontend conectado al API
+// ══════════════════════════════════════════
+
+// ── API Client ──
+const API = {
+  baseUrl: '/api/v1',
+  token: null,
+  refreshToken: null,
+  user: null,
+
+  headers() {
+    const h = { 'Content-Type': 'application/json' };
+    if (this.token) h['Authorization'] = 'Bearer ' + this.token;
+    return h;
+  },
+
+  async request(method, path, body) {
+    const opts = { method, headers: this.headers() };
+    if (body) opts.body = JSON.stringify(body);
+    const res = await fetch(this.baseUrl + path, opts);
+    if (res.status === 401 && this.refreshToken) {
+      const ok = await this.doRefresh();
+      if (ok) {
+        opts.headers = this.headers();
+        const retry = await fetch(this.baseUrl + path, opts);
+        return retry.json();
+      }
+    }
+    if (res.headers.get('content-type')?.includes('text/csv')) return res.text();
+    return res.json();
+  },
+
+  async doRefresh() {
+    try {
+      const res = await fetch(this.baseUrl + '/auth/refresh', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: this.refreshToken })
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      this.token = data.tokens.accessToken;
+      this.refreshToken = data.tokens.refreshToken;
+      return true;
+    } catch { return false; }
+  },
+
+  get(path) { return this.request('GET', path); },
+  post(path, body) { return this.request('POST', path, body); },
+  put(path, body) { return this.request('PUT', path, body); },
+  del(path) { return this.request('DELETE', path); },
+};
+
+// ── State ──
+let participants = [];
+let formTemplates = [];
+let currentParticipant = null;
+let currentParticipantForms = [];
+let activeTab = 'forms';
+let serverCustom = false;
+let statsCache = null;
+
+// ── Helpers ──
+function formatDoc(n) { return n.replace(/\B(?=(\d{3})+(?!\d))/g,'.'); }
+function formatDate(s) { if(!s)return''; const d=new Date(s); return d.toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}); }
+
+function showToast(msg) {
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.style.opacity='1'; t.style.transform='translateX(-50%) translateY(0)';
+  setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(-50%) translateY(20px)';},2000);
+}
+
+// ── Tab Bar (6 tabs) ──
+const tabDefs = [
+  { id:'forms', icon:'📋', label:'Formularios' },
+  { id:'participants', icon:'👥', label:'Participantes' },
+  { id:'drafts', icon:'📂', label:'Borradores' },
+  { id:'map', icon:'🗺️', label:'Mapa' },
+  { id:'sync', icon:'🔄', label:'Sync', badge:3 },
+  { id:'profile', icon:'👤', label:'Perfil' },
+];
+
+function renderAllTabs() {
+  document.querySelectorAll('[data-tabs]').forEach(el => {
+    el.innerHTML = tabDefs.map(t => `
+      <button class="tab-item ${t.id===activeTab?'active':''}" onclick="switchTab('${t.id}')">
+        <span class="tab-icon" style="position:relative">${t.icon}${t.badge?`<span class="tab-badge">${t.badge}</span>`:''}</span>
+        <span class="tab-label">${t.label}</span>
+      </button>
+    `).join('');
+  });
+}
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const map = { forms:'screen-forms', participants:'screen-participants', drafts:'screen-drafts', map:'screen-map', sync:'screen-sync', profile:'screen-profile' };
+  document.getElementById(map[tab]).classList.add('active');
+  renderAllTabs();
+  // Load data for specific tabs
+  if (tab === 'sync') loadSyncStatus();
+  if (tab === 'map') loadMapData();
+  if (tab === 'drafts') loadDrafts();
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+function goBack(to) { showScreen(to); }
+
+// ── Login ──
+function toggleServerPanel() {
+  const p = document.getElementById('server-panel');
+  const a = document.getElementById('server-arrow');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  a.textContent = p.style.display === 'none' ? '▼' : '▲';
+}
+function saveServerUrl() {
+  const url = document.getElementById('server-url-input').value.trim();
+  if (url) {
+    serverCustom = true;
+    document.getElementById('server-label').textContent = 'Servidor: Personalizado';
+    document.getElementById('settings-server-url').textContent = url;
+    const b = document.getElementById('settings-server-badge');
+    b.textContent = 'PERSONALIZADO'; b.className = 'settings-badge settings-badge-custom';
+    showToast('Servidor guardado');
+    toggleServerPanel();
+  }
+}
+function resetServerUrl() {
+  serverCustom = false;
+  document.getElementById('server-url-input').value = '';
+  document.getElementById('server-label').textContent = 'Servidor: Por defecto';
+  document.getElementById('settings-server-url').textContent = 'https://infomatt360.tecnomatt.com/api/v1';
+  const b = document.getElementById('settings-server-badge');
+  b.textContent = 'POR DEFECTO'; b.className = 'settings-badge settings-badge-default';
+  showToast('Servidor restaurado');
+  toggleServerPanel();
+}
+async function doLogin() {
+  const inputs = document.querySelectorAll('.login-input');
+  const email = inputs[1]?.value?.trim();
+  const password = inputs[2]?.value?.trim();
+  if (!email || !password) { showToast('Ingrese correo y contrasena'); return; }
+
+  showToast('Iniciando sesion...');
+  try {
+    const serverInput = document.getElementById('server-url-input').value.trim();
+    if (serverInput) API.baseUrl = serverInput;
+
+    const res = await API.post('/auth/login', { email, password });
+    if (res.error) { showToast(res.error); return; }
+
+    API.token = res.tokens.accessToken;
+    API.refreshToken = res.tokens.refreshToken;
+    API.user = res.user;
+
+    // Update profile screen
+    updateProfileScreen();
+    // Update offline banner
+    document.querySelector('.offline-banner').textContent = '⚡ Conectado — ' + (res.user.proyecto_activo?.nombre || 'InfoMatt360');
+
+    // Load initial data
+    await Promise.all([loadParticipants(), loadFormTemplates()]);
+    switchTab('forms');
+    showToast('Bienvenido, ' + res.user.nombre);
+  } catch (err) {
+    showToast('Error de conexion');
+    console.error('Login error:', err);
+  }
+}
+
+function updateProfileScreen() {
+  const u = API.user;
+  if (!u) return;
+  const initials = u.nombre.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
+  const profileHTML = `
+    <div style="padding:24px 16px;text-align:center">
+      <div style="width:72px;height:72px;border-radius:50%;background:var(--primary);color:var(--text-on-primary);display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;margin:0 auto 12px">${initials}</div>
+      <div style="font-size:18px;font-weight:700">${u.nombre}</div>
+      <div style="font-size:13px;color:var(--text-secondary);margin-top:4px">${u.email}</div>
+      <div style="font-size:12px;color:var(--primary);font-weight:500;margin-top:4px">${u.rol.charAt(0).toUpperCase()+u.rol.slice(1)}</div>
+    </div>
+    <div style="padding:0 16px">
+      <div class="card" style="margin:0 0 8px;cursor:default;width:100%">
+        <span style="margin-right:12px;font-size:18px">🏢</span>
+        <div class="card-content"><div class="card-name" style="font-size:13px">Organizacion</div><div class="card-doc">${u.organizacion?.nombre || 'N/A'}</div></div>
+      </div>
+      <div class="card" style="margin:0 0 8px;cursor:default;width:100%">
+        <span style="margin-right:12px;font-size:18px">📊</span>
+        <div class="card-content"><div class="card-name" style="font-size:13px">Proyecto activo</div><div class="card-doc">${u.proyecto_activo?.nombre || 'N/A'}</div></div>
+      </div>
+      <div class="card" style="margin:0 0 8px;cursor:default;width:100%" id="profile-stats-card">
+        <span style="margin-right:12px;font-size:18px">📈</span>
+        <div class="card-content"><div class="card-name" style="font-size:13px">Registros capturados</div><div class="card-doc">Cargando...</div></div>
+      </div>
+    </div>
+    <div style="padding:8px 0 16px">
+      <button class="profile-menu-item" onclick="showScreen('screen-stats');loadStats()">
+        <span class="profile-menu-icon">📊</span>
+        <span class="profile-menu-label">Estadisticas</span>
+        <span class="profile-menu-chevron">›</span>
+      </button>
+      <button class="profile-menu-item" onclick="showScreen('screen-settings')">
+        <span class="profile-menu-icon">⚙️</span>
+        <span class="profile-menu-label">Configuracion</span>
+        <span class="profile-menu-chevron">›</span>
+      </button>
+      <button class="profile-menu-item" onclick="showScreen('screen-crashlogs')">
+        <span class="profile-menu-icon">🐛</span>
+        <span class="profile-menu-label">Registro de errores</span>
+        <span class="profile-menu-chevron">›</span>
+      </button>
+      <button class="profile-menu-item" onclick="doLogout()">
+        <span class="profile-menu-icon">🚪</span>
+        <span class="profile-menu-label" style="color:var(--error)">Cerrar sesion</span>
+        <span class="profile-menu-chevron">›</span>
+      </button>
+    </div>`;
+  const body = document.querySelector('#screen-profile .screen-body');
+  if (body) body.innerHTML = profileHTML;
+}
+
+async function doLogout() {
+  try { await API.post('/auth/logout'); } catch {}
+  API.token = null; API.refreshToken = null; API.user = null;
+  showScreen('screen-login'); activeTab = '';
+  showToast('Sesion cerrada');
+}
+
+async function loadParticipants() {
+  const res = await API.get('/participantes');
+  if (res.data) {
+    participants = res.data.map(p => ({
+      id: p.id, name: p.nombre, docType: p.tipo_documento,
+      docNum: p.numero_documento, code: p.codigo, phone: p.telefono,
+      municipio: p.municipio, vereda: p.vereda,
+      totalRegistros: p.total_registros, sincronizados: p.registros_sincronizados
+    }));
+    renderParticipants(participants);
+    document.getElementById('search-count').textContent = `${participants.length} participantes`;
+  }
+}
+
+async function loadFormTemplates() {
+  const res = await API.get('/plantillas');
+  if (res.data) {
+    formTemplates = res.data.map(p => ({
+      id: p.id, name: p.nombre, desc: p.descripcion || '',
+      records: p.total_registros, fields: p.campos?.length || 0
+    }));
+    renderFormsList();
+  }
+}
+
+// ── Participant List ──
+function renderParticipants(list) {
+  const c = document.getElementById('participant-list');
+  if (!list.length) { c.innerHTML=`<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-title">Sin resultados</div></div>`; return; }
+  c.innerHTML = list.map(p => `
+    <button class="card" onclick="openParticipant(${p.id})">
+      <div class="avatar">${p.name.charAt(0)}</div>
+      <div class="card-content">
+        <div class="card-name">${p.name}</div>
+        <div class="card-doc">${p.docType} ${formatDoc(p.docNum)}</div>
+        <div class="card-code">${p.code}</div>
+      </div>
+      <span class="card-chevron">›</span>
+    </button>
+  `).join('');
+}
+
+function filterParticipants() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const f = participants.filter(p => p.name.toLowerCase().includes(q)||p.docNum.includes(q)||p.code.toLowerCase().includes(q));
+  renderParticipants(f);
+  document.getElementById('search-count').textContent = `${f.length} de ${participants.length} participantes`;
+}
+
+// ── Participant Detail ──
+async function openParticipant(id) {
+  currentParticipant = participants.find(p=>p.id===id);
+  if(!currentParticipant)return;
+  const p = currentParticipant;
+  document.getElementById('detail-header').innerHTML = `
+    <div class="detail-label">PARTICIPANTE SELECCIONADO</div>
+    <div class="detail-name">${p.name}</div>
+    <div class="detail-doc">${p.docType} ${formatDoc(p.docNum)} · ${p.code}</div>
+    ${p.phone?`<div class="detail-extra">Tel: ${p.phone}</div>`:''}
+    ${p.municipio?`<div class="detail-extra">📍 ${p.municipio}${p.vereda?' · '+p.vereda:''}</div>`:''}
+  `;
+  showScreen('screen-detail');
+
+  // Fetch form status from API
+  document.getElementById('progress-section').innerHTML = `<div class="progress-label">Cargando formularios...</div>`;
+  document.getElementById('form-status-list').innerHTML = '';
+
+  try {
+    const detail = await API.get('/participantes/' + id);
+    if (detail.formStatus) {
+      currentParticipantForms = detail.formStatus;
+      const applied = detail.formStatus.filter(f=>f.aplicado).length;
+      const total = detail.formStatus.length;
+      document.getElementById('progress-section').innerHTML = `
+        <div class="progress-label">${applied} de ${total} aplicados</div>
+        <div class="progress-track"><div class="progress-fill" style="width:${Math.round(applied/total*100)}%"></div></div>
+      `;
+      document.getElementById('form-status-list').innerHTML = detail.formStatus.map(f => `
+        <div class="form-card">
+          <div class="form-card-content">
+            <div class="form-card-name">${f.plantilla_nombre}</div>
+            <div class="status-row">
+              ${f.aplicado?`<span class="badge badge-applied">✓ Aplicado</span><span class="applied-date">${formatDate(f.registro?.created_at)}</span>`
+                :`<span class="badge badge-pending">○ No aplicado</span>`}
+            </div>
+          </div>
+          <div class="form-actions">
+            ${f.aplicado&&f.registro?`<button class="btn-sm btn-view" onclick="openRecord('${f.registro.id}')">Ver</button><button class="btn-sm btn-acta" onclick="openActa()">Acta</button>`
+              :!f.aplicado?`<button class="btn-sm btn-capture" onclick="showToast('Abriendo formulario...')">Aplicar</button>`:''}
+          </div>
+        </div>
+      `).join('');
+    }
+  } catch (err) {
+    document.getElementById('progress-section').innerHTML = `<div class="progress-label" style="color:var(--error)">Error cargando datos</div>`;
+  }
+}
+
+// ── Record Detail ──
+async function openRecord(rid) {
+  document.getElementById('record-body').innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-title">Cargando...</div></div>';
+  showScreen('screen-record');
+
+  try {
+    const r = await API.get('/registros/' + rid);
+    if (r.error) { document.getElementById('record-body').innerHTML = `<div class="empty-state"><div class="empty-icon">❌</div><div class="empty-title">${r.error}</div></div>`; return; }
+
+    const statusMap = { sincronizado:'synced', completado:'synced', borrador:'pending', error:'error' };
+    const statusLabel = { sincronizado:'✓ Sincronizado', completado:'✓ Completado', borrador:'⏳ Borrador', error:'❌ Error' };
+    const cls = statusMap[r.estado] || 'pending';
+
+    // Parse respuestas
+    let respuestas = {};
+    try { respuestas = typeof r.respuestas === 'string' ? JSON.parse(r.respuestas) : (r.respuestas || {}); } catch {}
+
+    // Build field rows from schema + responses
+    let fieldsHTML = '';
+    if (r.campos && Array.isArray(r.campos)) {
+      fieldsHTML = r.campos.filter(c => c.tipo !== 'fingerprint' && c.tipo !== 'signature' && c.tipo !== 'photo')
+        .map(c => `<div class="field-row"><span class="field-label">${c.label}</span><span class="field-value">${respuestas[c.id] || '—'}</span></div>`).join('');
+    } else {
+      fieldsHTML = Object.entries(respuestas).filter(([k])=>!k.startsWith('_'))
+        .map(([k,v]) => `<div class="field-row"><span class="field-label">${k}</span><span class="field-value">${v}</span></div>`).join('');
+    }
+
+    let h = `<div class="record-section"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <span class="status-tag status-${cls}">${statusLabel[r.estado]||r.estado}</span>
+      <span style="font-size:12px;color:var(--text-secondary)">${formatDate(r.created_at)}</span></div></div>
+      <div class="record-section"><div class="record-section-title">Respuestas</div>${fieldsHTML || '<div style="color:var(--text-secondary);font-size:13px">Sin respuestas registradas</div>'}</div>`;
+
+    if(r.tiene_huella) h+=`<div class="record-section"><div class="record-section-title">Huellas dactilares</div></div><div class="evidence-grid"><div class="evidence-thumb">🖐️<span class="evidence-badge">Huella D</span></div><div class="evidence-thumb">🤚<span class="evidence-badge">Huella I</span></div></div>`;
+    if(r.tiene_firma) h+=`<div class="record-section"><div class="record-section-title">Firma</div></div><div style="padding:0 16px 16px"><div style="background:var(--surface);border-radius:var(--radius);padding:20px;box-shadow:0 1px 4px rgba(0,0,0,0.06);text-align:center"><div style="font-size:40px;margin-bottom:8px">✍️</div><div style="font-size:12px;color:var(--text-secondary)">Firma del participante capturada</div></div></div>`;
+    if(r.latitud && r.longitud) h+=`<div class="record-section"><div class="gps-tag">📍 ${Number(r.latitud).toFixed(6)}, ${Number(r.longitud).toFixed(6)}</div></div>`;
+
+    document.getElementById('record-body').innerHTML = h;
+  } catch (err) {
+    document.getElementById('record-body').innerHTML = '<div class="empty-state"><div class="empty-icon">❌</div><div class="empty-title">Error al cargar registro</div></div>';
+  }
+}
+
+function openActa() {
+  if(currentParticipant) document.getElementById('acta-participant-name').textContent=`Acta de ${currentParticipant.name} — ${currentParticipant.docType} ${formatDoc(currentParticipant.docNum)}`;
+  showScreen('screen-acta');
+}
+
+// ── Forms list ──
+function renderFormsList() {
+  document.getElementById('forms-list').innerHTML = formTemplates.map(f => `
+    <div class="form-list-card">
+      <div class="form-list-icon">📋</div>
+      <div class="form-list-content">
+        <div class="form-list-name">${f.name}</div>
+        <div class="form-list-desc">${f.desc}</div>
+        <div class="form-list-meta">${f.records} registros · ${f.fields} campos</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ── Drafts list ──
+let draftsData = [];
+async function loadDrafts() {
+  try {
+    const res = await API.get('/registros?estado=borrador');
+    if (res.data) {
+      draftsData = res.data;
+      renderDrafts();
+      // Update sync badge
+      const syncBadge = tabDefs.find(t=>t.id==='sync');
+      if (syncBadge) syncBadge.badge = draftsData.length || 0;
+      renderAllTabs();
+    }
+  } catch { draftsData = []; renderDrafts(); }
+}
+
+function renderDrafts() {
+  const c = document.getElementById('drafts-list');
+  if (!draftsData.length) {
+    c.innerHTML = `<div class="empty-state"><div class="empty-icon">📂</div><div class="empty-title">Sin borradores</div><div style="font-size:13px;color:var(--text-secondary)">Los formularios sin enviar aparecen aqui</div></div>`;
+    return;
+  }
+  c.innerHTML = draftsData.map(d => `
+    <div class="draft-card" onclick="openRecord('${d.id}')">
+      <span class="draft-icon">📝</span>
+      <div class="draft-content">
+        <div class="draft-name">${d.plantilla_nombre || 'Formulario'}</div>
+        <div class="draft-meta">${d.participante_nombre || ''} · ${formatDate(d.created_at)}</div>
+        <div class="draft-status">Borrador</div>
+      </div>
+      <span class="card-chevron">›</span>
+    </div>
+  `).join('');
+}
+
+// ── Charts & Stats (all driven by API /estadisticas) ──
+
+async function loadStats() {
+  const fromVal = document.getElementById('date-from-input')?.value;
+  const toVal = document.getElementById('date-to-input')?.value;
+  let qs = '';
+  if (fromVal) qs += `?desde=${fromVal}`;
+  if (toVal) qs += `${qs?'&':'?'}hasta=${toVal}`;
+
+  try {
+    const s = await API.get('/estadisticas' + qs);
+    if (s.error) { showToast(s.error); return; }
+    statsCache = s;
+    renderStats(s);
+  } catch (err) {
+    console.error('Stats error:', err);
+    showToast('Error cargando estadisticas');
+  }
+}
+
+function renderStats(s) {
+  const t = s.totales;
+  const total = t.total_registros;
+  const synced = t.sincronizados;
+  const pending = t.borradores + t.completados;
+  const errors = t.errores;
+  const pct = Math.round(s.tasa_envio);
+
+  // Stats grid
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-value">${total}</div><div class="stat-label">Total registros</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--success)">${synced}</div><div class="stat-label">Enviados</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--warning)">${pending}</div><div class="stat-label">Pendientes</div></div>
+    <div class="stat-card"><div class="stat-value" style="color:var(--error)">${errors}</div><div class="stat-label">Errores</div></div>`;
+
+  // Send rate
+  document.getElementById('send-rate-card').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-size:14px;font-weight:600">Tasa de envio</span>
+      <span style="font-size:20px;font-weight:700;color:var(--success)">${pct}%</span>
+    </div>
+    <div class="progress-track" style="height:8px;margin-bottom:8px">
+      <div style="height:100%;width:${pct}%;background:var(--success);border-radius:3px;transition:width 0.3s"></div>
+    </div>
+    <div class="chart-legend" style="border:none;padding:0;margin:0">
+      <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--success)"></div>Enviados</div>
+      <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--warning)"></div>Pendientes</div>
+      <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--error)"></div>Errores</div>
+    </div>`;
+
+  // Coverage from API
+  const cov = s.cobertura;
+  const covPct = Math.round(Number(cov.porcentaje));
+  document.getElementById('coverage-card').innerHTML = `
+    <div class="coverage-header">Cobertura de participantes</div>
+    <div class="coverage-row">
+      <div class="coverage-circle" style="background: conic-gradient(var(--success) 0% ${covPct}%, var(--border) ${covPct}% 100%);">
+        <div style="width:60px;height:60px;border-radius:50%;background:var(--surface);display:flex;align-items:center;justify-content:center">
+          <span class="coverage-pct">${covPct}%</span>
+        </div>
+      </div>
+      <div class="coverage-details">
+        <div class="coverage-detail"><div class="coverage-dot" style="background:var(--success)"></div>Con registros: ${cov.con_registro}</div>
+        <div class="coverage-detail"><div class="coverage-dot" style="background:var(--border)"></div>Sin registros: ${cov.total_participantes - cov.con_registro}</div>
+        <div class="coverage-detail" style="font-weight:500;color:var(--text)">Total: ${cov.total_participantes} participantes</div>
+      </div>
+    </div>`;
+
+  // Extra stats
+  const plantillasCount = s.por_plantilla?.length || 0;
+  const evidences = (t.con_huella || 0) + (t.con_firma || 0);
+  document.getElementById('extra-stats').innerHTML = `
+    <div style="flex:1;text-align:center"><div style="font-size:16px;font-weight:700">${plantillasCount}</div><div style="font-size:10px;color:var(--text-secondary);margin-top:2px">Formularios</div></div>
+    <div style="flex:1;text-align:center"><div style="font-size:16px;font-weight:700">${evidences}</div><div style="font-size:10px;color:var(--text-secondary);margin-top:2px">Evidencias</div></div>
+    <div style="flex:1;text-align:center"><div style="font-size:16px;font-weight:700">${t.borradores}</div><div style="font-size:10px;color:var(--text-secondary);margin-top:2px">Borradores</div></div>
+    <div style="flex:1;text-align:center"><div style="font-size:16px;font-weight:700">${errors}</div><div style="font-size:10px;color:var(--text-secondary);margin-top:2px">Conflictos</div></div>`;
+
+  // Charts
+  renderDailyChart(s.actividad_diaria || []);
+  renderHourlyChart(s.actividad_horaria || []);
+  renderTemplateBreakdown(s.por_plantilla || []);
+  updateReportDesc();
+
+  // Update profile stats card if visible
+  const profileCard = document.getElementById('profile-stats-card');
+  if (profileCard) {
+    profileCard.querySelector('.card-doc').textContent = `${total} registros · ${synced} sincronizados`;
+  }
+}
+
+function renderDailyChart(dailyData) {
+  const el = document.getElementById('daily-chart');
+  if (!dailyData.length) { el.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:12px;padding:20px">Sin datos</div>'; return; }
+  const max = Math.max(...dailyData.map(d=>d.total), 1);
+  el.innerHTML = dailyData.map(d => {
+    const hPct = (d.total/max*100);
+    const sPct = d.total>0?(d.sincronizados/d.total*100):0;
+    const pPct = d.total>0?(d.pendientes/d.total*100):0;
+    return `<div class="chart-bar-group">
+      <div class="chart-bar-count">${d.total}</div>
+      <div class="chart-bar" style="height:${Math.max(hPct,4)}%;width:100%;max-width:28px;display:flex;flex-direction:column;justify-content:flex-end">
+        ${d.pendientes>0?`<div style="background:var(--warning);height:${pPct}%;border-radius:4px 4px 0 0"></div>`:''}
+        <div style="background:var(--success);height:${sPct}%;${d.pendientes===0?'border-radius:4px 4px 0 0':''}"></div>
+      </div>
+      <span class="chart-bar-label">${d.dia}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderHourlyChart(hourlyData) {
+  const el = document.getElementById('hourly-chart');
+  if (!hourlyData.length) { el.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:12px;padding:20px">Sin datos</div>'; return; }
+  const max = Math.max(...hourlyData.map(d=>d.total), 1);
+  el.innerHTML = hourlyData.map(d => {
+    const hPct = (d.total/max*100);
+    const opacity = 0.3 + (d.total/max*0.7);
+    return `<div class="hourly-bar-group">
+      <div class="hourly-count">${d.total}</div>
+      <div class="hourly-bar" style="height:${Math.max(hPct,4)}%;opacity:${opacity}"></div>
+      <span class="hourly-label">${d.hora}h</span>
+    </div>`;
+  }).join('');
+}
+
+function renderTemplateBreakdown(templateData) {
+  const el = document.getElementById('template-breakdown');
+  if (!templateData.length) { el.innerHTML = '<div style="text-align:center;color:var(--text-secondary);font-size:12px;padding:8px">Sin datos</div>'; return; }
+  const total = templateData.reduce((s,t)=>s+t.total,0) || 1;
+  el.innerHTML = templateData.map((t,i) => {
+    const pct = Math.round(t.total/total*100);
+    return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;${i>0?'border-top:1px solid var(--border)':''}">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${t.nombre}</div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-top:2px">${t.total} registros · ${t.sincronizados} sync</div>
+      </div>
+      <div style="width:80px;flex-shrink:0">
+        <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden"><div style="height:100%;background:var(--primary);width:${pct}%;border-radius:3px"></div></div>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--primary);width:32px;text-align:right">${pct}%</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Export ──
+async function exportData(formato) {
+  const fromVal = document.getElementById('date-from-input')?.value || '';
+  const toVal = document.getElementById('date-to-input')?.value || '';
+  let qs = `?formato=${formato}`;
+  if (fromVal) qs += `&desde=${fromVal}`;
+  if (toVal) qs += `&hasta=${toVal}`;
+
+  showToast('Generando exportacion...');
+  try {
+    const res = await API.get('/estadisticas/exportar' + qs);
+    if (formato === 'csv' && typeof res === 'string') {
+      const blob = new Blob([res], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'infomatt360_export.csv'; a.click();
+      URL.revokeObjectURL(url);
+      showToast('CSV descargado');
+    } else {
+      const blob = new Blob([JSON.stringify(res, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = 'infomatt360_export.json'; a.click();
+      URL.revokeObjectURL(url);
+      showToast('JSON descargado');
+    }
+  } catch (err) {
+    showToast('Error al exportar');
+    console.error('Export error:', err);
+  }
+}
+
+// ── Sync screen ──
+let syncQueue = [];
+async function loadSyncStatus() {
+  try {
+    const res = await API.get('/registros?estado=borrador&limit=100');
+    syncQueue = res.data || [];
+    renderSyncScreen();
+  } catch { syncQueue = []; renderSyncScreen(); }
+}
+
+function renderSyncScreen() {
+  const c = document.querySelector('#screen-sync .screen-body');
+  if (!c) return;
+  const pending = syncQueue.length;
+  c.innerHTML = `
+    <div style="padding:16px">
+      <div class="card" style="cursor:default;width:100%;margin-bottom:12px">
+        <span style="font-size:24px;margin-right:12px">${pending > 0 ? '🔄' : '✅'}</span>
+        <div class="card-content">
+          <div class="card-name">${pending > 0 ? pending + ' registros pendientes' : 'Todo sincronizado'}</div>
+          <div class="card-doc">${pending > 0 ? 'Listo para enviar al servidor' : 'No hay registros pendientes'}</div>
+        </div>
+      </div>
+      ${pending > 0 ? `<button onclick="doSync()" style="width:100%;padding:14px;border-radius:var(--radius);background:var(--primary);color:var(--text-on-primary);font-size:15px;font-weight:600;border:none;cursor:pointer;margin-bottom:16px">
+        🚀 Sincronizar ahora
+      </button>` : ''}
+      <div id="sync-log" style="font-size:12px;color:var(--text-secondary)"></div>
+      ${syncQueue.length ? `<div style="margin-top:12px">${syncQueue.map(r => `
+        <div class="card" style="cursor:default;width:100%;margin-bottom:6px">
+          <span style="font-size:16px;margin-right:10px">📝</span>
+          <div class="card-content">
+            <div class="card-name" style="font-size:13px">${r.plantilla_nombre || 'Registro'}</div>
+            <div class="card-doc">${r.participante_nombre || ''} · ${formatDate(r.created_at)}</div>
+          </div>
+          <span class="badge badge-pending" style="font-size:10px">Pendiente</span>
+        </div>
+      `).join('')}</div>` : ''}
+    </div>`;
+}
+
+async function doSync() {
+  if (!syncQueue.length) { showToast('Nada que sincronizar'); return; }
+  const log = document.getElementById('sync-log');
+  log.innerHTML = '<div>⏳ Iniciando sincronizacion...</div>';
+
+  try {
+    const batch = syncQueue.map(r => ({
+      offline_id: r.offline_id || r.id,
+      plantilla_id: r.plantilla_id,
+      participante_id: r.participante_id,
+      respuestas: typeof r.respuestas_json === 'string' ? JSON.parse(r.respuestas_json) : {},
+      latitud: r.latitud, longitud: r.longitud,
+      tiene_huella: r.tiene_huella, tiene_firma: r.tiene_firma,
+    }));
+    const res = await API.post('/sync/batch', { registros: batch });
+    if (res.results) {
+      const ok = res.results.filter(r => r.status === 'created' || r.status === 'exists').length;
+      const fail = res.results.filter(r => r.status === 'error').length;
+      log.innerHTML = `<div style="color:var(--success)">✅ ${ok} registros sincronizados</div>${fail ? `<div style="color:var(--error)">❌ ${fail} con errores</div>` : ''}`;
+      showToast(`Sincronizacion completa: ${ok} enviados`);
+      // Reload sync queue
+      await loadSyncStatus();
+      await loadDrafts();
+    }
+  } catch (err) {
+    log.innerHTML = `<div style="color:var(--error)">❌ Error de conexion</div>`;
+    showToast('Error al sincronizar');
+  }
+}
+
+// ── Map screen ──
+async function loadMapData() {
+  try {
+    const res = await API.get('/registros?limit=200');
+    if (!res.data) return;
+    const withGPS = res.data.filter(r => r.latitud && r.longitud);
+    renderMapPins(withGPS);
+  } catch (err) {
+    console.error('Map error:', err);
+  }
+}
+
+function renderMapPins(records) {
+  const mapContainer = document.querySelector('#screen-map .screen-body');
+  if (!mapContainer) return;
+
+  if (!records.length) {
+    mapContainer.innerHTML = `
+      <div style="position:relative;width:100%;height:100%;background:var(--surface)">
+        <div class="empty-state" style="padding-top:120px">
+          <div class="empty-icon">🗺️</div>
+          <div class="empty-title">Sin datos GPS</div>
+          <div style="font-size:13px;color:var(--text-secondary)">Los registros con ubicacion apareceran aqui</div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  // Calculate center
+  const avgLat = records.reduce((s,r) => s + Number(r.latitud), 0) / records.length;
+  const avgLng = records.reduce((s,r) => s + Number(r.longitud), 0) / records.length;
+
+  // Build a simple CSS map with pins
+  const latRange = Math.max(...records.map(r=>Number(r.latitud))) - Math.min(...records.map(r=>Number(r.latitud)));
+  const lngRange = Math.max(...records.map(r=>Number(r.longitud))) - Math.min(...records.map(r=>Number(r.longitud)));
+  const latMin = Math.min(...records.map(r=>Number(r.latitud)));
+  const lngMin = Math.min(...records.map(r=>Number(r.longitud)));
+
+  const pins = records.map(r => {
+    const x = lngRange > 0 ? ((Number(r.longitud) - lngMin) / lngRange * 80 + 10) : 50;
+    const y = latRange > 0 ? (100 - ((Number(r.latitud) - latMin) / latRange * 80 + 10)) : 50;
+    const color = r.estado === 'sincronizado' ? 'var(--success)' : r.estado === 'error' ? 'var(--error)' : 'var(--warning)';
+    return `<div style="position:absolute;left:${x}%;top:${y}%;transform:translate(-50%,-100%);cursor:pointer" onclick="showToast('${(r.participante_nombre||'').replace(/'/g,'')} — ${r.plantilla_nombre||''}')">
+      <div style="width:12px;height:12px;background:${color};border-radius:50%;border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3)"></div>
+    </div>`;
+  }).join('');
+
+  mapContainer.innerHTML = `
+    <div style="position:relative;width:100%;height:100%;background:linear-gradient(135deg,#e8f0e8,#d4e4d4);overflow:hidden">
+      <div style="position:absolute;top:12px;left:12px;right:12px;z-index:2;background:var(--surface);border-radius:var(--radius);padding:8px 12px;box-shadow:var(--shadow);display:flex;align-items:center;gap:8px">
+        <span>📍</span>
+        <span style="font-size:13px;font-weight:500">${records.length} registros con GPS</span>
+        <span style="font-size:11px;color:var(--text-secondary);margin-left:auto">${avgLat.toFixed(4)}, ${avgLng.toFixed(4)}</span>
+      </div>
+      ${pins}
+      <div style="position:absolute;bottom:12px;left:12px;background:var(--surface);border-radius:var(--radius-sm);padding:6px 10px;box-shadow:var(--shadow);display:flex;gap:12px;font-size:10px">
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--success);margin-right:4px"></span>Sync</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warning);margin-right:4px"></span>Pend</span>
+        <span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--error);margin-right:4px"></span>Error</span>
+      </div>
+    </div>`;
+}
+
+// ── Date helpers ──
+function toISO(d) { return d.toISOString().slice(0,10); }
+function fmtDate(d) { return d.toLocaleDateString('es-CO', { day:'2-digit', month:'short', year:'numeric' }); }
+
+function initDateInputs() {
+  const to = new Date();
+  const from = new Date(); from.setDate(from.getDate() - 30);
+  const fromEl = document.getElementById('date-from-input');
+  const toEl = document.getElementById('date-to-input');
+  if (fromEl) fromEl.value = toISO(from);
+  if (toEl) toEl.value = toISO(to);
+  updateReportDesc();
+}
+
+function onDateChange() {
+  document.querySelectorAll('.quick-filter-btn').forEach(b => b.classList.remove('active'));
+  loadStats();
+}
+
+function updateReportDesc() {
+  const fromVal = document.getElementById('date-from-input')?.value;
+  const toVal = document.getElementById('date-to-input')?.value;
+  if (!fromVal || !toVal) return;
+  const from = new Date(fromVal + 'T12:00:00');
+  const to = new Date(toVal + 'T12:00:00');
+  const desc = document.querySelector('.report-desc');
+  if (desc) desc.textContent = `Exportar registros enviados del ${fmtDate(from)} al ${fmtDate(to)}`;
+}
+
+function setQuickFilter(days, el) {
+  document.querySelectorAll('.quick-filter-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  const to = new Date();
+  const from = new Date();
+  if (days > 0) from.setDate(from.getDate() - days);
+  else from.setFullYear(from.getFullYear() - 5);
+  document.getElementById('date-from-input').value = toISO(from);
+  document.getElementById('date-to-input').value = toISO(to);
+  loadStats();
+  showToast(`Periodo: ${days > 0 ? days + ' dias' : 'Todos'}`);
+}
+
+// ── Init — show login screen first ──
+showScreen('screen-login');
+renderAllTabs();
+</script>
+
+</body></html>

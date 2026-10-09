@@ -908,7 +908,7 @@ const DEMO = {
     }
     if (p === '/estadisticas') return this.estadisticas;
     if (p === '/estadisticas/exportar') return qs.formato === 'csv' ? 'id,participante,plantilla,estado\nr1,María,Encuesta,sincronizado' : [{ id:'r1' }];
-    if (p === '/sync/batch') return { results: (body?.registros||[]).map(r => ({ offline_id:r.offline_id, status:'created' })) };
+    if (p === '/sync/batch') { const regs = body?.registros||[]; return { success:true, total:regs.length, synced:regs.length, errors:0, details:{ synced:regs.map(r=>({offline_id:r.offline_id,id:'demo-'+Math.random().toString(36).slice(2),status:'synced'})), errors:[] } }; }
     return { ok: true };
   },
 };
@@ -1579,13 +1579,15 @@ async function doSync() {
       participante_id: r.participante_id,
       respuestas: typeof r.respuestas_json === 'string' ? JSON.parse(r.respuestas_json) : {},
       latitud: r.latitud, longitud: r.longitud,
+      precision_gps: r.precision_gps,
       tiene_huella: r.tiene_huella, tiene_firma: r.tiene_firma,
+      device_id: r.device_id,
+      created_at: r.created_at,
     }));
     const res = await API.post('/sync/batch', { registros: batch });
-    const details = res.details || res.results || [];
-    if (res.success || details.length) {
-      const ok = details.filter(r => r.status === 'created' || r.status === 'exists').length || res.synced || 0;
-      const fail = details.filter(r => r.status === 'error').length || res.errors || 0;
+    if (res.success) {
+      const ok = res.synced || 0;
+      const fail = res.errors || 0;
       log.innerHTML = `<div style="color:var(--success)">✅ ${ok} registros sincronizados</div>${fail ? `<div style="color:var(--error)">❌ ${fail} con errores</div>` : ''}`;
       showToast(`Sincronizacion completa: ${ok} enviados`);
       // Reload sync queue

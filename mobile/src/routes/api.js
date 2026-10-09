@@ -34,13 +34,13 @@ router.get('/registros', registros.list);
 router.get('/registros/:id', registros.getById);
 router.post('/registros', registros.create);
 router.put('/registros/:id', registros.update);
-router.delete('/registros/:id', registros.delete);
+router.delete('/registros/:id', requireRole('admin', 'supervisor'), registros.delete);
 
 // ── Sincronización batch ──
 router.post('/sync/batch', registros.syncBatch);
 
 // ── Estadísticas ──
-router.get('/estadisticas', estadisticas.resumen);
-router.get('/estadisticas/exportar', estadisticas.exportar);
+router.get('/estadisticas', requireRole('admin', 'supervisor'), estadisticas.resumen);
+router.get('/estadisticas/exportar', requireRole('admin', 'supervisor'), estadisticas.exportar);
 
 module.exports = router;

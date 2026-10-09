@@ -28,6 +28,7 @@
     --radius: 12px;
     --radius-sm: 8px;
     --radius-full: 999px;
+    --shadow: 0 2px 8px rgba(10,37,64,0.12);
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -35,6 +36,7 @@
       --primary-light: #00C2FF; --accent: #00C2FF; --text: #E8F0F8; --text-secondary: #7A9BB8;
       --text-on-primary: #FFFFFF; --border: #163050; --disabled: #2A4A68;
       --success: #00D48A; --warning: #F0B830; --error: #F05060;
+      --shadow: 0 2px 8px rgba(0,0,0,0.4);
       color-scheme: dark;
     }
   }
@@ -43,6 +45,7 @@
     --primary-light: #00C2FF; --accent: #00C2FF; --text: #E8F0F8; --text-secondary: #7A9BB8;
     --text-on-primary: #FFFFFF; --border: #163050; --disabled: #2A4A68;
     --success: #00D48A; --warning: #F0B830; --error: #F05060;
+    --shadow: 0 2px 8px rgba(0,0,0,0.4);
     color-scheme: dark;
   }
 
@@ -489,9 +492,9 @@
           </div>
         </div>
 
-        <input class="login-input" placeholder="Organizacion (opcional)">
-        <input class="login-input" placeholder="Correo electronico" type="email">
-        <input class="login-input" placeholder="Contrasena" type="password">
+        <input class="login-input" id="login-org" placeholder="Organizacion (opcional)">
+        <input class="login-input" id="login-email" placeholder="Correo electronico" type="email">
+        <input class="login-input" id="login-password" placeholder="Contrasena" type="password">
         <button class="login-btn" onclick="doLogin()">Iniciar Sesion</button>
       </div>
     </div>
@@ -1068,9 +1071,8 @@ function resetServerUrl() {
   toggleServerPanel();
 }
 async function doLogin() {
-  const inputs = document.querySelectorAll('.login-input');
-  const email = inputs[1]?.value?.trim();
-  const password = inputs[2]?.value?.trim();
+  const email = document.getElementById('login-email')?.value?.trim();
+  const password = document.getElementById('login-password')?.value?.trim();
   if (!email || !password) { showToast('Ingrese correo y contrasena'); return; }
 
   showToast('Iniciando sesion...');
@@ -1126,7 +1128,7 @@ function updateProfileScreen() {
       </div>
     </div>
     <div style="padding:8px 0 16px">
-      <button class="profile-menu-item" onclick="showScreen('screen-stats');loadStats()">
+      <button class="profile-menu-item" onclick="showScreen('screen-stats');initDateInputs();loadStats()">
         <span class="profile-menu-icon">📊</span>
         <span class="profile-menu-label">Estadisticas</span>
         <span class="profile-menu-chevron">›</span>
@@ -1580,9 +1582,10 @@ async function doSync() {
       tiene_huella: r.tiene_huella, tiene_firma: r.tiene_firma,
     }));
     const res = await API.post('/sync/batch', { registros: batch });
-    if (res.results) {
-      const ok = res.results.filter(r => r.status === 'created' || r.status === 'exists').length;
-      const fail = res.results.filter(r => r.status === 'error').length;
+    const details = res.details || res.results || [];
+    if (res.success || details.length) {
+      const ok = details.filter(r => r.status === 'created' || r.status === 'exists').length || res.synced || 0;
+      const fail = details.filter(r => r.status === 'error').length || res.errors || 0;
       log.innerHTML = `<div style="color:var(--success)">✅ ${ok} registros sincronizados</div>${fail ? `<div style="color:var(--error)">❌ ${fail} con errores</div>` : ''}`;
       showToast(`Sincronizacion completa: ${ok} enviados`);
       // Reload sync queue

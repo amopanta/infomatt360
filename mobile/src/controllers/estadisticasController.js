@@ -129,9 +129,15 @@ exports.exportar = (req, res) => {
     `).all(...params);
 
     if (formato === 'csv') {
+      const esc = (v) => {
+        if (v == null) return '';
+        const s = String(v);
+        return (s.includes(',') || s.includes('"') || s.includes('\n'))
+          ? '"' + s.replace(/"/g, '""') + '"' : s;
+      };
       const headers = 'ID,Participante,Documento,Codigo,Formulario,Estado,Fecha,GPS Lat,GPS Lng,Huella,Firma\n';
       const rows = registros.map(r =>
-        `${r.id},${r.participante},${r.numero_documento},${r.codigo},${r.formulario},${r.estado},${r.created_at},${r.latitud||''},${r.longitud||''},${r.tiene_huella?'Si':'No'},${r.tiene_firma?'Si':'No'}`
+        [r.id, r.participante, r.numero_documento, r.codigo, r.formulario, r.estado, r.created_at, r.latitud||'', r.longitud||'', r.tiene_huella?'Si':'No', r.tiene_firma?'Si':'No'].map(esc).join(',')
       ).join('\n');
       res.setHeader('Content-Type', 'text/csv');
       res.setHeader('Content-Disposition', 'attachment; filename=infomatt360_export.csv');

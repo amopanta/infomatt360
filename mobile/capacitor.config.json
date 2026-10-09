@@ -1,0 +1,28 @@
+{
+  "appId": "co.infomatt.infomatt360",
+  "appName": "InfoMatt360",
+  "webDir": "public",
+  "server": {
+    "androidScheme": "https",
+    "allowNavigation": ["*"]
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#0A2540",
+      "showSpinner": true,
+      "spinnerColor": "#00C2FF"
+    },
+    "StatusBar": {
+      "style": "DARK",
+      "backgroundColor": "#0A2540"
+    },
+    "Keyboard": {
+      "resize": "body"
+    }
+  },
+  "android": {
+    "allowMixedContent": false,
+    "backgroundColor": "#0A2540"
+  }
+}

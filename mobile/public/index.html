@@ -911,8 +911,14 @@ const DEMO = {
 };
 
 // ── API Client ──
+// Configuración: si se define API_BASE_URL, se usa esa URL (para APK nativo)
+// Si no, se usa la URL relativa (para PWA en el mismo servidor)
+const API_CONFIG = {
+  API_BASE_URL: '', // Dejar vacío para usar URL relativa; el build-apk.sh lo configura
+};
+
 const API = {
-  baseUrl: '/api/v1',
+  baseUrl: API_CONFIG.API_BASE_URL ? API_CONFIG.API_BASE_URL + '/api/v1' : '/api/v1',
   token: null,
   refreshToken: null,
   user: null,

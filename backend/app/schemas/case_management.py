@@ -7,6 +7,8 @@ from pydantic import BaseModel, Field
 class CaseCreate(BaseModel):
     participant_id: str
     title: str = Field(min_length=3, max_length=180)
+    case_type: str = Field(default="general", min_length=1, max_length=80)
+    parent_case_id: str | None = None
     assigned_user_id: str | None = None
     due_at: datetime | None = None
     properties: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
@@ -26,6 +28,8 @@ class CaseRead(BaseModel):
     id: str
     project_id: str
     participant_id: str
+    case_type: str
+    parent_case_id: str | None
     title: str
     status: str
     assigned_user_id: str | None
@@ -60,6 +64,7 @@ class TerritoryRead(TerritoryCreate):
 class SavedExportCreate(BaseModel):
     name: str = Field(min_length=3, max_length=180)
     template_id: str | None = None
+    export_kind: Literal["summary", "form", "cases"] | None = None
     frequency: Literal["manual", "daily", "weekly"] = "manual"
     recipient_user_id: str
 

@@ -800,6 +800,112 @@
 // InfoMatt360 — Frontend conectado al API
 // ══════════════════════════════════════════
 
+// ── Demo Data (used when no backend available) ──
+const DEMO = {
+  active: false,
+  users: {
+    'carlos@infomatt.co': { password:'Carlos123!', id:'u1', nombre:'Carlos Ramírez', email:'carlos@infomatt.co', rol:'encuestador', organizacion:{nombre:'InfoMatt Colombia SAS'}, proyecto_id:'p1', proyecto_activo:{nombre:'Censo Rural Cundinamarca 2026'} },
+    'laura@infomatt.co': { password:'Laura123!', id:'u2', nombre:'Laura Gómez', email:'laura@infomatt.co', rol:'supervisor', organizacion:{nombre:'InfoMatt Colombia SAS'}, proyecto_id:'p1', proyecto_activo:{nombre:'Censo Rural Cundinamarca 2026'} },
+    'admin@infomatt.co': { password:'Admin123!', id:'u3', nombre:'Admin InfoMatt', email:'admin@infomatt.co', rol:'admin', organizacion:{nombre:'InfoMatt Colombia SAS'}, proyecto_id:'p1', proyecto_activo:{nombre:'Censo Rural Cundinamarca 2026'} },
+  },
+  participantes: [
+    { id:'pa1', proyecto_id:'p1', codigo:'P-0001', nombre:'María López Rodríguez', tipo_documento:'CC', numero_documento:'1023456789', telefono:'3101234567', municipio:'Fusagasugá', departamento:'Cundinamarca', vereda:'San Antonio', total_registros:4, registros_sincronizados:3 },
+    { id:'pa2', proyecto_id:'p1', codigo:'P-0002', nombre:'Jorge Hernández Castro', tipo_documento:'CC', numero_documento:'80234567', telefono:'3209876543', municipio:'Silvania', departamento:'Cundinamarca', vereda:'La Victoria', total_registros:3, registros_sincronizados:2 },
+    { id:'pa3', proyecto_id:'p1', codigo:'P-0003', nombre:'Ana Martínez Díaz', tipo_documento:'CC', numero_documento:'52987654', telefono:'3005551234', municipio:'Tibacuy', departamento:'Cundinamarca', vereda:'El Carmelo', total_registros:2, registros_sincronizados:2 },
+    { id:'pa4', proyecto_id:'p1', codigo:'P-0004', nombre:'Pedro Suárez Gómez', tipo_documento:'TI', numero_documento:'1012345678', municipio:'Pasca', departamento:'Cundinamarca', vereda:'El Retiro', total_registros:1, registros_sincronizados:0 },
+    { id:'pa5', proyecto_id:'p1', codigo:'P-0005', nombre:'Carmen Ruiz Peña', tipo_documento:'CC', numero_documento:'39876543', telefono:'3157778899', municipio:'Arbeláez', departamento:'Cundinamarca', vereda:'La Esperanza', total_registros:3, registros_sincronizados:3 },
+    { id:'pa6', proyecto_id:'p1', codigo:'P-0006', nombre:'Luis Moreno Vargas', tipo_documento:'CE', numero_documento:'E234567', telefono:'3001112233', municipio:'San Bernardo', departamento:'Cundinamarca', vereda:'Centro', total_registros:2, registros_sincronizados:1 },
+  ],
+  plantillas: [
+    { id:'pl1', proyecto_id:'p1', nombre:'Encuesta Socioeconómica', descripcion:'Datos socioeconómicos del hogar', total_registros:142, campos:[{id:'nombre_completo',tipo:'text',label:'Nombre completo',requerido:true},{id:'fecha_nacimiento',tipo:'date',label:'Fecha de nacimiento',requerido:true},{id:'estado_civil',tipo:'select',label:'Estado civil'},{id:'num_hijos',tipo:'number',label:'Número de hijos'},{id:'ingresos',tipo:'number',label:'Ingresos mensuales'}] },
+    { id:'pl2', proyecto_id:'p1', nombre:'Ficha Predial', descripcion:'Información del predio y uso del suelo', total_registros:98, campos:[{id:'area_total',tipo:'number',label:'Área total (ha)'},{id:'uso_suelo',tipo:'select',label:'Uso del suelo'},{id:'tiene_agua',tipo:'boolean',label:'Acceso a agua'},{id:'tipo_vivienda',tipo:'select',label:'Tipo de vivienda'}] },
+    { id:'pl3', proyecto_id:'p1', nombre:'Registro Productivo', descripcion:'Actividades agropecuarias y productivas', total_registros:87, campos:[{id:'tipo_actividad',tipo:'select',label:'Tipo de actividad'},{id:'hectareas',tipo:'number',label:'Hectáreas cultivadas'},{id:'produccion_mensual',tipo:'number',label:'Producción mensual (kg)'}] },
+    { id:'pl4', proyecto_id:'p1', nombre:'Encuesta de Salud', descripcion:'Condiciones de salud y acceso a servicios', total_registros:67, campos:[{id:'eps',tipo:'text',label:'EPS afiliada'},{id:'enfermedades',tipo:'text',label:'Enfermedades crónicas'},{id:'distancia_hospital',tipo:'number',label:'Distancia al hospital (km)'}] },
+  ],
+  registros: function() {
+    const estados = ['sincronizado','sincronizado','sincronizado','completado','borrador'];
+    const days = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+    const recs = [];
+    for (let i = 0; i < 50; i++) {
+      const pi = i % 6;
+      const pli = i % 4;
+      const est = estados[i % 5];
+      const d = new Date(); d.setDate(d.getDate() - Math.floor(Math.random()*30));
+      recs.push({
+        id:'r'+i, participante_id:DEMO.participantes[pi].id, plantilla_id:DEMO.plantillas[pli].id,
+        participante_nombre: DEMO.participantes[pi].nombre, plantilla_nombre: DEMO.plantillas[pli].nombre,
+        estado: est, created_at: d.toISOString(),
+        latitud: 4.3 + Math.random()*0.8, longitud: -74.0 - Math.random()*0.3,
+        tiene_huella: Math.random()>0.3?1:0, tiene_firma: Math.random()>0.2?1:0,
+        respuestas_json: JSON.stringify({nombre_completo:DEMO.participantes[pi].nombre, fecha_nacimiento:'1985-03-15', estado_civil:'Casado/a', num_hijos:2}),
+      });
+    }
+    return recs;
+  },
+  formStatus: function(pid) {
+    return DEMO.plantillas.map((pl,i) => ({
+      plantilla_id:pl.id, plantilla_nombre:pl.nombre,
+      aplicado: i < 3,
+      registro: i < 3 ? { id:'r'+Math.floor(Math.random()*50), created_at: new Date(Date.now()-86400000*(i+1)).toISOString(), estado:'sincronizado' } : null,
+    }));
+  },
+  estadisticas: {
+    totales: { total_registros:394, sincronizados:243, completados:74, borradores:77, errores:0, con_huella:292, con_firma:315 },
+    tasa_envio: 61.7,
+    cobertura: { total_participantes:6, con_registro:5, porcentaje:'83.3' },
+    promedio_diario: 13,
+    actividad_diaria: [{dia:'Lun',total:52,sincronizados:34,pendientes:18},{dia:'Mar',total:68,sincronizados:42,pendientes:26},{dia:'Mié',total:45,sincronizados:30,pendientes:15},{dia:'Jue',total:61,sincronizados:38,pendientes:23},{dia:'Vie',total:72,sincronizados:48,pendientes:24},{dia:'Sáb',total:58,sincronizados:32,pendientes:26},{dia:'Dom',total:38,sincronizados:19,pendientes:19}],
+    actividad_horaria: [{hora:6,total:8},{hora:7,total:22},{hora:8,total:45},{hora:9,total:62},{hora:10,total:58},{hora:11,total:41},{hora:12,total:15},{hora:13,total:12},{hora:14,total:38},{hora:15,total:42},{hora:16,total:30},{hora:17,total:18},{hora:18,total:3}],
+    por_plantilla: [{nombre:'Encuesta Socioeconómica',total:142,sincronizados:98},{nombre:'Ficha Predial',total:98,sincronizados:62},{nombre:'Registro Productivo',total:87,sincronizados:48},{nombre:'Encuesta de Salud',total:67,sincronizados:35}],
+  },
+  handle(method, path, body) {
+    const p = path.replace(/\?.*/, '');
+    const qs = path.includes('?') ? Object.fromEntries(new URLSearchParams(path.split('?')[1])) : {};
+    if (p === '/auth/login' && method === 'POST') {
+      const u = this.users[body?.email];
+      if (!u || u.password !== body?.password) return { error: 'Credenciales inválidas' };
+      const { password, ...user } = u;
+      return { tokens: { accessToken:'demo-token', refreshToken:'demo-refresh' }, user };
+    }
+    if (p === '/auth/me') return this.users['carlos@infomatt.co'];
+    if (p === '/auth/refresh') return { tokens: { accessToken:'demo-token-2', refreshToken:'demo-refresh-2' } };
+    if (p === '/auth/logout') return { ok: true };
+    if (p === '/participantes' && method === 'GET') {
+      let list = [...this.participantes];
+      if (qs.search) { const s = qs.search.toLowerCase(); list = list.filter(x => x.nombre.toLowerCase().includes(s) || x.numero_documento.includes(s)); }
+      return { data: list, pagination: { page:1, limit:50, total:list.length, pages:1 } };
+    }
+    if (p.startsWith('/participantes/') && method === 'GET') {
+      const id = p.split('/')[2];
+      const pa = this.participantes.find(x => x.id === id);
+      if (!pa) return { error: 'No encontrado' };
+      return { ...pa, formStatus: this.formStatus(id), registros: [] };
+    }
+    if (p === '/plantillas' && method === 'GET') return { data: this.plantillas };
+    if (p.startsWith('/plantillas/') && method === 'GET') {
+      const id = p.split('/')[2];
+      const pl = this.plantillas.find(x => x.id === id);
+      return pl ? { ...pl, campos: pl.campos } : { error: 'No encontrada' };
+    }
+    if (p === '/registros' && method === 'GET') {
+      let recs = this.registros();
+      if (qs.estado) recs = recs.filter(r => r.estado === qs.estado);
+      const lim = Number(qs.limit) || 50;
+      return { data: recs.slice(0, lim), pagination: { page:1, limit:lim, total:recs.length, pages:Math.ceil(recs.length/lim) } };
+    }
+    if (p.startsWith('/registros/') && method === 'GET') {
+      const recs = this.registros();
+      const r = recs.find(x => x.id === p.split('/')[2]);
+      if (!r) return { error: 'No encontrado' };
+      return { ...r, respuestas: JSON.parse(r.respuestas_json), campos: this.plantillas[0].campos };
+    }
+    if (p === '/estadisticas') return this.estadisticas;
+    if (p === '/estadisticas/exportar') return qs.formato === 'csv' ? 'id,participante,plantilla,estado\nr1,María,Encuesta,sincronizado' : [{ id:'r1' }];
+    if (p === '/sync/batch') return { results: (body?.registros||[]).map(r => ({ offline_id:r.offline_id, status:'created' })) };
+    return { ok: true };
+  },
+};
+
 // ── API Client ──
 const API = {
   baseUrl: '/api/v1',
@@ -814,22 +920,36 @@ const API = {
   },
 
   async request(method, path, body) {
-    const opts = { method, headers: this.headers() };
-    if (body) opts.body = JSON.stringify(body);
-    const res = await fetch(this.baseUrl + path, opts);
-    if (res.status === 401 && this.refreshToken) {
-      const ok = await this.doRefresh();
-      if (ok) {
-        opts.headers = this.headers();
-        const retry = await fetch(this.baseUrl + path, opts);
-        return retry.json();
-      }
+    // If demo mode, use mock data
+    if (DEMO.active) {
+      return DEMO.handle(method, path, body);
     }
-    if (res.headers.get('content-type')?.includes('text/csv')) return res.text();
-    return res.json();
+    try {
+      const opts = { method, headers: this.headers() };
+      if (body) opts.body = JSON.stringify(body);
+      const res = await fetch(this.baseUrl + path, opts);
+      if (res.status === 401 && this.refreshToken) {
+        const ok = await this.doRefresh();
+        if (ok) {
+          opts.headers = this.headers();
+          const retry = await fetch(this.baseUrl + path, opts);
+          return retry.json();
+        }
+      }
+      if (res.headers.get('content-type')?.includes('text/csv')) return res.text();
+      return res.json();
+    } catch (err) {
+      // Network error — switch to demo mode
+      if (!DEMO.active) {
+        DEMO.active = true;
+        console.log('⚡ Modo demo activado (sin servidor)');
+      }
+      return DEMO.handle(method, path, body);
+    }
   },
 
   async doRefresh() {
+    if (DEMO.active) return true;
     try {
       const res = await fetch(this.baseUrl + '/auth/refresh', {
         method: 'POST',
@@ -1058,7 +1178,7 @@ function renderParticipants(list) {
   const c = document.getElementById('participant-list');
   if (!list.length) { c.innerHTML=`<div class="empty-state"><div class="empty-icon">👥</div><div class="empty-title">Sin resultados</div></div>`; return; }
   c.innerHTML = list.map(p => `
-    <button class="card" onclick="openParticipant(${p.id})">
+    <button class="card" onclick="openParticipant('${p.id}')">
       <div class="avatar">${p.name.charAt(0)}</div>
       <div class="card-content">
         <div class="card-name">${p.name}</div>

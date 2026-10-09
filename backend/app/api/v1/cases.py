@@ -40,6 +40,7 @@ def _case(db: Session, user: User, case_id: str, *, write: bool = False) -> Part
 
 def _read(row: ParticipantCase) -> CaseRead:
     return CaseRead(id=row.id, project_id=row.project_id, participant_id=row.participant_id,
+                    case_type=row.case_type, parent_case_id=row.parent_case_id,
                     title=row.title, status=row.status, assigned_user_id=row.assigned_user_id,
                     due_at=row.due_at, properties=json.loads(row.properties_json),
                     created_by=row.created_by, created_at=row.created_at, updated_at=row.updated_at)
@@ -78,9 +79,16 @@ def list_cases(participant_id: str, db: Session = Depends(get_db), user: User = 
 @router.post("/", response_model=CaseRead)
 def create_case(payload: CaseCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     participant = _participant(db, user, payload.participant_id, write=True)
+    if not payload.case_type.strip():
+        raise HTTPException(status_code=422, detail="El tipo de caso es obligatorio")
+    parent = _case(db, user, payload.parent_case_id) if payload.parent_case_id else None
+    if parent and parent.project_id != participant.project_id:
+        raise HTTPException(status_code=422, detail="El caso padre pertenece a otro proyecto")
     _check_assignee(db, participant.project_id, payload.assigned_user_id, participant)
     now = datetime.utcnow()
-    row = ParticipantCase(project_id=participant.project_id, participant_id=participant.id, title=payload.title.strip(),
+    row = ParticipantCase(project_id=participant.project_id, participant_id=participant.id,
+                          case_type=payload.case_type.strip(), parent_case_id=parent.id if parent else None,
+                          title=payload.title.strip(),
                           assigned_user_id=payload.assigned_user_id, due_at=payload.due_at,
                           properties_json=json.dumps({**{key: value for key, value in payload.properties.items() if not key.startswith("_")}, "_reminder_channels": list(dict.fromkeys(payload.reminder_channels))}, ensure_ascii=False), created_by=user.id,
                           created_at=now, updated_at=now)
@@ -91,6 +99,13 @@ def create_case(payload: CaseCreate, db: Session = Depends(get_db), user: User =
     db.commit()
     db.refresh(row)
     return _read(row)
+
+
+@router.get("/{case_id}/children", response_model=list[CaseRead])
+def case_children(case_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    parent = _case(db, user, case_id)
+    rows = db.query(ParticipantCase).filter(ParticipantCase.parent_case_id == parent.id).order_by(ParticipantCase.created_at).all()
+    return [_read(row) for row in rows if participant_visible(db, user.id, db.get(Participant, row.participant_id))]
 
 
 @router.patch("/{case_id}", response_model=CaseRead)

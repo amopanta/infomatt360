@@ -102,6 +102,62 @@ def test_territory_assignment_is_manager_only():
         Base.metadata.drop_all(engine)
 
 
+def test_child_case_reuses_participant_access_and_tracks_parent():
+    engine, _sessions = setup()
+    try:
+        with TestClient(app) as client:
+            manager = auth(client, "case-manager@example.com", "Manager12345!")
+            parent = client.post("/api/v1/cases/", headers=manager, json={
+                "participant_id": "case-participant", "title": "Hogar de Ana", "case_type": "hogar"})
+            assert parent.status_code == 200, parent.text
+            child = client.post("/api/v1/cases/", headers=manager, json={
+                "participant_id": "other-participant", "title": "Miembro Beto",
+                "case_type": "integrante", "parent_case_id": parent.json()["id"]})
+            assert child.status_code == 200, child.text
+            assert child.json()["parent_case_id"] == parent.json()["id"]
+            children = client.get(f"/api/v1/cases/{parent.json()['id']}/children", headers=manager)
+            assert [row["id"] for row in children.json()] == [child.json()["id"]]
+            worker = auth(client, "case-worker@example.com", "Worker12345!")
+            assert client.post("/api/v1/territories/case-project", headers=manager, json={
+                "user_id": "case-worker", "department": "Cundinamarca"}).status_code == 200
+            assert client.get(f"/api/v1/cases/{parent.json()['id']}/children", headers=worker).json() == []
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(engine)
+
+
+def test_saved_case_export_uses_existing_scheduler_and_territory_filter():
+    engine, sessions = setup()
+    try:
+        with sessions() as db:
+            db.get(Role, "case-worker-role").permissions += ",reports.export"
+            db.commit()
+        with TestClient(app) as client:
+            manager = auth(client, "case-manager@example.com", "Manager12345!")
+            worker = auth(client, "case-worker@example.com", "Worker12345!")
+            assert client.post("/api/v1/cases/", headers=manager, json={
+                "participant_id": "case-participant", "title": "Caso visible"}).status_code == 200
+            assert client.post("/api/v1/cases/", headers=manager, json={
+                "participant_id": "other-participant", "title": "Caso oculto"}).status_code == 200
+            assert client.post("/api/v1/territories/case-project", headers=manager, json={
+                "user_id": "case-worker", "department": "Cundinamarca"}).status_code == 200
+            created = client.post("/api/v1/saved-exports/case-project", headers=manager, json={
+                "name": "Casos por territorio", "export_kind": "cases", "frequency": "weekly",
+                "recipient_user_id": "case-worker"})
+            assert created.status_code == 200, created.text
+            export_id = created.json()["id"]
+            assert created.json()["export_kind"] == "cases"
+            run = client.post(f"/api/v1/saved-exports/{export_id}/run", headers=worker)
+            assert run.status_code == 200, run.text
+            downloaded = client.get(f"/api/v1/saved-exports/{export_id}/files/{run.json()['file_id']}", headers=worker)
+            assert downloaded.status_code == 200
+            assert b"Caso visible" in downloaded.content
+            assert b"Caso oculto" not in downloaded.content
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(engine)
+
+
 def test_case_reminder_uses_existing_message_channels(monkeypatch):
     engine, sessions = setup()
     sent = []

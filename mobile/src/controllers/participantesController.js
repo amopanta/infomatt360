@@ -23,7 +23,7 @@ exports.list = (req, res) => {
       params.push(s, s, s);
     }
 
-    const countQuery = query.replace(/SELECT p\.\*.*FROM/, 'SELECT COUNT(*) as total FROM');
+    const countQuery = query.replace(/SELECT[\s\S]*?FROM participantes/, 'SELECT COUNT(*) as total FROM participantes');
     const total = db.prepare(countQuery).get(...params).total;
 
     query += ` ORDER BY p.nombre ASC LIMIT ? OFFSET ?`;

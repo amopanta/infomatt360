@@ -16,3 +16,4 @@ dist/
 backups/
 release/
 .claude/
+*.tar.gz

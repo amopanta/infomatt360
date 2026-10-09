@@ -4,11 +4,14 @@ exports.resumen = (req, res) => {
   try {
     const { desde, hasta, proyecto_id } = req.query;
     const userId = req.user.id;
+    const isAdmin = req.user.rol === 'admin' || req.user.rol === 'supervisor';
 
     let dateFilter = '';
-    const params = [userId];
+    const params = isAdmin ? [] : [userId];
     if (desde) { dateFilter += ` AND r.created_at >= ?`; params.push(desde); }
     if (hasta) { dateFilter += ` AND r.created_at <= ?`; params.push(hasta + 'T23:59:59'); }
+
+    const userFilter = isAdmin ? '' : 'r.usuario_id = ? AND';
 
     // Totales
     const totales = db.prepare(`
@@ -20,7 +23,7 @@ exports.resumen = (req, res) => {
         SUM(CASE WHEN estado = 'error' THEN 1 ELSE 0 END) as errores,
         SUM(tiene_huella) as con_huella,
         SUM(tiene_firma) as con_firma
-      FROM registros r WHERE r.usuario_id = ? ${dateFilter}
+      FROM registros r WHERE ${userFilter} 1=1 ${dateFilter}
     `).get(...params);
 
     // Tasa de envío
@@ -38,7 +41,7 @@ exports.resumen = (req, res) => {
         COUNT(*) as total,
         SUM(CASE WHEN estado = 'sincronizado' THEN 1 ELSE 0 END) as sincronizados,
         SUM(CASE WHEN estado != 'sincronizado' THEN 1 ELSE 0 END) as pendientes
-      FROM registros r WHERE r.usuario_id = ? ${dateFilter}
+      FROM registros r WHERE ${userFilter} 1=1 ${dateFilter}
       GROUP BY strftime('%w', r.created_at)
       ORDER BY cast(strftime('%w', r.created_at) as integer)
     `).all(...params);
@@ -46,7 +49,7 @@ exports.resumen = (req, res) => {
     // Por hora
     const porHora = db.prepare(`
       SELECT cast(strftime('%H', r.created_at) as integer) as hora, COUNT(*) as total
-      FROM registros r WHERE r.usuario_id = ? ${dateFilter}
+      FROM registros r WHERE ${userFilter} 1=1 ${dateFilter}
       GROUP BY hora ORDER BY hora
     `).all(...params);
 
@@ -56,22 +59,24 @@ exports.resumen = (req, res) => {
         SUM(CASE WHEN r.estado = 'sincronizado' THEN 1 ELSE 0 END) as sincronizados
       FROM registros r
       JOIN plantillas pl ON r.plantilla_id = pl.id
-      WHERE r.usuario_id = ? ${dateFilter}
+      WHERE ${userFilter} 1=1 ${dateFilter}
       GROUP BY pl.id ORDER BY total DESC
     `).all(...params);
 
     // Cobertura de participantes
+    const coberturaParams = isAdmin ? [] : [userId];
+    const coberturaFilter = isAdmin ? '' : 'up.usuario_id = ? AND';
     const totalParticipantes = db.prepare(`
       SELECT COUNT(DISTINCT p.id) as total
       FROM participantes p
       JOIN proyectos pr ON p.proyecto_id = pr.id
       JOIN usuario_proyecto up ON pr.id = up.proyecto_id
-      WHERE up.usuario_id = ?
-    `).get(userId).total;
+      WHERE ${coberturaFilter} 1=1
+    `).get(...coberturaParams).total;
 
     const participantesConRegistro = db.prepare(`
       SELECT COUNT(DISTINCT r.participante_id) as total
-      FROM registros r WHERE r.usuario_id = ? ${dateFilter}
+      FROM registros r WHERE ${userFilter} 1=1 ${dateFilter}
     `).get(...params).total;
 
     // Promedio diario
@@ -85,7 +90,7 @@ exports.resumen = (req, res) => {
     const tiempoPromedio = db.prepare(`
       SELECT AVG(diff) as promedio FROM (
         SELECT julianday(r.created_at) - julianday(LAG(r.created_at) OVER (ORDER BY r.created_at)) as diff
-        FROM registros r WHERE r.usuario_id = ? ${dateFilter}
+        FROM registros r WHERE ${userFilter} 1=1 ${dateFilter}
       ) WHERE diff IS NOT NULL AND diff < 1
     `).get(...params);
 
@@ -112,10 +117,13 @@ exports.resumen = (req, res) => {
 exports.exportar = (req, res) => {
   try {
     const { formato = 'json', desde, hasta } = req.query;
+    const isAdmin = req.user.rol === 'admin' || req.user.rol === 'supervisor';
     let dateFilter = '';
-    const params = [req.user.id];
+    const params = isAdmin ? [] : [req.user.id];
     if (desde) { dateFilter += ` AND r.created_at >= ?`; params.push(desde); }
     if (hasta) { dateFilter += ` AND r.created_at <= ?`; params.push(hasta + 'T23:59:59'); }
+
+    const userFilter = isAdmin ? '' : 'r.usuario_id = ? AND';
 
     const registros = db.prepare(`
       SELECT r.id, r.estado, r.created_at, r.synced_at, r.latitud, r.longitud,
@@ -124,7 +132,7 @@ exports.exportar = (req, res) => {
       FROM registros r
       JOIN plantillas pl ON r.plantilla_id = pl.id
       JOIN participantes pa ON r.participante_id = pa.id
-      WHERE r.usuario_id = ? ${dateFilter}
+      WHERE ${userFilter} 1=1 ${dateFilter}
       ORDER BY r.created_at DESC
     `).all(...params);
 

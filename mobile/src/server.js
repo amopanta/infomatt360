@@ -62,6 +62,19 @@ app.get('/api/v1', (req, res) => {
       sync: {
         'POST   /api/v1/sync/batch': 'Sincronización batch de registros offline',
       },
+      cases: {
+        'GET    /api/v1/cases/participant/:id': 'Listar casos de un participante',
+        'GET    /api/v1/cases/project/:projectId/assignees': 'Usuarios asignables en proyecto',
+        'GET    /api/v1/cases/:id': 'Detalle de caso',
+        'POST   /api/v1/cases': 'Crear caso de seguimiento',
+        'PATCH  /api/v1/cases/:id': 'Actualizar caso (estado, asignación, nota)',
+        'GET    /api/v1/cases/:id/events': 'Timeline de eventos del caso',
+      },
+      territories: {
+        'GET    /api/v1/territories/:projectId': 'Listar territorios del proyecto',
+        'POST   /api/v1/territories/:projectId': 'Asignar territorio a usuario',
+        'DELETE /api/v1/territories/:projectId/:id': 'Eliminar asignación territorial',
+      },
       estadisticas: {
         'GET    /api/v1/estadisticas': 'Resumen con filtro de fechas',
         'GET    /api/v1/estadisticas/exportar': 'Exportar CSV o JSON',

@@ -5,6 +5,8 @@ const participantes = require('../controllers/participantesController');
 const registros = require('../controllers/registrosController');
 const plantillas = require('../controllers/plantillasController');
 const estadisticas = require('../controllers/estadisticasController');
+const casos = require('../controllers/casosController');
+const territorios = require('../controllers/territoriosController');
 
 // ── Health check (no auth) ──
 router.get('/health', (req, res) => {
@@ -38,6 +40,19 @@ router.delete('/registros/:id', requireRole('admin', 'supervisor'), registros.de
 
 // ── Sincronización batch ──
 router.post('/sync/batch', registros.syncBatch);
+
+// ── Casos (seguimiento longitudinal) ──
+router.get('/cases/participant/:participantId', casos.listByParticipant);
+router.get('/cases/project/:projectId/assignees', casos.listAssignees);
+router.get('/cases/:id', casos.getById);
+router.post('/cases', casos.create);
+router.patch('/cases/:id', casos.update);
+router.get('/cases/:id/events', casos.listEvents);
+
+// ── Territorios ──
+router.get('/territories/:projectId', territorios.list);
+router.post('/territories/:projectId', territorios.assign);
+router.delete('/territories/:projectId/:id', requireRole('admin', 'supervisor'), territorios.remove);
 
 // ── Estadísticas ──
 router.get('/estadisticas', requireRole('admin', 'supervisor'), estadisticas.resumen);

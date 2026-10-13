@@ -181,6 +181,49 @@ function initDatabase() {
       FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
     );
 
+    -- ═══ CASOS (seguimiento longitudinal, inspirado en CommCare) ═══
+    CREATE TABLE IF NOT EXISTS casos (
+      id TEXT PRIMARY KEY,
+      participante_id TEXT NOT NULL,
+      titulo TEXT NOT NULL,
+      estado TEXT DEFAULT 'abierto' CHECK(estado IN ('abierto','en_progreso','cerrado','archivado')),
+      assigned_user_id TEXT,
+      due_at TEXT,
+      propiedades_json TEXT DEFAULT '{}',
+      created_by TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      updated_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (participante_id) REFERENCES participantes(id),
+      FOREIGN KEY (assigned_user_id) REFERENCES usuarios(id),
+      FOREIGN KEY (created_by) REFERENCES usuarios(id)
+    );
+
+    -- ═══ EVENTOS DE CASO ═══
+    CREATE TABLE IF NOT EXISTS caso_eventos (
+      id TEXT PRIMARY KEY,
+      caso_id TEXT NOT NULL,
+      event_type TEXT NOT NULL CHECK(event_type IN ('created','assigned','status_change','note','reminder','closed')),
+      nota TEXT,
+      from_user_id TEXT NOT NULL,
+      to_user_id TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (caso_id) REFERENCES casos(id) ON DELETE CASCADE,
+      FOREIGN KEY (from_user_id) REFERENCES usuarios(id)
+    );
+
+    -- ═══ TERRITORIOS DE USUARIO ═══
+    CREATE TABLE IF NOT EXISTS user_territories (
+      id TEXT PRIMARY KEY,
+      proyecto_id TEXT NOT NULL,
+      user_id TEXT NOT NULL,
+      departamento TEXT NOT NULL,
+      municipio TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (proyecto_id) REFERENCES proyectos(id),
+      FOREIGN KEY (user_id) REFERENCES usuarios(id),
+      UNIQUE(proyecto_id, user_id, departamento, municipio)
+    );
+
     -- ═══ ÍNDICES ═══
     CREATE INDEX IF NOT EXISTS idx_usuarios_email ON usuarios(email);
     CREATE INDEX IF NOT EXISTS idx_usuarios_org ON usuarios(organizacion_id);
@@ -194,6 +237,12 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_registros_fecha ON registros(created_at);
     CREATE INDEX IF NOT EXISTS idx_evidencias_registro ON evidencias(registro_id);
     CREATE INDEX IF NOT EXISTS idx_sync_queue_estado ON sync_queue(estado);
+    CREATE INDEX IF NOT EXISTS idx_casos_participante ON casos(participante_id);
+    CREATE INDEX IF NOT EXISTS idx_casos_assigned ON casos(assigned_user_id);
+    CREATE INDEX IF NOT EXISTS idx_casos_estado ON casos(estado);
+    CREATE INDEX IF NOT EXISTS idx_caso_eventos_caso ON caso_eventos(caso_id);
+    CREATE INDEX IF NOT EXISTS idx_territories_proyecto ON user_territories(proyecto_id);
+    CREATE INDEX IF NOT EXISTS idx_territories_user ON user_territories(user_id);
   `);
 
   console.log('✅ Base de datos inicializada correctamente');

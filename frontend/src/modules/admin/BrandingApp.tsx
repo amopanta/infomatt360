@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
+import { useI18n } from '../../i18n';
 import {
   fetchAdminProjects,
   fetchOrganizationBranding,
@@ -12,6 +13,7 @@ import {
 import type { AdminProject, Organization, OrganizationBranding } from './brandingAdminApi';
 
 export function BrandingApp() {
+  const { t } = useI18n();
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [projects, setProjects] = useState<AdminProject[]>([]);
   const [selectedOrgId, setSelectedOrgId] = useState('');
@@ -33,7 +35,7 @@ export function BrandingApp() {
       setOrganizations(rows);
       if (rows.length > 0 && !selectedOrgId) setSelectedOrgId(rows[0].id);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible consultar las organizaciones.');
+      setMessage(error instanceof Error ? error.message : t('admin.branding.errorLoadOrganizations'));
     }
   }
 
@@ -54,7 +56,7 @@ export function BrandingApp() {
       setBackgroundColor(row?.background_color ?? '');
       setSlogan(row?.slogan ?? '');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible consultar la marca.');
+      setMessage(error instanceof Error ? error.message : t('admin.branding.errorLoadBranding'));
     }
   }
 
@@ -67,9 +69,9 @@ export function BrandingApp() {
     try {
       const updated = await uploadOrganizationLogo(selectedOrgId, file);
       setBranding(updated);
-      setMessage('Logo subido correctamente.');
+      setMessage(t('admin.branding.logoUploaded'));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible subir el logo.');
+      setMessage(error instanceof Error ? error.message : t('admin.branding.errorUploadLogo'));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
@@ -81,8 +83,6 @@ export function BrandingApp() {
     setSaving(true);
     setMessage('');
     try {
-      // Se reenvia el logo_url vigente a proposito: PUT /branding pisa todos
-      // los campos, y omitirlo borraria el logo ya subido.
       const updated = await saveOrganizationBranding(selectedOrgId, {
         logo_url: branding?.logo_url ?? null,
         primary_color: primaryColor.trim() || null,
@@ -91,9 +91,9 @@ export function BrandingApp() {
         slogan: slogan.trim() || null,
       });
       setBranding(updated);
-      setMessage('Marca guardada correctamente.');
+      setMessage(t('admin.branding.brandingSaved'));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible guardar la marca.');
+      setMessage(error instanceof Error ? error.message : t('admin.branding.errorSaveBranding'));
     } finally {
       setSaving(false);
     }
@@ -104,10 +104,10 @@ export function BrandingApp() {
     setMessage('');
     try {
       await setProjectOrganization(project.id, organizationId);
-      setMessage(organizationId ? `Proyecto "${project.name}" vinculado a la organizacion.` : `Proyecto "${project.name}" desvinculado.`);
+      setMessage(organizationId ? t('admin.branding.projectLinked', { name: project.name }) : t('admin.branding.projectUnlinked', { name: project.name }));
       await loadProjects();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible actualizar el proyecto.');
+      setMessage(error instanceof Error ? error.message : t('admin.branding.errorUpdateProject'));
     } finally {
       setLinkingProjectId(null);
     }
@@ -116,16 +116,16 @@ export function BrandingApp() {
   const selectedOrg = organizations.find((org) => org.id === selectedOrgId) ?? null;
 
   return (
-    <AppShell title="Marca de la organizacion">
+    <AppShell title={t('admin.branding.title')}>
       {message ? <p className="feedback">{message}</p> : null}
 
       <section className="panel">
         <header>
-          <h2>Organizacion</h2>
-          <p>El logo y los colores aparecen en la pantalla de inicio de sesion y en las actas PDF de los proyectos vinculados.</p>
+          <h2>{t('admin.branding.organizationTitle')}</h2>
+          <p>{t('admin.branding.organizationDescription')}</p>
         </header>
         <label>
-          Organizacion
+          {t('admin.branding.organizationLabel')}
           <select value={selectedOrgId} onChange={(event) => setSelectedOrgId(event.target.value)}>
             {organizations.map((org) => (
               <option key={org.id} value={org.id}>{org.name} ({org.slug})</option>
@@ -138,16 +138,16 @@ export function BrandingApp() {
         <>
           <section className="panel">
             <header>
-              <h2>Logo</h2>
-              <p>PNG, JPEG o WebP, maximo 2MB. Reemplaza el anterior al subir uno nuevo.</p>
+              <h2>{t('admin.branding.logoTitle')}</h2>
+              <p>{t('admin.branding.logoDescription')}</p>
             </header>
             {branding?.logo_url ? (
-              <p><img src={branding.logo_url} alt={`Logo de ${selectedOrg.name}`} style={{ maxHeight: 80 }} /></p>
+              <p><img src={branding.logo_url} alt={t('admin.branding.logoAlt', { name: selectedOrg.name })} style={{ maxHeight: 80 }} /></p>
             ) : (
-              <p><small>Esta organizacion todavia no tiene logo cargado.</small></p>
+              <p><small>{t('admin.branding.noLogoYet')}</small></p>
             )}
             <label>
-              Subir logo
+              {t('admin.branding.uploadLogo')}
               <input
                 ref={fileInputRef}
                 type="file"
@@ -159,45 +159,45 @@ export function BrandingApp() {
                 }}
               />
             </label>
-            {uploading ? <p><small>Subiendo logo...</small></p> : null}
+            {uploading ? <p><small>{t('admin.branding.uploadingLogo')}</small></p> : null}
           </section>
 
           <section className="panel">
             <header>
-              <h2>Colores y eslogan</h2>
+              <h2>{t('admin.branding.colorsAndSlogan')}</h2>
             </header>
             <form onSubmit={submitBranding}>
               <label>
-                Color primario (hex)
+                {t('admin.branding.primaryColorLabel')}
                 <input value={primaryColor} onChange={(event) => setPrimaryColor(event.target.value)} placeholder="#0A2540" />
               </label>
               <label>
-                Color de acento (hex)
+                {t('admin.branding.accentColorLabel')}
                 <input value={accentColor} onChange={(event) => setAccentColor(event.target.value)} placeholder="#38BDF8" />
               </label>
               <label>
-                Color de fondo (hex)
+                {t('admin.branding.backgroundColorLabel')}
                 <input value={backgroundColor} onChange={(event) => setBackgroundColor(event.target.value)} placeholder="#F8FAFC" />
               </label>
               <label>
-                Eslogan
-                <input value={slogan} onChange={(event) => setSlogan(event.target.value)} placeholder="Territorio conectado" />
+                {t('admin.branding.sloganLabel')}
+                <input value={slogan} onChange={(event) => setSlogan(event.target.value)} placeholder={t('admin.branding.sloganPlaceholder')} />
               </label>
-              <button type="submit" disabled={saving}>{saving ? 'Guardando...' : 'Guardar marca'}</button>
+              <button type="submit" disabled={saving}>{saving ? t('admin.branding.saving') : t('admin.branding.saveBranding')}</button>
             </form>
           </section>
 
           <section className="panel">
             <header>
-              <h2>Proyectos vinculados</h2>
-              <p>Las actas de un proyecto usan el logo de su organizacion. Un proyecto sin organizacion genera actas sin logo.</p>
+              <h2>{t('admin.branding.linkedProjects')}</h2>
+              <p>{t('admin.branding.linkedProjectsDescription')}</p>
             </header>
             <table className="records-table">
               <thead>
                 <tr>
-                  <th>Proyecto</th>
-                  <th>Organizacion actual</th>
-                  <th>Accion</th>
+                  <th>{t('admin.branding.colProject')}</th>
+                  <th>{t('admin.branding.colCurrentOrg')}</th>
+                  <th>{t('admin.branding.colAction')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -207,15 +207,15 @@ export function BrandingApp() {
                   return (
                     <tr key={project.id}>
                       <td>{project.name}</td>
-                      <td>{project.organization_id ? (linkedName ?? project.organization_id) : 'Sin organizacion'}</td>
+                      <td>{project.organization_id ? (linkedName ?? project.organization_id) : t('admin.branding.noOrganization')}</td>
                       <td>
                         {linkedHere ? (
                           <button type="button" disabled={linkingProjectId === project.id} onClick={() => void submitLinkProject(project, null)}>
-                            {linkingProjectId === project.id ? 'Actualizando...' : 'Desvincular'}
+                            {linkingProjectId === project.id ? t('admin.branding.updating') : t('admin.branding.unlink')}
                           </button>
                         ) : (
                           <button type="button" disabled={linkingProjectId === project.id} onClick={() => void submitLinkProject(project, selectedOrgId)}>
-                            {linkingProjectId === project.id ? 'Actualizando...' : `Vincular a ${selectedOrg.name}`}
+                            {linkingProjectId === project.id ? t('admin.branding.updating') : t('admin.branding.linkTo', { name: selectedOrg.name })}
                           </button>
                         )}
                       </td>
@@ -228,7 +228,7 @@ export function BrandingApp() {
         </>
       ) : (
         <section className="panel">
-          <p>No hay organizaciones registradas. Crea una desde la API de organizaciones o el instalador.</p>
+          <p>{t('admin.branding.noOrganizations')}</p>
         </section>
       )}
     </AppShell>

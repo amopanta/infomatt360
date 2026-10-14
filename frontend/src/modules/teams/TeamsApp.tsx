@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { AppShell } from '../../components/AppShell';
+import { useI18n } from '../../i18n';
 import { PROJECT_KEY } from '../auth/session';
 import { addGestorTeamMember, bulkImportGestorTeams, createGestorTeam, deleteGestorTeam, downloadGestorTeamTemplate, fetchGestorTeamSummaries, removeGestorTeamMember, renameGestorTeam, searchGestorTeamMembers, type GestorTeamSummary, type TeamBulkPreview, type TeamSearchResult } from './api';
 
 export function TeamsApp() {
+  const { t } = useI18n();
   const projectId = localStorage.getItem(PROJECT_KEY) || '';
   const [teams, setTeams] = useState<GestorTeamSummary[]>([]);
   const [selectedId, setSelectedId] = useState('');
@@ -34,12 +36,12 @@ export function TeamsApp() {
   async function run(action: () => Promise<unknown>, success: string) {
     setBusy(true); setMessage('');
     try { await action(); await refreshTeams(); setMessage(success); }
-    catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible completar la operación.'); }
+    catch (error) { setMessage(error instanceof Error ? error.message : t('teams.errorOperation')); }
     finally { setBusy(false); }
   }
   async function create() {
     if (!newName.trim()) return;
-    await run(async () => { const team = await createGestorTeam(projectId, newName.trim()); setSelectedId(team.id); setNewName(''); }, 'Equipo creado.');
+    await run(async () => { const team = await createGestorTeam(projectId, newName.trim()); setSelectedId(team.id); setNewName(''); }, t('teams.teamCreated'));
   }
   async function toggle(person: TeamSearchResult) {
     if (!selected) return;
@@ -49,7 +51,7 @@ export function TeamsApp() {
       else await addGestorTeamMember(selected.id, kind, person.id);
       setResults((current) => current.map((item) => item.id === person.id ? { ...item, selected: !person.selected } : item));
       await refreshTeams();
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible actualizar el integrante.'); }
+    } catch (error) { setMessage(error instanceof Error ? error.message : t('teams.errorMember')); }
     finally { setBusy(false); }
   }
   async function validateFile(previewOnly: boolean) {
@@ -58,24 +60,23 @@ export function TeamsApp() {
     try {
       const result = await bulkImportGestorTeams(projectId, file, previewOnly);
       setPreview(result);
-      if (!previewOnly && !result.issues.length) { await refreshTeams(); setMessage(`${result.applied} integrantes agregados.`); setPreview(null); setFile(null); }
-    } catch (error) { setMessage(error instanceof Error ? error.message : 'No fue posible procesar el archivo.'); }
+      if (!previewOnly && !result.issues.length) { await refreshTeams(); setMessage(t('teams.bulkApplied', { count: result.applied })); setPreview(null); setFile(null); }
+    } catch (error) { setMessage(error instanceof Error ? error.message : t('teams.errorFile')); }
     finally { setBusy(false); }
   }
 
-  return <AppShell title="Equipos de gestores"><main className="teams-page">
-    <h1>Equipos de gestores</h1><p>Asigna usuarios y participantes a equipos. Estos equipos son distintos del grupo usado al importar participantes. Pertenecer a un equipo no concede acceso automático a formularios.</p>
-    <section className="teams-card"><h2>Crear equipo</h2><div className="teams-inline"><input aria-label="Nombre del equipo" placeholder="Nombre del equipo" value={newName} onChange={(event) => setNewName(event.target.value)} /><button type="button" disabled={busy || !newName.trim()} onClick={() => void create()}>Crear equipo</button></div></section>
-    <section className="teams-card"><h2>Asignación masiva desde Excel o CSV</h2><p>Una fila por integrante. Columnas: <strong>equipo, tipo, identificador</strong>. Usa <strong>gestor</strong> con correo o documento y <strong>participante</strong> con documento o código. Un archivo puede crear varios equipos y asignar miles de integrantes.</p>
-      <div className="teams-inline"><button type="button" onClick={() => void downloadGestorTeamTemplate(projectId).catch((error: Error) => setMessage(error.message))}>Descargar plantilla</button><input type="file" aria-label="Archivo de equipos" accept=".xlsx,.csv" onChange={(event) => { setFile(event.target.files?.[0] || null); setPreview(null); }} /><button type="button" disabled={busy || !file} onClick={() => void validateFile(true)}>Validar archivo</button></div>
-      {preview && <div role="status"><p>{preview.rows} filas · {preview.teams_to_create} equipos nuevos · {preview.new_members} integrantes nuevos · {preview.already_members} ya vinculados.</p>{preview.issues.length > 0 && <ul>{preview.issues.map((issue, index) => <li key={`${index}-${issue}`}>{issue}</li>)}</ul>}<button type="button" disabled={busy || preview.issues.length > 0 || (preview.new_members === 0 && preview.teams_to_create === 0)} onClick={() => void validateFile(false)}>Confirmar carga masiva</button></div>}
+  return <AppShell title={t('teams.title')}><main className="teams-page">
+    <h1>{t('teams.title')}</h1><p>{t('teams.description')}</p>
+    <section className="teams-card"><h2>{t('teams.createTeam')}</h2><div className="teams-inline"><input aria-label={t('teams.teamNameLabel')} placeholder={t('teams.teamNamePlaceholder')} value={newName} onChange={(event) => setNewName(event.target.value)} /><button type="button" disabled={busy || !newName.trim()} onClick={() => void create()}>{t('teams.createTeam')}</button></div></section>
+    <section className="teams-card"><h2>{t('teams.bulkTitle')}</h2><p dangerouslySetInnerHTML={{ __html: t('teams.bulkDescription') }} />
+      <div className="teams-inline"><button type="button" onClick={() => void downloadGestorTeamTemplate(projectId).catch((error: Error) => setMessage(error.message))}>{t('teams.downloadTemplate')}</button><input type="file" aria-label={t('teams.teamFileLabel')} accept=".xlsx,.csv" onChange={(event) => { setFile(event.target.files?.[0] || null); setPreview(null); }} /><button type="button" disabled={busy || !file} onClick={() => void validateFile(true)}>{t('teams.validateFile')}</button></div>
+      {preview && <div role="status"><p>{t('teams.previewSummary', { rows: preview.rows, teamsToCreate: preview.teams_to_create, newMembers: preview.new_members, alreadyMembers: preview.already_members })}</p>{preview.issues.length > 0 && <ul>{preview.issues.map((issue, index) => <li key={`${index}-${issue}`}>{issue}</li>)}</ul>}<button type="button" disabled={busy || preview.issues.length > 0 || (preview.new_members === 0 && preview.teams_to_create === 0)} onClick={() => void validateFile(false)}>{t('teams.confirmBulk')}</button></div>}
     </section>
-    <div className="teams-layout"><section className="teams-card"><h2>Equipos del proyecto</h2><label>Buscar equipo<input type="search" value={teamSearch} onChange={(event) => setTeamSearch(event.target.value)} placeholder="Nombre del equipo" /></label><p>{visibleTeams.length} de {teams.length} equipos</p>{visibleTeams.length ? visibleTeams.map((team) => <button type="button" className={`teams-item ${selectedId === team.id ? 'selected' : ''}`} key={team.id} onClick={() => setSelectedId(team.id)}>{team.name}<small>{team.user_count} gestores · {team.participant_count} participantes</small></button>) : <p>{teams.length ? 'No hay equipos que coincidan con la búsqueda.' : 'No hay equipos creados.'}</p>}</section>
-      {selected && <section className="teams-card"><h2>Asignación individual: {selected.name}</h2><label>Nombre del equipo<input value={name} onChange={(event) => setName(event.target.value)} /></label><div className="teams-inline"><button type="button" disabled={busy || !name.trim() || name.trim() === selected.name} onClick={() => void run(() => renameGestorTeam(selected.id, name.trim()), 'Equipo renombrado.')}>Guardar nombre</button><button type="button" disabled={busy} onClick={() => { if (window.confirm(`¿Eliminar el equipo ${selected.name}?`)) void run(async () => { await deleteGestorTeam(selected.id); setSelectedId(''); }, 'Equipo eliminado.'); }}>Eliminar equipo</button></div>
-        <div className="teams-inline"><label>Integrante<select value={kind} onChange={(event) => setKind(event.target.value as 'gestor' | 'participante')}><option value="gestor">Gestor</option><option value="participante">Participante</option></select></label><label>Buscar<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Nombre, correo, documento o código" /></label></div><p>Se muestran hasta 50 coincidencias. Busca para encontrar otros integrantes.</p>
-        <div className="teams-options teams-people">{results.map((person) => <label key={person.id}><input type="checkbox" disabled={busy} checked={person.selected} onChange={() => void toggle(person)} /><span>{person.name}<small>{person.identifier}</small></span></label>)}{!results.length && <p>No hay coincidencias.</p>}</div>
+    <div className="teams-layout"><section className="teams-card"><h2>{t('teams.projectTeams')}</h2><label>{t('teams.searchTeam')}<input type="search" value={teamSearch} onChange={(event) => setTeamSearch(event.target.value)} placeholder={t('teams.teamNamePlaceholder')} /></label><p>{t('teams.teamsCount', { visible: visibleTeams.length, total: teams.length })}</p>{visibleTeams.length ? visibleTeams.map((team) => <button type="button" className={`teams-item ${selectedId === team.id ? 'selected' : ''}`} key={team.id} onClick={() => setSelectedId(team.id)}>{team.name}<small>{t('teams.teamSummary', { userCount: team.user_count, participantCount: team.participant_count })}</small></button>) : <p>{teams.length ? t('teams.noTeamsMatch') : t('teams.noTeamsCreated')}</p>}</section>
+      {selected && <section className="teams-card"><h2>{t('teams.individualAssignment', { name: selected.name })}</h2><label>{t('teams.teamNameLabel')}<input value={name} onChange={(event) => setName(event.target.value)} /></label><div className="teams-inline"><button type="button" disabled={busy || !name.trim() || name.trim() === selected.name} onClick={() => void run(() => renameGestorTeam(selected.id, name.trim()), t('teams.teamRenamed'))}>{t('teams.saveName')}</button><button type="button" disabled={busy} onClick={() => { if (window.confirm(t('teams.confirmDelete', { name: selected.name }))) void run(async () => { await deleteGestorTeam(selected.id); setSelectedId(''); }, t('teams.teamDeleted')); }}>{t('teams.deleteTeam')}</button></div>
+        <div className="teams-inline"><label>{t('teams.memberType')}<select value={kind} onChange={(event) => setKind(event.target.value as 'gestor' | 'participante')}><option value="gestor">{t('teams.gestorOption')}</option><option value="participante">{t('teams.participantOption')}</option></select></label><label>{t('teams.searchLabel')}<input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t('teams.searchPlaceholder')} /></label></div><p>{t('teams.searchHint')}</p>
+        <div className="teams-options teams-people">{results.map((person) => <label key={person.id}><input type="checkbox" disabled={busy} checked={person.selected} onChange={() => void toggle(person)} /><span>{person.name}<small>{person.identifier}</small></span></label>)}{!results.length && <p>{t('teams.noMatches')}</p>}</div>
       </section>}
     </div>{message && <p role="status">{message}</p>}
   </main></AppShell>;
 }
-

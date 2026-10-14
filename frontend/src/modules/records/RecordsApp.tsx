@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
+import { useI18n } from '../../i18n';
 import { PROJECT_KEY, currentProjectPermissions, hasAnyCurrentProjectPermission } from '../auth/session';
 import { applyReviewAction, correctRecordField, downloadRecord, downloadTemplateRecords, duplicateRecord, fetchProjectTemplates, fetchRecord, fetchRecordNeighbors, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, reopenApprovedRecord, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
@@ -26,12 +27,13 @@ function templateIdFromPath(): string {
 }
 
 function FlowSnapshotSummary({ title, snapshot }: { title: string; snapshot?: ReviewFlowSnapshot | null }) {
-  if (!snapshot) return <article><strong>{title}</strong><span>Sin flujo configurado.</span></article>;
+  const { t } = useI18n();
+  if (!snapshot) return <article><strong>{title}</strong><span>{t('recordsView.noFlowConfigured')}</span></article>;
   return (
     <article>
       <strong>{title}</strong>
-      <span>{snapshot.name || 'Flujo sin nombre'} · versión {snapshot.flow_version || '—'} · {snapshot.steps.length} paso(s)</span>
-      <small>{snapshot.steps.map((step) => `${step.step_order}. ${step.action_label} → ${step.status_after}`).join(' · ') || 'Sin pasos activos'}</small>
+      <span>{snapshot.name || t('recordsView.flowNoName')} · {t('recordsView.version')} {snapshot.flow_version || '—'} · {t('recordsView.stepsCount', { count: snapshot.steps.length })}</span>
+      <small>{snapshot.steps.map((step) => `${step.step_order}. ${step.action_label} → ${step.status_after}`).join(' · ') || t('recordsView.noActiveSteps')}</small>
     </article>
   );
 }
@@ -49,6 +51,7 @@ function GenerateActaPanel({
   record: RuntimeRecord;
   onMessage: (value: string) => void;
 }) {
+  const { t } = useI18n();
   const [templates, setTemplates] = useState<ActaTemplateSummary[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [generating, setGenerating] = useState(false);
@@ -72,9 +75,9 @@ function GenerateActaPanel({
     setGenerating(true);
     try {
       await renderActaFromRecord(selectedTemplateId, record.id, 'acta');
-      onMessage('Acta generada.');
+      onMessage(t('recordsView.actaGenerated'));
     } catch (error) {
-      onMessage(error instanceof Error ? error.message : 'No fue posible generar el acta.');
+      onMessage(error instanceof Error ? error.message : t('recordsView.actaGenerateFailed'));
     } finally {
       setGenerating(false);
     }
@@ -85,34 +88,34 @@ function GenerateActaPanel({
     setPrinting(true);
     try {
       const result = await printActaFromRecord(selectedTemplateId, record.id, printerName || undefined, copies);
-      onMessage(result.success ? 'Acta enviada a impresión.' : `No fue posible imprimir: ${result.failureReason}`);
+      onMessage(result.success ? t('recordsView.actaSentToPrint') : t('recordsView.actaPrintFailedPrefix', { reason: result.failureReason }));
     } catch (error) {
-      onMessage(error instanceof Error ? error.message : 'No fue posible imprimir el acta.');
+      onMessage(error instanceof Error ? error.message : t('recordsView.actaPrintFailed'));
     } finally {
       setPrinting(false);
     }
   }
 
   if (templates.length === 0) {
-    return <div className="acta-panel"><button type="button" disabled={generating} onClick={() => { setGenerating(true); void renderDefaultRecordActa(record.id).then(() => onMessage('Acta básica descargada.')).catch((error: Error) => onMessage(error.message)).finally(() => setGenerating(false)); }}>{generating ? 'Generando...' : 'Descargar acta básica'}</button>{canManageActa && <a href="/acta">Crear plantilla personalizada</a>}</div>;
+    return <div className="acta-panel"><button type="button" disabled={generating} onClick={() => { setGenerating(true); void renderDefaultRecordActa(record.id).then(() => onMessage(t('recordsView.basicActaDownloaded'))).catch((error: Error) => onMessage(error.message)).finally(() => setGenerating(false)); }}>{generating ? t('recordsView.generating') : t('recordsView.downloadBasicActa')}</button>{canManageActa && <a href="/acta">{t('recordsView.createCustomTemplate')}</a>}</div>;
   }
 
   return (
     <div className="acta-panel">
       <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
-        <option value="">Selecciona una plantilla de acta</option>
+        <option value="">{t('recordsView.selectActaTemplate')}</option>
         {templates.map((template) => (
           <option key={template.id} value={template.id}>{template.name}</option>
         ))}
       </select>
       <button type="button" className="secondary" onClick={() => void generate()} disabled={!selectedTemplateId || generating}>
-        {generating ? 'Generando...' : 'Generar acta'}
+        {generating ? t('recordsView.generating') : t('recordsView.generateActa')}
       </button>
       {isDesktopApp() && (
         <>
           <PrinterPicker printerName={printerName} onPrinterNameChange={setPrinterName} copies={copies} onCopiesChange={setCopies} />
           <button type="button" className="secondary" onClick={() => void print()} disabled={!selectedTemplateId || printing}>
-            {printing ? 'Imprimiendo...' : 'Imprimir'}
+            {printing ? t('recordsView.printing') : t('recordsView.print')}
           </button>
         </>
       )}
@@ -143,6 +146,7 @@ function BulkActaBar({
   onMessage: (value: string) => void;
   onClear: () => void;
 }) {
+  const { t } = useI18n();
   const [templates, setTemplates] = useState<ActaTemplateSummary[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState('');
   const [generating, setGenerating] = useState(false);
@@ -161,9 +165,9 @@ function BulkActaBar({
     setGenerating(true);
     try {
       await renderActaBatch(selectedTemplateId, selection, 'actas-lote');
-      onMessage('Lote de actas generado.');
+      onMessage(t('recordsView.batchActaGenerated'));
     } catch (error) {
-      onMessage(error instanceof Error ? error.message : 'No fue posible generar el lote de actas.');
+      onMessage(error instanceof Error ? error.message : t('recordsView.batchActaGenerateFailed'));
     } finally {
       setGenerating(false);
     }
@@ -176,7 +180,7 @@ function BulkActaBar({
       const result = await printActaBatch(selectedTemplateId, selection, printerName || undefined, copies);
       onMessage(formatBatchPrintMessage(result));
     } catch (error) {
-      onMessage(error instanceof Error ? error.message : 'No fue posible imprimir el lote de actas.');
+      onMessage(error instanceof Error ? error.message : t('recordsView.batchActaPrintFailed'));
     } finally {
       setPrinting(false);
     }
@@ -184,25 +188,25 @@ function BulkActaBar({
 
   return (
     <div className="records-bulk-bar">
-      <span>{selectAllMatchingFilter ? `Todos los que coinciden con el filtro (${total})` : `${selectedCount} registro(s) seleccionado(s)`}</span>
+      <span>{selectAllMatchingFilter ? t('recordsView.allMatchingFilter', { count: total }) : t('recordsView.selectedRecords', { count: selectedCount })}</span>
       <select value={selectedTemplateId} onChange={(event) => setSelectedTemplateId(event.target.value)}>
-        <option value="">Selecciona una plantilla de acta</option>
+        <option value="">{t('recordsView.selectActaTemplate')}</option>
         {templates.map((template) => (
           <option key={template.id} value={template.id}>{template.name}</option>
         ))}
       </select>
       <button type="button" onClick={() => void generateBatch()} disabled={!selectedTemplateId || generating}>
-        {generating ? 'Generando...' : 'Generar actas en lote'}
+        {generating ? t('recordsView.generating') : t('recordsView.generateBatchActas')}
       </button>
       {isDesktopApp() && (
         <>
           <PrinterPicker printerName={printerName} onPrinterNameChange={setPrinterName} copies={copies} onCopiesChange={setCopies} />
           <button type="button" onClick={() => void printBatch()} disabled={!selectedTemplateId || printing}>
-            {printing ? 'Imprimiendo...' : 'Imprimir lote'}
+            {printing ? t('recordsView.printing') : t('recordsView.printBatch')}
           </button>
         </>
       )}
-      <button type="button" className="secondary" onClick={onClear}>Limpiar selección</button>
+      <button type="button" className="secondary" onClick={onClear}>{t('recordsView.clearSelection')}</button>
     </div>
   );
 }
@@ -218,6 +222,7 @@ function ReviewPanel({
   onMessage: (value: string) => void;
   onRecordUpdated: (record: RuntimeRecord) => void;
 }) {
+  const { t } = useI18n();
   const [history, setHistory] = useState<ReviewAction[]>([]);
   const [nextActions, setNextActions] = useState<ReviewNextAction[]>([]);
   const [approvalProgress, setApprovalProgress] = useState<ReviewApprovalProgress[]>([]);
@@ -251,32 +256,32 @@ function ReviewPanel({
       await applyReviewAction({ projectId, recordId: record.id, toStatus: action.toStatus, action: action.action, notes, rejectedFieldName: fieldName || undefined });
       await loadReviewState();
       onRecordUpdated(await fetchRecord(record.id));
-      onMessage(`Acción aplicada: ${action.label}.`);
+      onMessage(t('recordsView.actionApplied', { label: action.label }));
     } catch (error) {
-      onMessage(error instanceof Error ? error.message : 'No fue posible aplicar la revisión.');
+      onMessage(error instanceof Error ? error.message : t('recordsView.reviewApplyFailed'));
     }
   }
 
   async function reopen() {
-    if (notes.trim().length < 5) { onMessage('Escribe el motivo de devolución (mínimo 5 caracteres).'); return; }
-    try { await reopenApprovedRecord(record.id, notes.trim()); await loadReviewState(); onRecordUpdated(await fetchRecord(record.id)); onMessage('Registro devuelto para corrección. La aprobación anterior permanece en el historial.'); }
-    catch (error) { onMessage(error instanceof Error ? error.message : 'No fue posible devolver el registro.'); }
+    if (notes.trim().length < 5) { onMessage(t('recordsView.returnReasonMinChars')); return; }
+    try { await reopenApprovedRecord(record.id, notes.trim()); await loadReviewState(); onRecordUpdated(await fetchRecord(record.id)); onMessage(t('recordsView.recordReturnedForCorrection')); }
+    catch (error) { onMessage(error instanceof Error ? error.message : t('recordsView.recordReturnFailed')); }
   }
 
   if (!canReview) return null;
 
   return (
     <section className="review-panel">
-      <h3>Flujo de revisión</h3>
+      <h3>{t('recordsView.reviewFlow')}</h3>
       {flowComparison?.has_snapshot ? (
         <div className={`review-flow-comparison ${flowComparison.changed ? 'changed' : ''}`}>
           <header>
-            <strong>Comparación del flujo</strong>
-            <span>{flowComparison.changed ? 'El flujo actual cambió frente al snapshot del registro.' : 'El flujo actual coincide con el snapshot del registro.'}</span>
+            <strong>{t('recordsView.flowComparison')}</strong>
+            <span>{flowComparison.changed ? t('recordsView.flowChanged') : t('recordsView.flowMatches')}</span>
           </header>
           <div>
-            <FlowSnapshotSummary title="Snapshot del registro" snapshot={flowComparison.snapshot} />
-            <FlowSnapshotSummary title="Flujo actual" snapshot={flowComparison.current} />
+            <FlowSnapshotSummary title={t('recordsView.recordSnapshot')} snapshot={flowComparison.snapshot} />
+            <FlowSnapshotSummary title={t('recordsView.currentFlow')} snapshot={flowComparison.current} />
           </div>
           {flowComparison.differences.length ? (
             <ul className="review-flow-differences">
@@ -289,47 +294,47 @@ function ReviewPanel({
         <div className="review-progress">
           {approvalProgress.map((item) => (
             <article key={`${item.action}-${item.to_status}`}>
-              <strong>Aprobación parcial: {item.label}</strong>
-              <span>{item.approved_count} de {item.required_count} aprobadores completados · faltan {item.pending_count}</span>
-              <small>Destino: {item.to_status}</small>
+              <strong>{t('recordsView.partialApproval', { label: item.label })}</strong>
+              <span>{t('recordsView.approvalProgress', { approved: item.approved_count, required: item.required_count, pending: item.pending_count })}</span>
+              <small>{t('recordsView.destination', { status: item.to_status })}</small>
             </article>
           ))}
         </div>
       ) : null}
       <label>
-        Observación
+        {t('recordsView.observation')}
         <textarea rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />
       </label>
       {showFieldSelector ? (
         <label>
-          Campo con error (para el enlace de corrección por WhatsApp)
+          {t('recordsView.errorFieldLabel')}
           <select value={rejectedFieldName} onChange={(event) => setRejectedFieldName(event.target.value)}>
-            <option value="">Sin campo específico</option>
+            <option value="">{t('recordsView.noSpecificField')}</option>
             {record.values.map((value) => <option key={value.id} value={value.field_name}>{value.field_name}</option>)}
           </select>
         </label>
       ) : null}
       <div className="review-actions">
-        {record.status === 'approved' && permissions.has('identity.users.manage') && <button type="button" disabled={notes.trim().length < 5} onClick={() => void reopen()}>Devolver aprobado para corrección</button>}
+        {record.status === 'approved' && permissions.has('identity.users.manage') && <button type="button" disabled={notes.trim().length < 5} onClick={() => void reopen()}>{t('recordsView.returnApprovedForCorrection')}</button>}
         {actions.length ? (
           actions.map((item) => <button key={item.action} onClick={() => void submit(item)}>{item.label}</button>)
         ) : (
-          <span>Sin acciones disponibles para este estado.</span>
+          <span>{t('recordsView.noActionsAvailable')}</span>
         )}
       </div>
       <div className="review-history">
-        <strong>Historial</strong>
+        <strong>{t('recordsView.history')}</strong>
         {history.length ? (
           history.map((item) => (
             <p key={item.id}>
               {item.created_at ? new Date(item.created_at).toLocaleString() : ''} · {item.action}: {item.from_status || '—'} → {item.to_status}
-              {item.approval_flow_version ? ` · flujo v${item.approval_flow_version}` : ''}
+              {item.approval_flow_version ? ` · ${t('recordsView.flowVersion', { version: item.approval_flow_version })}` : ''}
               {item.notes ? ` · ${item.notes}` : ''}
-              {item.rejected_field_name ? ` · Campo: ${item.rejected_field_name}` : ''}
+              {item.rejected_field_name ? ` · ${t('recordsView.fieldLabel', { name: item.rejected_field_name })}` : ''}
             </p>
           ))
         ) : (
-          <p>Sin acciones registradas.</p>
+          <p>{t('recordsView.noActionsRecorded')}</p>
         )}
       </div>
     </section>
@@ -337,15 +342,16 @@ function ReviewPanel({
 }
 
 function CorrectionSubmitPanel({ projectId, record, onRecordUpdated, onMessage }: { projectId: string; record: RuntimeRecord; onRecordUpdated: (record: RuntimeRecord) => void; onMessage: (value: string) => void }) {
+  const { t } = useI18n();
   const canWrite = hasAnyCurrentProjectPermission(['records.write']);
   if (!canWrite || !['returned', 'corrected'].includes(record.status)) return null;
   const toStatus = record.status === 'returned' ? 'corrected' : 'submitted';
-  const label = record.status === 'returned' ? 'Terminé la corrección' : 'Reenviar para aprobación';
+  const label = record.status === 'returned' ? t('recordsView.finishedCorrection') : t('recordsView.resendForApproval');
   async function submit() {
-    try { await applyReviewAction({ projectId, recordId: record.id, toStatus, action: toStatus }); onRecordUpdated(await fetchRecord(record.id)); onMessage(`${label}: estado actualizado.`); }
-    catch (error) { onMessage(error instanceof Error ? error.message : 'No fue posible reenviar la respuesta.'); }
+    try { await applyReviewAction({ projectId, recordId: record.id, toStatus, action: toStatus }); onRecordUpdated(await fetchRecord(record.id)); onMessage(t('recordsView.statusUpdated', { label })); }
+    catch (error) { onMessage(error instanceof Error ? error.message : t('recordsView.resendFailed')); }
   }
-  return <section className="record-correction-panel"><h3>Corrección de respuesta</h3><p>{record.status === 'returned' ? 'Edita los campos necesarios y luego indica que terminaste.' : 'La respuesta está corregida. Envíala de nuevo para que pase por aprobación.'}</p><button type="button" onClick={() => void submit()}>{label}</button></section>;
+  return <section className="record-correction-panel"><h3>{t('recordsView.correctionTitle')}</h3><p>{record.status === 'returned' ? t('recordsView.correctionInstructionReturned') : t('recordsView.correctionInstructionCorrected')}</p><button type="button" onClick={() => void submit()}>{label}</button></section>;
 }
 
 export function RecordsApp() {
@@ -354,28 +360,29 @@ export function RecordsApp() {
 }
 
 function TemplateList() {
+  const { t } = useI18n();
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
-  const [message, setMessage] = useState('Cargando formularios...');
+  const [message, setMessage] = useState(t('recordsView.loadingForms'));
 
   useEffect(() => {
     fetchProjectTemplates(projectId)
       .then((rows) => {
         setTemplates(rows);
-        setMessage(rows.length ? '' : 'Este proyecto aún no tiene formularios.');
+        setMessage(rows.length ? '' : t('recordsView.noFormsYet'));
       })
       .catch((error: Error) => setMessage(error.message));
   }, [projectId]);
 
   return (
-    <AppShell title="Registros">
+    <AppShell title={t('recordsView.registros')}>
       <main className="records-shell">
         {message ? <p role="status">{message}</p> : null}
         <div className="record-template-grid">
           {templates.map((template) => (
             <a className="record-template-card" key={template.id} href={`/records/${template.id}`}>
               <strong>{template.name}</strong>
-              <span>{template.description || 'Sin descripción'}</span>
+              <span>{template.description || t('recordsView.noDescription')}</span>
               <small>{template.status}</small>
             </a>
           ))}
@@ -408,6 +415,7 @@ function CorrectableField({
   onMessage: (value: string) => void;
   initialEditing?: boolean;
 }) {
+  const { t } = useI18n();
   const [editing, setEditing] = useState(initialEditing);
   const [draft, setDraft] = useState(() => {
     if (!initialEditing) return '';
@@ -436,37 +444,37 @@ function CorrectableField({
       const updated = await correctRecordField({
         recordId: record.id,
         fieldName: value.field_name,
-        fieldValueJson: JSON.stringify((() => { const old = JSON.parse(value.field_value_json); if (!isEditableScalar(value.field_value_json)) { try { return JSON.parse(draft); } catch { throw new Error('Introduce un JSON válido para este campo.'); } } if (typeof old === 'number') { const numeric = Number(draft); if (!Number.isFinite(numeric)) throw new Error('Introduce un número válido.'); return numeric; } if (typeof old === 'boolean') return draft.toLowerCase() === 'true' || draft.toLowerCase() === 'sí'; return draft; })()),
+        fieldValueJson: JSON.stringify((() => { const old = JSON.parse(value.field_value_json); if (!isEditableScalar(value.field_value_json)) { try { return JSON.parse(draft); } catch { throw new Error(t('recordsView.invalidJson')); } } if (typeof old === 'number') { const numeric = Number(draft); if (!Number.isFinite(numeric)) throw new Error(t('recordsView.invalidNumber')); return numeric; } if (typeof old === 'boolean') return draft.toLowerCase() === 'true' || draft.toLowerCase() === 'sí'; return draft; })()),
         expectedLockVersion: record.lock_version,
       });
       onCorrected(updated);
       setEditing(false);
-      onMessage('Corrección guardada.');
+      onMessage(t('recordsView.correctionSaved'));
     } catch (error) {
-      onMessage(error instanceof Error ? error.message : 'No fue posible guardar la corrección.');
+      onMessage(error instanceof Error ? error.message : t('recordsView.correctionSaveFailed'));
     } finally {
       setSaving(false);
     }
   }
 
   if (!canEditHere) {
-    return <dd>{formatValue(value.field_value_json, true)}</dd>;
+    return <dd>{formatValue(value.field_value_json, true, t)}</dd>;
   }
 
   if (!editing) {
     return (
       <dd>
-        {formatValue(value.field_value_json, true)}
-        <button className="record-field-edit-button" onClick={startEditing}>Editar</button>
+        {formatValue(value.field_value_json, true, t)}
+        <button className="record-field-edit-button" onClick={startEditing}>{t('recordsView.editButton')}</button>
       </dd>
     );
   }
 
   return (
     <dd>
-      {isEditableScalar(value.field_value_json) ? <input value={draft} onChange={(event) => setDraft(event.target.value)} disabled={saving} /> : <textarea rows={5} value={draft} onChange={(event) => setDraft(event.target.value)} disabled={saving} aria-label={`Valor JSON de ${value.field_name}`} />}
-      <button disabled={saving} onClick={() => void submitCorrection()}>{saving ? 'Guardando…' : 'Guardar corrección'}</button>
-      <button disabled={saving} onClick={() => setEditing(false)}>Cancelar</button>
+      {isEditableScalar(value.field_value_json) ? <input value={draft} onChange={(event) => setDraft(event.target.value)} disabled={saving} /> : <textarea rows={5} value={draft} onChange={(event) => setDraft(event.target.value)} disabled={saving} aria-label={t('recordsView.jsonValueAriaLabel', { name: value.field_name })} />}
+      <button disabled={saving} onClick={() => void submitCorrection()}>{saving ? t('recordsView.savingCorrection') : t('recordsView.saveCorrection')}</button>
+      <button disabled={saving} onClick={() => setEditing(false)}>{t('app.cancel')}</button>
     </dd>
   );
 }
@@ -490,6 +498,7 @@ function LinkedSubformField({
   field: RuntimeComponent;
   onMessage: (value: string) => void;
 }) {
+  const { t } = useI18n();
   const config = parseFieldConfig(field.config_json);
   const childTemplateId = config.child_template_id;
   const [children, setChildren] = useState<RuntimeRecordSummary[]>([]);
@@ -502,7 +511,7 @@ function LinkedSubformField({
     try {
       setChildren(await fetchRuntimeRecordChildren(parentRecordId, field.name));
     } catch (error) {
-      onMessage(error instanceof Error ? error.message : 'No fue posible consultar las filas hijas.');
+      onMessage(error instanceof Error ? error.message : t('recordsView.childRowsFetchFailed'));
     }
   }
 
@@ -522,9 +531,9 @@ function LinkedSubformField({
       setValues({});
       setAdding(false);
       await loadChildren();
-      onMessage('Fila hija guardada.');
+      onMessage(t('recordsView.childRowSaved'));
     } catch (error) {
-      onMessage(error instanceof Error ? error.message : 'No fue posible guardar la fila hija.');
+      onMessage(error instanceof Error ? error.message : t('recordsView.childRowSaveFailed'));
     } finally {
       setSaving(false);
     }
@@ -534,7 +543,7 @@ function LinkedSubformField({
     return (
       <article className="record-linked-subform-card">
         <strong>{field.label}</strong>
-        <p>Este campo aun no tiene una plantilla hija configurada en el constructor.</p>
+        <p>{t('recordsView.noChildTemplateConfigured')}</p>
       </article>
     );
   }
@@ -543,7 +552,7 @@ function LinkedSubformField({
     <article className="record-linked-subform-card">
       <header>
         <strong>{field.label}</strong>
-        <button type="button" onClick={() => setAdding((current) => !current)}>{adding ? 'Cancelar' : 'Agregar fila'}</button>
+        <button type="button" onClick={() => setAdding((current) => !current)}>{adding ? t('app.cancel') : t('recordsView.addRow')}</button>
       </header>
       {children.length ? (
         <div className="records-table-wrap">
@@ -552,19 +561,19 @@ function LinkedSubformField({
             <tbody>
               {children.map((child) => (
                 <tr key={child.id}>
-                  {childComponents.map((component) => <td key={component.id}>{formatValue(child.values.find((item) => item.field_name === component.name)?.field_value_json)}</td>)}
+                  {childComponents.map((component) => <td key={component.id}>{formatValue(child.values.find((item) => item.field_name === component.name)?.field_value_json, false, t)}</td>)}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-      ) : <p>Sin filas registradas todavia.</p>}
+      ) : <p>{t('recordsView.noRowsYet')}</p>}
       {adding && childTemplate ? (
         <div className="record-linked-subform-form">
           {childComponents.map((component) => (
             <RuntimeField key={component.id} component={component} templateId={childTemplateId} projectId={projectId} values={values} onChange={(name, value) => setValues((current) => ({ ...current, [name]: value }))} />
           ))}
-          <button type="button" className="primary" disabled={saving} onClick={() => void submitChild()}>{saving ? 'Guardando...' : 'Guardar fila'}</button>
+          <button type="button" className="primary" disabled={saving} onClick={() => void submitChild()}>{saving ? t('recordsView.savingRow') : t('recordsView.saveRow')}</button>
         </div>
       ) : null}
     </article>
@@ -572,6 +581,7 @@ function LinkedSubformField({
 }
 
 function LinkedSubformSection({ projectId, record, onMessage }: { projectId: string; record: RuntimeRecord; onMessage: (value: string) => void }) {
+  const { t } = useI18n();
   const [linkedFields, setLinkedFields] = useState<RuntimeComponent[]>([]);
 
   useEffect(() => {
@@ -584,7 +594,7 @@ function LinkedSubformSection({ projectId, record, onMessage }: { projectId: str
 
   return (
     <section className="record-linked-subforms">
-      <h3>Subformularios enlazados</h3>
+      <h3>{t('recordsView.linkedSubforms')}</h3>
       {linkedFields.map((field) => <LinkedSubformField key={field.id} projectId={projectId} parentRecordId={record.id} field={field} onMessage={onMessage} />)}
     </section>
   );
@@ -619,6 +629,7 @@ function DeepLinkedRecordCard({
   onDuplicated?: (record: RuntimeRecord) => void;
   onRemoved?: () => void;
 }) {
+  const { t } = useI18n();
   const fieldRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [fieldLabels, setFieldLabels] = useState<Record<string, string>>({});
   const [fieldQuery, setFieldQuery] = useState('');
@@ -640,41 +651,41 @@ function DeepLinkedRecordCard({
   }, [highlightField, record.id]);
 
   async function removeRecord() {
-    if (!window.confirm('¿Eliminar este registro? Quedará anulado y se conservará para auditoría.')) return;
+    if (!window.confirm(t('recordsView.confirmDeleteRecord'))) return;
     setRemoving(true);
     try {
-      await applyReviewAction({ projectId, recordId: record.id, toStatus: 'voided', action: 'void', notes: 'Eliminado desde la grilla de respuestas' });
-      onMessage('Registro anulado. Se conserva para auditoría.');
+      await applyReviewAction({ projectId, recordId: record.id, toStatus: 'voided', action: 'void', notes: t('recordsView.deleteVoidNotes') });
+      onMessage(t('recordsView.recordVoided'));
       if (onRemoved) onRemoved();
       else onRecordUpdated(await fetchRecord(record.id));
     } catch (error) {
-      onMessage(error instanceof Error ? error.message : 'No fue posible anular el registro.');
+      onMessage(error instanceof Error ? error.message : t('recordsView.recordVoidFailed'));
     } finally { setRemoving(false); }
   }
 
   return (
     <section className="record-deep-link-card">
       <div className="record-detail-actions">
-        {onClose ? <button type="button" onClick={onClose}>← Grilla</button> : <a href={`/records/${record.template_id}`}>← Grilla</a>}
+        {onClose ? <button type="button" onClick={onClose}>{t('recordsView.backToGrid')}</button> : <a href={`/records/${record.template_id}`}>{t('recordsView.backToGrid')}</a>}
         {hasAnyCurrentProjectPermission(['records.write']) && ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && (editMode
-          ? onEditModeChange ? <button type="button" onClick={() => onEditModeChange(false)}>Ver respuesta</button> : <a href={`/records/${record.template_id}?recordId=${record.id}`}>Ver respuesta</a>
-          : onEditModeChange ? <button type="button" onClick={() => onEditModeChange(true)}>✎ Editar respuesta</button> : <a href={`/records/${record.template_id}?recordId=${record.id}&edit=1`}>✎ Editar respuesta</a>)}
-        {onNavigate ? <button type="button" disabled={!previousId} onClick={() => previousId && onNavigate(previousId)}>Anterior</button> : <a aria-disabled={!previousId} href={previousId ? `/records/${record.template_id}?recordId=${previousId}` : undefined}>Anterior</a>}
-        {onNavigate ? <button type="button" disabled={!nextId} onClick={() => nextId && onNavigate(nextId)}>Siguiente</button> : <a aria-disabled={!nextId} href={nextId ? `/records/${record.template_id}?recordId=${nextId}` : undefined}>Siguiente</a>}
-        <button type="button" onClick={() => void downloadRecord(record.id).catch((error: Error) => onMessage(error.message))}>Descargar JSON</button>
-        {hasAnyCurrentProjectPermission(['records.write']) && <button type="button" onClick={() => void duplicateRecord(record.id).then((copy) => { if (onDuplicated) onDuplicated(copy); else window.location.href = `/records/${record.template_id}?recordId=${copy.id}`; }).catch((error: Error) => onMessage(error.message))}>Duplicar como borrador</button>}
-        {hasAnyCurrentProjectPermission(['records.void']) && !['draft', 'cancelled', 'voided'].includes(record.status) && <button type="button" className="record-remove-button" disabled={removing} onClick={() => void removeRecord()}>{removing ? 'Anulando...' : 'Eliminar registro'}</button>}
+          ? onEditModeChange ? <button type="button" onClick={() => onEditModeChange(false)}>{t('recordsView.viewResponse')}</button> : <a href={`/records/${record.template_id}?recordId=${record.id}`}>{t('recordsView.viewResponse')}</a>
+          : onEditModeChange ? <button type="button" onClick={() => onEditModeChange(true)}>{t('recordsView.editResponse')}</button> : <a href={`/records/${record.template_id}?recordId=${record.id}&edit=1`}>{t('recordsView.editResponse')}</a>)}
+        {onNavigate ? <button type="button" disabled={!previousId} onClick={() => previousId && onNavigate(previousId)}>{t('app.previous')}</button> : <a aria-disabled={!previousId} href={previousId ? `/records/${record.template_id}?recordId=${previousId}` : undefined}>{t('app.previous')}</a>}
+        {onNavigate ? <button type="button" disabled={!nextId} onClick={() => nextId && onNavigate(nextId)}>{t('app.next')}</button> : <a aria-disabled={!nextId} href={nextId ? `/records/${record.template_id}?recordId=${nextId}` : undefined}>{t('app.next')}</a>}
+        <button type="button" onClick={() => void downloadRecord(record.id).catch((error: Error) => onMessage(error.message))}>{t('recordsView.downloadJson')}</button>
+        {hasAnyCurrentProjectPermission(['records.write']) && <button type="button" onClick={() => void duplicateRecord(record.id).then((copy) => { if (onDuplicated) onDuplicated(copy); else window.location.href = `/records/${record.template_id}?recordId=${copy.id}`; }).catch((error: Error) => onMessage(error.message))}>{t('recordsView.duplicateAsDraft')}</button>}
+        {hasAnyCurrentProjectPermission(['records.void']) && !['draft', 'cancelled', 'voided'].includes(record.status) && <button type="button" className="record-remove-button" disabled={removing} onClick={() => void removeRecord()}>{removing ? t('recordsView.voiding') : t('recordsView.deleteRecord')}</button>}
       </div>
       <header>
-        <strong>{editMode ? 'Editar respuesta' : 'Respuesta completa'}</strong>
+        <strong>{editMode ? t('recordsView.editResponseTitle') : t('recordsView.fullResponse')}</strong>
         <span className={`record-status ${record.status}`}>{record.status}</span>
       </header>
       <div className="record-participant-summary">
-        <strong>Participante asociado</strong>
-        {record.participant_id ? <span>{record.participant_name || 'Nombre no disponible'} · Documento: {record.participant_document_id || '—'} · Código: {record.participant_external_code || '—'} · Municipio: {record.participant_municipality || '—'}</span> : <span>Sin participante enlazado</span>}
+        <strong>{t('recordsView.associatedParticipant')}</strong>
+        {record.participant_id ? <span>{record.participant_name || t('recordsView.nameNotAvailable')} · {t('recordsView.document')}: {record.participant_document_id || '—'} · {t('recordsView.code')}: {record.participant_external_code || '—'} · {t('recordsView.municipality')}: {record.participant_municipality || '—'}</span> : <span>{t('recordsView.noParticipantLinked')}</span>}
       </div>
-      <label className="record-field-search">Buscar pregunta<input type="search" value={fieldQuery} onChange={(event) => setFieldQuery(event.target.value)} placeholder="Nombre de la pregunta o campo" /></label>
-      <p className="record-field-count">{visibleValues.length} de {record.values.length} campos</p>
+      <label className="record-field-search">{t('recordsView.searchQuestion')}<input type="search" value={fieldQuery} onChange={(event) => setFieldQuery(event.target.value)} placeholder={t('recordsView.questionPlaceholder')} /></label>
+      <p className="record-field-count">{t('recordsView.fieldCount', { visible: visibleValues.length, total: record.values.length })}</p>
       <dl className="record-detail">
         {visibleValues.map((value) => (
           <div
@@ -687,7 +698,7 @@ function DeepLinkedRecordCard({
           </div>
         ))}
       </dl>
-      {!visibleValues.length && <p>No se encontraron preguntas con ese nombre.</p>}
+      {!visibleValues.length && <p>{t('recordsView.noQuestionsFound')}</p>}
       <LinkedSubformSection projectId={projectId} record={record} onMessage={onMessage} />
       <CorrectionSubmitPanel projectId={projectId} record={record} onMessage={onMessage} onRecordUpdated={onRecordUpdated} />
       <ReviewPanel projectId={projectId} record={record} onMessage={onMessage} onRecordUpdated={onRecordUpdated} />
@@ -697,6 +708,7 @@ function DeepLinkedRecordCard({
 }
 
 export function RecordTable({ templateId, embedded = false }: { templateId: string; embedded?: boolean }) {
+  const { t } = useI18n();
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [records, setRecords] = useState<RuntimeRecord[]>([]);
   const [templateStatus, setTemplateStatus] = useState('');
@@ -709,7 +721,7 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
   const [unlinkedOnly, setUnlinkedOnly] = useState(false);
   const [offset, setOffset] = useState(0);
   const [total, setTotal] = useState(0);
-  const [message, setMessage] = useState('Cargando registros...');
+  const [message, setMessage] = useState(t('recordsView.loadingRecords'));
   const [deepLink] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     return { recordId: params.get('recordId') ?? '', campo: params.get('campo') ?? '', edit: params.get('edit') === '1' };
@@ -759,13 +771,13 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
 
   useEffect(() => {
     let active = true;
-    setMessage('Cargando registros...');
+    setMessage(t('recordsView.loadingRecords'));
     searchTemplateRecords({ templateId, search: query.trim(), status, unlinkedOnly, fieldFilters, sortBy, sortDir, limit: PAGE_SIZE, offset })
       .then((page) => {
         if (!active) return;
         setRecords(page.items);
         setTotal(page.total);
-        setMessage(page.total ? '' : 'Este formulario aún no tiene registros con esos filtros.');
+        setMessage(page.total ? '' : t('recordsView.noRecordsWithFilters'));
       })
       .catch((error: Error) => active && setMessage(error.message));
     return () => {
@@ -787,11 +799,11 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
     setModalMessage('');
     try {
       const record = await fetchRecord(recordId);
-      if (record.template_id !== templateId) throw new Error('El registro no pertenece a este formulario.');
+      if (record.template_id !== templateId) throw new Error(t('recordsView.recordNotBelongToForm'));
       setModalRecord(record);
       fetchRecordNeighbors(recordId).then(setModalNeighbors).catch(() => setModalNeighbors({ previous_id: null, next_id: null }));
     } catch (error) {
-      setModalMessage(error instanceof Error ? error.message : 'No fue posible abrir el registro.');
+      setModalMessage(error instanceof Error ? error.message : t('recordsView.recordOpenFailed'));
     }
   }
 
@@ -827,7 +839,7 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
     try {
       await downloadTemplateRecords(templateId, { search: query.trim(), status });
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible exportar.');
+      setMessage(error instanceof Error ? error.message : t('recordsView.exportFailed'));
     }
   }
 
@@ -851,6 +863,12 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
     setSelectAllMatchingFilter(false);
   }
 
+  function captureNotAvailableMessage(): string {
+    if (templateStatus === 'paused') return t('recordsView.captureNotAvailablePaused');
+    if (templateStatus === 'archived') return t('recordsView.captureNotAvailableArchived');
+    return t('recordsView.captureNotAvailableUnpublished');
+  }
+
   const content = (
       <main className={`records-shell${embedded ? ' records-shell-embedded' : ''}`}>
         {deepLinkedRecord ? (
@@ -858,31 +876,31 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
         ) : deepLinkError ? (
           <p role="alert">{deepLinkError}</p>
         ) : deepLink.recordId ? (
-          <p role="status">Cargando respuesta...</p>
+          <p role="status">{t('recordsView.loadingResponse')}</p>
         ) : null}
         {!deepLink.recordId && <><div className="records-toolbar">
-          {!embedded && <a href="/records">Volver a formularios</a>}
+          {!embedded && <a href="/records">{t('recordsView.backToForms')}</a>}
           <div className="records-toolbar-actions">
-            {templateStatus === 'published' && hasAnyCurrentProjectPermission(['records.write']) && <a className="forms-primary-link" href={`/runtime/${templateId}`}>+ Agregar registro</a>}
-            {templateStatus && templateStatus !== 'published' && <span role="status">Captura no disponible: el formulario está {templateStatus === 'paused' ? 'pausado' : templateStatus === 'archived' ? 'archivado' : 'sin publicar'}. Solicita al administrador que habilite la recepción.</span>}
-            {templateStatus === 'published' && !hasAnyCurrentProjectPermission(['records.write']) && <span role="status">Para agregar registros necesitas el permiso de captura en este proyecto. Solicítalo al administrador.</span>}
-            <input type="search" aria-label="Buscar registros por participante, documento, código, campo, estado o usuario" placeholder="Buscar participante, documento, código o respuesta" value={query} onChange={(event) => { setQuery(event.target.value); setOffset(0); }} />
+            {templateStatus === 'published' && hasAnyCurrentProjectPermission(['records.write']) && <a className="forms-primary-link" href={`/runtime/${templateId}`}>{t('recordsView.addRecord')}</a>}
+            {templateStatus && templateStatus !== 'published' && <span role="status">{captureNotAvailableMessage()}</span>}
+            {templateStatus === 'published' && !hasAnyCurrentProjectPermission(['records.write']) && <span role="status">{t('recordsView.captureNeedsPermission')}</span>}
+            <input type="search" aria-label={t('recordsView.searchAriaLabel')} placeholder={t('recordsView.searchPlaceholder')} value={query} onChange={(event) => { setQuery(event.target.value); setOffset(0); }} />
             <label className="records-unlinked-filter">
               <input type="checkbox" checked={unlinkedOnly} onChange={(event) => { setUnlinkedOnly(event.target.checked); setOffset(0); }} />
-              Sin participante enlazado
+              {t('recordsView.unlinkedFilter')}
             </label>
-            <button onClick={() => void exportCsv()}>Exportar CSV</button>
+            <button onClick={() => void exportCsv()}>{t('recordsView.exportCsv')}</button>
           </div>
         </div>
         <div className="records-pagination" aria-live="polite">
-          <span>{pageStart}-{pageEnd} de {total} registros</span>
+          <span>{t('recordsView.paginationRange', { start: pageStart, end: pageEnd, total })}</span>
           <button className="secondary" disabled={total === 0 || selectAllMatchingFilter} onClick={activateSelectAllMatchingFilter}>
-            Seleccionar todos los que coinciden con el filtro ({total})
+            {t('recordsView.selectAllMatching', { count: total })}
           </button>
-          <button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>Anterior</button>
-          <button disabled={offset + PAGE_SIZE >= total} onClick={() => setOffset(offset + PAGE_SIZE)}>Siguiente</button>
+          <button disabled={offset === 0} onClick={() => setOffset(Math.max(0, offset - PAGE_SIZE))}>{t('app.previous')}</button>
+          <button disabled={offset + PAGE_SIZE >= total} onClick={() => setOffset(offset + PAGE_SIZE)}>{t('app.next')}</button>
         </div>
-        <p className="records-grid-hint">Todas las preguntas aparecen como columnas. Busca dentro de cada columna, ordénala desde su encabezado y desplázate horizontalmente para ver la grilla completa.</p>
+        <p className="records-grid-hint">{t('recordsView.gridHint')}</p>
         {message ? <p role="status">{message}</p> : null}
         {selectedIds.size > 0 || selectAllMatchingFilter ? (
           <BulkActaBar
@@ -896,20 +914,20 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
             onClear={clearSelection}
           />
         ) : null}
-        <div className="records-table-wrap" role="region" aria-label="Grilla de respuestas" tabIndex={0}>
+        <div className="records-table-wrap" role="region" aria-label={t('recordsView.gridAriaLabel')} tabIndex={0}>
           <table className="records-table">
             <thead>
               <tr>
-                <th className="records-leading-col">Acciones<br />
-                  <input type="checkbox" aria-label="Seleccionar todos los de esta página" checked={pageFullySelected} onChange={togglePageSelection} disabled={pageIds.length === 0} />
+                <th className="records-leading-col">{t('recordsView.actionsColumn')}<br />
+                  <input type="checkbox" aria-label={t('recordsView.selectAllPage')} checked={pageFullySelected} onChange={togglePageSelection} disabled={pageIds.length === 0} />
                 </th>
-                <th><button type="button" className="records-sort" onClick={() => sortColumn('participant_name')}>Participante {sortBy === 'participant_name' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
-                <th><button type="button" className="records-sort" onClick={() => sortColumn('participant_document_id')}>Documento {sortBy === 'participant_document_id' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
-                <th>Código</th>
-                <th>Municipio</th>
-                <th><button type="button" className="records-sort" onClick={() => sortColumn('created_at')}>Fecha de envío {sortBy === 'created_at' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
-                <th><button type="button" className="records-sort" onClick={() => sortColumn('status')}>Validación {sortBy === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
-                <th><button type="button" className="records-sort" onClick={() => sortColumn('submitted_by')}>Capturado por {sortBy === 'submitted_by' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
+                <th><button type="button" className="records-sort" onClick={() => sortColumn('participant_name')}>{t('recordsView.participant')} {sortBy === 'participant_name' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
+                <th><button type="button" className="records-sort" onClick={() => sortColumn('participant_document_id')}>{t('recordsView.documentId')} {sortBy === 'participant_document_id' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
+                <th>{t('recordsView.externalCode')}</th>
+                <th>{t('recordsView.municipalityColumn')}</th>
+                <th><button type="button" className="records-sort" onClick={() => sortColumn('created_at')}>{t('recordsView.submissionDate')} {sortBy === 'created_at' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
+                <th><button type="button" className="records-sort" onClick={() => sortColumn('status')}>{t('recordsView.validation')} {sortBy === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
+                <th><button type="button" className="records-sort" onClick={() => sortColumn('submitted_by')}>{t('recordsView.capturedBy')} {sortBy === 'submitted_by' ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>
                 {fields.map((field) => <th key={field.name} title={field.name}><button type="button" className="records-sort" onClick={() => sortColumn(`field:${field.name}`)}>{field.label} {sortBy === `field:${field.name}` ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</button></th>)}
               </tr>
               <tr className="records-filter-row">
@@ -919,9 +937,9 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
                 <th />
                 <th />
                                 <th />
-<th><select aria-label="Filtrar por validación" value={status} onChange={(event) => { setStatus(event.target.value); setOffset(0); }}><option value="">Todos</option><option value="draft">Borrador</option><option value="submitted">Enviado</option><option value="under_review">En revisión</option><option value="tech_approved">Aprobado técnico</option><option value="coordinator_approved">Aprobado coordinación</option><option value="returned">Devuelto</option><option value="corrected">Corregido</option><option value="approved">Aprobado</option><option value="rejected">Rechazado</option><option value="cancelled">Cancelado</option><option value="archived">Archivado</option><option value="synced">Sincronizado</option><option value="voided">Anulado</option></select></th>
+<th><select aria-label={t('recordsView.filterByValidation')} value={status} onChange={(event) => { setStatus(event.target.value); setOffset(0); }}><option value="">{t('recordsView.filterAll')}</option><option value="draft">{t('recordsView.filterDraft')}</option><option value="submitted">{t('recordsView.filterSubmitted')}</option><option value="under_review">{t('recordsView.filterUnderReview')}</option><option value="tech_approved">{t('recordsView.filterTechApproved')}</option><option value="coordinator_approved">{t('recordsView.filterCoordinatorApproved')}</option><option value="returned">{t('recordsView.filterReturned')}</option><option value="corrected">{t('recordsView.filterCorrected')}</option><option value="approved">{t('recordsView.filterApproved')}</option><option value="rejected">{t('recordsView.filterRejected')}</option><option value="cancelled">{t('recordsView.filterCancelled')}</option><option value="archived">{t('recordsView.filterArchived')}</option><option value="synced">{t('recordsView.filterSynced')}</option><option value="voided">{t('recordsView.filterVoided')}</option></select></th>
                 <th />
-                {fields.map((field) => <th key={field.name}><input type="search" aria-label={`Buscar en ${field.label}`} placeholder="Buscar" value={fieldFilters[field.name] ?? ''} onChange={(event) => updateFieldFilter(field.name, event.target.value)} /></th>)}
+                {fields.map((field) => <th key={field.name}><input type="search" aria-label={t('recordsView.searchInField', { label: field.label })} placeholder={t('recordsView.searchInFieldPlaceholder')} value={fieldFilters[field.name] ?? ''} onChange={(event) => updateFieldFilter(field.name, event.target.value)} /></th>)}
               </tr>
             </thead>
             <tbody>
@@ -929,11 +947,11 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
                 <Fragment key={record.id}>
                   <tr>
                     <td className="records-leading-col">
-                      <input type="checkbox" aria-label={`Seleccionar registro ${record.id}`} checked={selectAllMatchingFilter || selectedIds.has(record.id)} onChange={() => toggleRecordSelection(record.id)} />
-                      <button type="button" className="record-icon-action" onClick={() => void openRecord(record.id)} aria-label={`Abrir registro ${record.id}`} title="Abrir respuesta completa">◉</button>
-                      {hasAnyCurrentProjectPermission(['records.write']) && ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && <button type="button" className="record-icon-action" onClick={() => void openRecord(record.id, true)} aria-label={`Editar registro ${record.id}`} title="Editar respuesta">✎</button>}
+                      <input type="checkbox" aria-label={t('recordsView.selectRecord', { id: record.id })} checked={selectAllMatchingFilter || selectedIds.has(record.id)} onChange={() => toggleRecordSelection(record.id)} />
+                      <button type="button" className="record-icon-action" onClick={() => void openRecord(record.id)} aria-label={t('recordsView.openRecord', { id: record.id })} title={t('recordsView.openFullResponse')}>◉</button>
+                      {hasAnyCurrentProjectPermission(['records.write']) && ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && <button type="button" className="record-icon-action" onClick={() => void openRecord(record.id, true)} aria-label={t('recordsView.editRecord', { id: record.id })} title={t('recordsView.editResponseAction')}>✎</button>}
                     </td>
-                    <td title={record.participant_name || ''}>{record.participant_id ? record.participant_name || 'Nombre no disponible' : 'Sin participante enlazado'}</td>
+                    <td title={record.participant_name || ''}>{record.participant_id ? record.participant_name || t('recordsView.nameNotAvailable') : t('recordsView.noParticipantLinked')}</td>
                     <td>{record.participant_document_id || '—'}</td>
                     <td>{record.participant_external_code || '—'}</td>
                     <td>{record.participant_municipality || '—'}</td>
@@ -941,7 +959,7 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
                     <td><span className={`record-status ${record.status}`}>{record.status}</span></td>
                     <td title={record.submitted_by ?? ''}>{record.submitted_by || '—'}</td>
                     {fields.map((field) => {
-                      const value = formatValue(record.values.find((item) => item.field_name === field.name)?.field_value_json, true);
+                      const value = formatValue(record.values.find((item) => item.field_name === field.name)?.field_value_json, true, t);
                       return <td key={field.name} title={value}>{value}</td>;
                     })}
                   </tr>
@@ -950,21 +968,25 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
             </tbody>
           </table>
         </div></>}
-        {modalId && <div className="record-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setModalId(''); }}><div className="record-modal" role="dialog" aria-modal="true" aria-label={modalEdit ? 'Editar respuesta' : 'Ver respuesta'}><button type="button" className="record-modal-close" onClick={() => setModalId('')} aria-label="Cerrar ventana">×</button>{modalMessage && <p role="status" className="records-modal-message">{modalMessage}</p>}{modalRecord ? <DeepLinkedRecordCard key={`${modalRecord.id}:${modalEdit}`} projectId={projectId} record={modalRecord} highlightField="" editMode={modalEdit} onRecordUpdated={updateModalRecord} onMessage={setModalMessage} previousId={modalNeighbors.previous_id || undefined} nextId={modalNeighbors.next_id || undefined} onClose={() => setModalId('')} onNavigate={(id) => void openRecord(id)} onEditModeChange={setModalEdit} onDuplicated={(copy) => { setRefreshVersion((value) => value + 1); void openRecord(copy.id, true); }} onRemoved={() => { setModalId(''); setRefreshVersion((value) => value + 1); }} /> : !modalMessage && <p role="status">Cargando respuesta...</p>}</div></div>}
+        {modalId && <div className="record-modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setModalId(''); }}><div className="record-modal" role="dialog" aria-modal="true" aria-label={modalEdit ? t('recordsView.editResponseTitle') : t('recordsView.viewResponse')}><button type="button" className="record-modal-close" onClick={() => setModalId('')} aria-label={t('recordsView.closeWindow')}>×</button>{modalMessage && <p role="status" className="records-modal-message">{modalMessage}</p>}{modalRecord ? <DeepLinkedRecordCard key={`${modalRecord.id}:${modalEdit}`} projectId={projectId} record={modalRecord} highlightField="" editMode={modalEdit} onRecordUpdated={updateModalRecord} onMessage={setModalMessage} previousId={modalNeighbors.previous_id || undefined} nextId={modalNeighbors.next_id || undefined} onClose={() => setModalId('')} onNavigate={(id) => void openRecord(id)} onEditModeChange={setModalEdit} onDuplicated={(copy) => { setRefreshVersion((value) => value + 1); void openRecord(copy.id, true); }} onRemoved={() => { setModalId(''); setRefreshVersion((value) => value + 1); }} /> : !modalMessage && <p role="status">{t('recordsView.loadingResponse')}</p>}</div></div>}
       </main>
   );
-  return embedded ? content : <AppShell title="Registros del formulario">{content}</AppShell>;
+  return embedded ? content : <AppShell title={t('recordsView.formRecordsTitle')}>{content}</AppShell>;
 }
 
-function formatValue(raw?: string, detailed = false): string {
-  if (!raw) return '—';
+function formatValue(raw: string | undefined, detailed: boolean, t: (key: string, params?: Record<string, string | number>) => string): string;
+function formatValue(raw?: string, detailed?: boolean, t?: (key: string, params?: Record<string, string | number>) => string): string;
+function formatValue(raw?: string, detailed = false, t?: (key: string, params?: Record<string, string | number>) => string): string {
+  const emptyValue = t ? t('recordsView.emptyValue') : '—';
+  if (!raw) return emptyValue;
   try {
     const value = JSON.parse(raw);
-    if (value === null || value === '') return '—';
-    if (typeof value === 'boolean') return value ? 'Sí' : 'No';
+    if (value === null || value === '') return emptyValue;
+    if (typeof value === 'boolean') return value ? (t ? t('recordsView.booleanYes') : 'Sí') : (t ? t('recordsView.booleanNo') : 'No');
     if (typeof value === 'string' || typeof value === 'number') return String(value);
     if (value && typeof value === 'object' && value.method === 'device_user_verification') {
-      return `Dispositivo verificado${value.verified_at ? ` · ${new Date(value.verified_at).toLocaleString()}` : ''}`;
+      const label = t ? t('recordsView.deviceVerified') : 'Dispositivo verificado';
+      return `${label}${value.verified_at ? ` · ${new Date(value.verified_at).toLocaleString()}` : ''}`;
     }
     const text = JSON.stringify(value);
     return detailed ? text : `${text.slice(0, 60)}${text.length > 60 ? '…' : ''}`;

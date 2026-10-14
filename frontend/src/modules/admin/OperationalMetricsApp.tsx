@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
+import { useI18n } from '../../i18n';
 import { fetchOperationalMetrics } from './operationalMetricsApi';
 import type { HttpPathMetrics, OperationalMetrics } from './operationalMetricsApi';
 
@@ -29,7 +30,7 @@ function countStatus(metrics: OperationalMetrics, code: string): number {
   return metrics.http.by_status_code[code] ?? 0;
 }
 
-function operationalAlerts(metrics: OperationalMetrics): Array<{ level: 'warning' | 'danger'; title: string; detail: string }> {
+function operationalAlerts(metrics: OperationalMetrics, t: (key: string, params?: Record<string, string | number>) => string): Array<{ level: 'warning' | 'danger'; title: string; detail: string }> {
   const alerts: Array<{ level: 'warning' | 'danger'; title: string; detail: string }> = [];
   const serverErrors = metrics.http.by_status_family['5xx'] ?? 0;
   const rateLimited = countStatus(metrics, '429');
@@ -39,26 +40,27 @@ function operationalAlerts(metrics: OperationalMetrics): Array<{ level: 'warning
   const failedStale = Number(metrics.bulk_jobs.failed_stale ?? 0);
   const retries = Number(metrics.bulk_jobs.retries_scheduled ?? 0);
 
-  if (serverErrors > 0) alerts.push({ level: 'danger', title: 'Errores 5xx detectados', detail: `${serverErrors} respuesta(s) del servidor terminaron en error.` });
-  if (rateLimited > 0) alerts.push({ level: 'warning', title: 'Rate limiting activo', detail: `${rateLimited} request(s) recibieron 429. Revisar integraciones o limites.` });
-  if (unauthorized + forbidden > 0) alerts.push({ level: 'warning', title: 'Eventos de acceso denegado', detail: `${unauthorized} 401 y ${forbidden} 403 registrados.` });
-  if (failedJobs > 0 || failedStale > 0) alerts.push({ level: 'danger', title: 'Jobs bulk fallidos', detail: `${failedJobs} fallido(s), ${failedStale} atascado(s) agotaron intentos.` });
-  if (retries > 0) alerts.push({ level: 'warning', title: 'Reintentos bulk programados', detail: `${retries} job(s) fueron reprogramados con backoff.` });
+  if (serverErrors > 0) alerts.push({ level: 'danger', title: t('admin.metrics.alert5xx'), detail: t('admin.metrics.alert5xxDetail', { count: serverErrors }) });
+  if (rateLimited > 0) alerts.push({ level: 'warning', title: t('admin.metrics.alertRateLimit'), detail: t('admin.metrics.alertRateLimitDetail', { count: rateLimited }) });
+  if (unauthorized + forbidden > 0) alerts.push({ level: 'warning', title: t('admin.metrics.alertAccessDenied'), detail: t('admin.metrics.alertAccessDeniedDetail', { unauthorized, forbidden }) });
+  if (failedJobs > 0 || failedStale > 0) alerts.push({ level: 'danger', title: t('admin.metrics.alertBulkFailed'), detail: t('admin.metrics.alertBulkFailedDetail', { failed: failedJobs, stale: failedStale }) });
+  if (retries > 0) alerts.push({ level: 'warning', title: t('admin.metrics.alertBulkRetries'), detail: t('admin.metrics.alertBulkRetriesDetail', { count: retries }) });
 
-  if (!alerts.length) alerts.push({ level: 'warning', title: 'Sin alertas operativas', detail: 'No se observan errores 5xx, 429 ni jobs bulk fallidos en este proceso.' });
+  if (!alerts.length) alerts.push({ level: 'warning', title: t('admin.metrics.alertNoAlerts'), detail: t('admin.metrics.alertNoAlertsDetail') });
   return alerts;
 }
 
 export function OperationalMetricsApp() {
+  const { t } = useI18n();
   const [metrics, setMetrics] = useState<OperationalMetrics | null>(null);
-  const [message, setMessage] = useState('Cargando métricas operativas...');
+  const [message, setMessage] = useState(t('admin.metrics.loadingMessage'));
 
   async function loadMetrics() {
     try {
       setMetrics(await fetchOperationalMetrics());
       setMessage('');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible cargar métricas.');
+      setMessage(error instanceof Error ? error.message : t('admin.metrics.errorLoadMetrics'));
     }
   }
 
@@ -68,33 +70,33 @@ export function OperationalMetricsApp() {
 
   const busiestPaths = useMemo(() => topPaths(metrics?.http.by_path ?? {}, 'requests'), [metrics]);
   const slowestPaths = useMemo(() => topPaths(metrics?.http.by_path ?? {}, 'p95'), [metrics]);
-  const alerts = useMemo(() => (metrics ? operationalAlerts(metrics) : []), [metrics]);
+  const alerts = useMemo(() => (metrics ? operationalAlerts(metrics, t) : []), [metrics, t]);
 
   return (
-    <AppShell title="Métricas operativas">
+    <AppShell title={t('admin.metrics.title')}>
       <main className="operational-metrics-shell">
         <section className="operational-metrics-hero">
           <div>
-            <h2>Salud HTTP y latencia</h2>
-            <p>Lectura en memoria del proceso actual. Útil para demo, preproducción y diagnóstico rápido.</p>
+            <h2>{t('admin.metrics.httpHealthTitle')}</h2>
+            <p>{t('admin.metrics.httpHealthDescription')}</p>
           </div>
-          <button onClick={() => void loadMetrics()}>Actualizar</button>
+          <button onClick={() => void loadMetrics()}>{t('admin.metrics.refresh')}</button>
         </section>
         {message ? <p role="status">{message}</p> : null}
         {metrics ? (
           <>
             <section className="operational-metric-cards">
-              <article><strong>{metrics.http.total_requests}</strong><span>Requests</span></article>
-              <article><strong>{formatDuration(metrics.http.avg_duration_ms)}</strong><span>Promedio</span></article>
-              <article><strong>{formatDuration(metrics.http.latency_percentiles_ms.p95)}</strong><span>p95 global</span></article>
-              <article><strong>{formatDuration(metrics.http.latency_percentiles_ms.p99)}</strong><span>p99 global</span></article>
-              <article><strong>{formatDuration(metrics.http.max_duration_ms)}</strong><span>Máxima</span></article>
-              <article><strong>{formatUptime(metrics.http.uptime_seconds)}</strong><span>Uptime</span></article>
-              <article><strong>{metrics.metrics_enabled ? 'Activo' : 'Inactivo'}</strong><span>Métricas</span></article>
-              <article><strong>{metrics.service}</strong><span>Servicio</span></article>
+              <article><strong>{metrics.http.total_requests}</strong><span>{t('admin.metrics.requests')}</span></article>
+              <article><strong>{formatDuration(metrics.http.avg_duration_ms)}</strong><span>{t('admin.metrics.average')}</span></article>
+              <article><strong>{formatDuration(metrics.http.latency_percentiles_ms.p95)}</strong><span>{t('admin.metrics.p95Global')}</span></article>
+              <article><strong>{formatDuration(metrics.http.latency_percentiles_ms.p99)}</strong><span>{t('admin.metrics.p99Global')}</span></article>
+              <article><strong>{formatDuration(metrics.http.max_duration_ms)}</strong><span>{t('admin.metrics.maximum')}</span></article>
+              <article><strong>{formatUptime(metrics.http.uptime_seconds)}</strong><span>{t('admin.metrics.uptime')}</span></article>
+              <article><strong>{metrics.metrics_enabled ? t('admin.metrics.metricsActive') : t('admin.metrics.metricsInactive')}</strong><span>{t('admin.metrics.metricsLabel')}</span></article>
+              <article><strong>{metrics.service}</strong><span>{t('admin.metrics.serviceLabel')}</span></article>
             </section>
 
-            <section className="operational-alerts" aria-label="Alertas operativas">
+            <section className="operational-alerts" aria-label={t('admin.metrics.alertsAriaLabel')}>
               {alerts.map((alert) => (
                 <article key={`${alert.title}-${alert.detail}`} className={alert.level}>
                   <strong>{alert.title}</strong>
@@ -105,13 +107,13 @@ export function OperationalMetricsApp() {
 
             <section className="operational-metrics-grid">
               <article className="operational-metrics-panel">
-                <h3>Estados HTTP</h3>
+                <h3>{t('admin.metrics.httpStatusTitle')}</h3>
                 <div className="operational-status-grid">
                   {Object.entries(metrics.http.by_status_family).map(([family, count]) => (
                     <div key={family}><strong>{count}</strong><span>{family}</span></div>
                   ))}
                 </div>
-                <h4>Códigos exactos</h4>
+                <h4>{t('admin.metrics.exactCodes')}</h4>
                 <div className="operational-code-list">
                   {Object.entries(metrics.http.by_status_code).map(([code, count]) => (
                     <span key={code}><strong>{code}</strong> {count}</span>
@@ -119,8 +121,8 @@ export function OperationalMetricsApp() {
                 </div>
               </article>
 
-              <PathTable title="Rutas con más tráfico" rows={busiestPaths} />
-              <PathTable title="Rutas más lentas por p95" rows={slowestPaths} />
+              <PathTable title={t('admin.metrics.busiestPaths')} rows={busiestPaths} t={t} />
+              <PathTable title={t('admin.metrics.slowestPaths')} rows={slowestPaths} t={t} />
             </section>
           </>
         ) : null}
@@ -129,13 +131,13 @@ export function OperationalMetricsApp() {
   );
 }
 
-function PathTable({ title, rows }: { title: string; rows: Array<[string, HttpPathMetrics]> }) {
+function PathTable({ title, rows, t }: { title: string; rows: Array<[string, HttpPathMetrics]>; t: (key: string, params?: Record<string, string | number>) => string }) {
   return (
     <article className="operational-metrics-panel">
       <h3>{title}</h3>
       {rows.length ? (
         <div className="operational-path-table">
-          <div className="header"><span>Ruta</span><span>Req.</span><span>p95</span><span>Último</span></div>
+          <div className="header"><span>{t('admin.metrics.pathHeader')}</span><span>{t('admin.metrics.reqHeader')}</span><span>{t('admin.metrics.p95Header')}</span><span>{t('admin.metrics.lastHeader')}</span></div>
           {rows.map(([path, values]) => (
             <div key={path}>
               <code>{path}</code>
@@ -145,7 +147,7 @@ function PathTable({ title, rows }: { title: string; rows: Array<[string, HttpPa
             </div>
           ))}
         </div>
-      ) : <p>Todavía no hay tráfico registrado.</p>}
+      ) : <p>{t('admin.metrics.noTrafficYet')}</p>}
     </article>
   );
 }

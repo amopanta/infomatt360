@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
+import { useI18n } from '../../i18n';
 import { PROJECT_KEY } from '../auth/session';
 import { fetchProjectTemplates } from '../records/api';
 import type { TemplateSummary } from '../records/api';
@@ -14,11 +15,6 @@ const TARGET_FIELDS: Record<string, string[]> = {
   assignments: ['email', 'role_name', 'status'],
 };
 
-function statusLabel(status: string) {
-  const labels: Record<string, string> = { uploaded: 'Subido (pendiente de mapeo)', mapped: 'Mapeado (listo para aprobar)', completed: 'Completado', failed: 'Fallido' };
-  return labels[status] ?? status;
-}
-
 function statusClass(status: string) {
   if (status === 'completed') return 'sent';
   if (status === 'failed') return 'failed';
@@ -26,6 +22,7 @@ function statusClass(status: string) {
 }
 
 export function ExcelImportApp() {
+  const { t } = useI18n();
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [entityType, setEntityType] = useState('participants');
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
@@ -39,11 +36,21 @@ export function ExcelImportApp() {
   const [validation, setValidation] = useState<ExcelImportValidation | null>(null);
   const [busy, setBusy] = useState(false);
 
+  function statusLabel(status: string) {
+    const labels: Record<string, string> = {
+      uploaded: t('admin.excelImport.statusUploaded'),
+      mapped: t('admin.excelImport.statusMapped'),
+      completed: t('admin.excelImport.statusCompleted'),
+      failed: t('admin.excelImport.statusFailed'),
+    };
+    return labels[status] ?? status;
+  }
+
   async function loadJobs() {
     try {
       setJobs(await fetchExcelImportJobs(projectId));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible cargar el historial de lotes.');
+      setMessage(error instanceof Error ? error.message : t('admin.excelImport.errorLoadJobs'));
     }
   }
 
@@ -58,9 +65,9 @@ export function ExcelImportApp() {
 
   async function submitUpload() {
     if (!file) return;
-    if (entityType === 'participants' && !groupName.trim()) { setMessage('Escribe un nombre para el grupo de participantes.'); return; }
+    if (entityType === 'participants' && !groupName.trim()) { setMessage(t('admin.excelImport.groupRequired')); return; }
     if (entityType === 'records' && !templateId) {
-      setMessage('Selecciona la plantilla del formulario antes de subir el archivo.');
+      setMessage(t('admin.excelImport.templateRequired'));
       return;
     }
     setBusy(true);
@@ -69,10 +76,10 @@ export function ExcelImportApp() {
       setCurrentJob(job);
       setValidation(null);
       setColumnMapping(job.column_mapping ?? {});
-      setMessage(`Archivo subido: ${job.total_rows} fila(s) detectada(s).`);
+      setMessage(t('admin.excelImport.rowsDetected', { count: job.total_rows }));
       await loadJobs();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible subir el archivo.');
+      setMessage(error instanceof Error ? error.message : t('admin.excelImport.errorUpload'));
     } finally {
       setBusy(false);
     }
@@ -86,10 +93,10 @@ export function ExcelImportApp() {
       const job = await confirmExcelImportMapping(currentJob.id, mapping);
       setCurrentJob(job);
       setValidation(null);
-      setMessage('Mapeo confirmado. El lote esta listo para aprobar e importar.');
+      setMessage(t('admin.excelImport.mappingConfirmed'));
       await loadJobs();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible confirmar el mapeo.');
+      setMessage(error instanceof Error ? error.message : t('admin.excelImport.errorConfirmMapping'));
     } finally {
       setBusy(false);
     }
@@ -97,15 +104,15 @@ export function ExcelImportApp() {
 
   async function submitApprove() {
     if (!currentJob) return;
-    if (!validation || validation.errors.length) { setMessage('Valida el archivo y corrige los errores antes de importar.'); return; }
+    if (!validation || validation.errors.length) { setMessage(t('admin.excelImport.validateFirst')); return; }
     setBusy(true);
     try {
       const job = await approveExcelImport(currentJob.id);
       setCurrentJob(job);
-      setMessage(`Importacion completada: ${job.imported_rows} importada(s), ${job.failed_rows} fallida(s).`);
+      setMessage(t('admin.excelImport.importResult', { imported: job.imported_rows, failed: job.failed_rows }));
       await loadJobs();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible aprobar el lote.');
+      setMessage(error instanceof Error ? error.message : t('admin.excelImport.errorApprove'));
     } finally {
       setBusy(false);
     }
@@ -114,8 +121,8 @@ export function ExcelImportApp() {
   async function submitValidation() {
     if (!currentJob) return;
     setBusy(true);
-    try { const result = await validateExcelImport(currentJob.id); setValidation(result); setMessage(`${result.valid_rows} de ${result.total_rows} filas válidas. ${result.errors.length} error(es).`); }
-    catch (error) { setMessage(error instanceof Error ? error.message : 'No se pudo validar.'); }
+    try { const result = await validateExcelImport(currentJob.id); setValidation(result); setMessage(t('admin.excelImport.validationResult', { valid: result.valid_rows, total: result.total_rows, errors: result.errors.length })); }
+    catch (error) { setMessage(error instanceof Error ? error.message : t('admin.excelImport.errorValidate')); }
     finally { setBusy(false); }
   }
 
@@ -123,45 +130,45 @@ export function ExcelImportApp() {
   const targetFieldOptions: ExcelImportTargetField[] = dynamicTargetFields ?? (TARGET_FIELDS[entityType] ?? []).map((name) => ({ name, label: name }));
 
   return (
-    <AppShell title="Carga masiva desde Excel">
+    <AppShell title={t('admin.excelImport.title')}>
       <main className="audit-shell">
         {message ? <p role="status" className="erp-message">{message}</p> : null}
 
         <section className="audit-panel">
           <header>
             <div>
-              <h2>1. Subir archivo</h2>
-              <p>Importa participantes nuevos o actualiza los existentes por documento. Antes de aplicar, revisa el mapeo y valida todas las filas.</p>
+              <h2>{t('admin.excelImport.stepUpload')}</h2>
+              <p>{t('admin.excelImport.uploadDescription')}</p>
             </div>
           </header>
           <div className="ai-analyze-inline">
             <label>
-              Tipo de entidad
+              {t('admin.excelImport.entityTypeLabel')}
               <select value={entityType} onChange={(event) => { setEntityType(event.target.value); setTemplateId(''); setValidation(null); }}>
-                <option value="participants">Participantes</option>
-                <option value="participant_updates">Actualizar participantes existentes</option>
-                <option value="users">Usuarios</option>
-                <option value="assignments">Asignaciones (usuario-proyecto-rol)</option>
-                <option value="records">Registros historicos de un formulario</option>
+                <option value="participants">{t('admin.excelImport.entityParticipants')}</option>
+                <option value="participant_updates">{t('admin.excelImport.entityParticipantUpdates')}</option>
+                <option value="users">{t('admin.excelImport.entityUsers')}</option>
+                <option value="assignments">{t('admin.excelImport.entityAssignments')}</option>
+                <option value="records">{t('admin.excelImport.entityRecords')}</option>
               </select>
             </label>
             {entityType === 'records' ? (
               <label>
-                Plantilla del formulario
+                {t('admin.excelImport.formTemplateLabel')}
                 <select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
-                  <option value="">Selecciona una plantilla</option>
+                  <option value="">{t('admin.excelImport.selectTemplate')}</option>
                   {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
                 </select>
               </label>
             ) : null}
-            {entityType === 'participants' && <label>Nombre del grupo de participantes<input value={groupName} maxLength={160} placeholder="Ej. Familias de Soacha 2026" onChange={(event) => setGroupName(event.target.value)} required /><small>Todos los participantes importados en este lote quedarán en este grupo.</small></label>}
-            {entityType === 'participant_updates' && <p>Identifica cada persona por documento. Las celdas vacías conservan el dato actual. Usa active o inactive en Estado.</p>}
-            <button type="button" disabled={busy || (entityType === 'records' && !templateId)} onClick={() => void downloadExcelImportTemplate(projectId, entityType, entityType === 'records' ? templateId : undefined).catch((error: Error) => setMessage(error.message))}>⬇ Descargar plantilla</button>
+            {entityType === 'participants' && <label>{t('admin.excelImport.groupNameLabel')}<input value={groupName} maxLength={160} placeholder={t('admin.excelImport.groupNamePlaceholder')} onChange={(event) => setGroupName(event.target.value)} required /><small>{t('admin.excelImport.groupNameHint')}</small></label>}
+            {entityType === 'participant_updates' && <p>{t('admin.excelImport.participantUpdateHint')}</p>}
+            <button type="button" disabled={busy || (entityType === 'records' && !templateId)} onClick={() => void downloadExcelImportTemplate(projectId, entityType, entityType === 'records' ? templateId : undefined).catch((error: Error) => setMessage(error.message))}>⬇ {t('admin.excelImport.downloadTemplate')}</button>
             <label>
-              Archivo (.xlsx)
+              {t('admin.excelImport.fileLabel')}
               <input type="file" accept=".xlsx" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
             </label>
-            <button disabled={!file || busy || (entityType === 'participants' && !groupName.trim())} onClick={() => void submitUpload()}>Subir y previsualizar</button>
+            <button disabled={!file || busy || (entityType === 'participants' && !groupName.trim())} onClick={() => void submitUpload()}>{t('admin.excelImport.uploadAndPreview')}</button>
           </div>
         </section>
 
@@ -169,17 +176,17 @@ export function ExcelImportApp() {
           <section className="audit-panel">
             <header>
               <div>
-                <h2>2. Mapear columnas</h2>
-                <p>{currentJob.source_filename} · {currentJob.total_rows} fila(s) {currentJob.group_name ? `· Grupo: ${currentJob.group_name}` : ''} · estado: <span className={`wa-status ${statusClass(currentJob.status)}`}>{statusLabel(currentJob.status)}</span></p>
+                <h2>{t('admin.excelImport.stepMapping')}</h2>
+                <p>{currentJob.source_filename} · {currentJob.total_rows} fila(s) {currentJob.group_name ? `· ${t('admin.excelImport.groupPrefix', { name: currentJob.group_name })}` : ''} · estado: <span className={`wa-status ${statusClass(currentJob.status)}`}>{statusLabel(currentJob.status)}</span></p>
               </div>
             </header>
             <div className="audit-table-wrap">
               <table className="audit-table">
                 <thead>
                   <tr>
-                    <th>Columna del Excel</th>
-                    <th>Campo destino</th>
-                    {currentJob.preview.sample_rows.slice(0, 2).map((_, index) => <th key={index}>Ejemplo {index + 1}</th>)}
+                    <th>{t('admin.excelImport.colExcelColumn')}</th>
+                    <th>{t('admin.excelImport.colTargetField')}</th>
+                    {currentJob.preview.sample_rows.slice(0, 2).map((_, index) => <th key={index}>{t('admin.excelImport.examplePrefix', { index: index + 1 })}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -191,7 +198,7 @@ export function ExcelImportApp() {
                           value={columnMapping[header] ?? ''}
                           onChange={(event) => { setValidation(null); setColumnMapping((previous) => ({ ...previous, [header]: event.target.value })); }}
                         >
-                          <option value="">(ignorar)</option>
+                          <option value="">{t('admin.excelImport.ignoreOption')}</option>
                           {targetFieldOptions.map((field) => <option key={field.name} value={field.name}>{field.label}</option>)}
                         </select>
                       </td>
@@ -204,14 +211,14 @@ export function ExcelImportApp() {
               </table>
             </div>
             {currentJob.status === 'uploaded' ? (
-              <button className="primary" disabled={busy} onClick={() => void submitMapping()}>Confirmar mapeo</button>
+              <button className="primary" disabled={busy} onClick={() => void submitMapping()}>{t('admin.excelImport.confirmMapping')}</button>
             ) : null}
             {currentJob.status === 'mapped' ? (
-              <><button type="button" disabled={busy} onClick={() => void submitValidation()}>Validar archivo completo</button>{validation && <div role="status"><strong>{validation.valid_rows} de {validation.total_rows} filas válidas</strong>{validation.errors.map((error, index) => <p key={index}>Fila {error.row}: {error.error}</p>)}</div>}<button className="primary" disabled={busy || !validation || !!validation.errors.length} onClick={() => void submitApprove()}>Aprobar e importar</button></>
+              <><button type="button" disabled={busy} onClick={() => void submitValidation()}>{t('admin.excelImport.validateFile')}</button>{validation && <div role="status"><strong>{t('admin.excelImport.validRowsOf', { valid: validation.valid_rows, total: validation.total_rows })}</strong>{validation.errors.map((error, index) => <p key={index}>{t('admin.excelImport.rowError', { row: error.row, error: error.error })}</p>)}</div>}<button className="primary" disabled={busy || !validation || !!validation.errors.length} onClick={() => void submitApprove()}>{t('admin.excelImport.approveAndImport')}</button></>
             ) : null}
             {currentJob.status === 'completed' || currentJob.status === 'failed' ? (
               <article className="ds-map-card">
-                <strong>Importadas: {currentJob.imported_rows} · Fallidas: {currentJob.failed_rows}</strong>
+                <strong>{t('admin.excelImport.importedLabel', { imported: currentJob.imported_rows })} · {t('admin.excelImport.failedLabel', { failed: currentJob.failed_rows })}</strong>
                 {currentJob.error_report?.length ? (
                   <ul>
                     {currentJob.error_report.map((error, index) => <li key={index}>{JSON.stringify(error)}</li>)}
@@ -225,20 +232,20 @@ export function ExcelImportApp() {
         <section className="audit-panel">
           <header>
             <div>
-              <h2>Historial de lotes</h2>
+              <h2>{t('admin.excelImport.batchHistory')}</h2>
             </div>
-            <button onClick={() => void loadJobs()}>Actualizar</button>
+            <button onClick={() => void loadJobs()}>{t('admin.excelImport.refresh')}</button>
           </header>
-          {!jobs.length ? <p>Aun no hay lotes de carga masiva en este proyecto.</p> : null}
+          {!jobs.length ? <p>{t('admin.excelImport.noBatchesYet')}</p> : null}
           <div className="audit-table-wrap">
             <table className="audit-table">
               <thead>
                 <tr>
-                  <th>Fecha</th>
-                  <th>Archivo</th>
-                  <th>Tipo</th>
-                  <th>Estado</th>
-                  <th>Importadas / Fallidas</th>
+                  <th>{t('admin.excelImport.colDate')}</th>
+                  <th>{t('admin.excelImport.colFile')}</th>
+                  <th>{t('admin.excelImport.colType')}</th>
+                  <th>{t('admin.excelImport.colStatus')}</th>
+                  <th>{t('admin.excelImport.colImportedFailed')}</th>
                 </tr>
               </thead>
               <tbody>

@@ -1,6 +1,7 @@
 import jsQR from 'jsqr';
 import { useEffect, useRef, useState } from 'react';
 import { BrandLogo } from '../../components/BrandLogo';
+import { useI18n } from '../../i18n';
 import { extractTokenFromScannedUrl, validateEnrollmentQr } from './api';
 import type { EnrollmentValidation } from './api';
 
@@ -17,6 +18,7 @@ function deviceFingerprint(): string {
 }
 
 export function EnrollScanApp() {
+  const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -42,7 +44,7 @@ export function EnrollScanApp() {
       setResult(validation);
       setStatus('success');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible validar el codigo.');
+      setMessage(error instanceof Error ? error.message : t('enroll.validateError'));
       setStatus('error');
     } finally {
       stopCamera();
@@ -61,7 +63,7 @@ export function EnrollScanApp() {
       setStatus('scanning');
       scanFrame();
     } catch {
-      setMessage('No fue posible acceder a la camara. Revisa los permisos del navegador.');
+      setMessage(t('enroll.cameraError'));
       setStatus('error');
     }
   }
@@ -106,28 +108,28 @@ export function EnrollScanApp() {
     <div className="auth-page">
       <div className="auth-card enroll-scan-card">
         <BrandLogo />
-        <h1>Enrolamiento por QR</h1>
+        <h1>{t('enroll.title')}</h1>
         {status === 'scanning' || status === 'starting-camera' ? (
           <>
-            <p>Apunta la camara al codigo QR generado por tu administrador.</p>
+            <p>{t('enroll.instruction')}</p>
             <video ref={videoRef} className="enroll-scan-video" muted playsInline />
             <canvas ref={canvasRef} style={{ display: 'none' }} />
           </>
         ) : null}
-        {status === 'validating' ? <p>Validando codigo...</p> : null}
+        {status === 'validating' ? <p>{t('enroll.validating')}</p> : null}
         {status === 'success' && result ? (
           <div>
-            <p role="status">Dispositivo enrolado correctamente.</p>
-            <small>Proyecto: {result.project_id}</small>
+            <p role="status">{t('enroll.success')}</p>
+            <small>{t('enroll.project', { id: result.project_id })}</small>
           </div>
         ) : null}
         {status === 'error' ? (
           <div>
             <p role="alert">{message}</p>
-            <button onClick={retry}>Intentar de nuevo</button>
+            <button onClick={retry}>{t('enroll.retry')}</button>
           </div>
         ) : null}
-        <a href="/">Volver al ingreso</a>
+        <a href="/">{t('enroll.backToLogin')}</a>
       </div>
     </div>
   );

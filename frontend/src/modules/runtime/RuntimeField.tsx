@@ -9,6 +9,7 @@ import { isFieldVisible } from './formLogic';
 import { evaluateXlsExpression } from './xlsExpression';
 import type { RepeatItem, RuntimeComponent, RuntimeDeviceVerificationValue, RuntimeFileValue, RuntimeFormValue, RuntimeFormValues, RuntimeScalarValue } from './types';
 import type { RuntimeGeoValue } from './geoEngine';
+import { useI18n } from '../../i18n';
 
 type Props = {
   component: RuntimeComponent;
@@ -66,6 +67,7 @@ function RuntimeParentChildField({ fieldId, label, config, value, required, onCh
   required: boolean;
   onChange: (next: string | null) => void;
 }) {
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const [candidates, setCandidates] = useState<{ id: string; values: { field_name: string; field_value_json: string }[] }[]>([]);
   const [status, setStatus] = useState('');
@@ -84,7 +86,7 @@ function RuntimeParentChildField({ fieldId, label, config, value, required, onCh
     return (
       <div className="runtime-field-group">
         <RuntimeQuestionLabel label={label} config={config} />
-        <small className="runtime-field-unavailable">Este campo aun no tiene una plantilla enlazada configurada en el constructor.</small>
+        <small className="runtime-field-unavailable">{t('runtime.noLinkedTemplate')}</small>
       </div>
     );
   }
@@ -92,9 +94,9 @@ function RuntimeParentChildField({ fieldId, label, config, value, required, onCh
   return (
     <label className="runtime-field-group" htmlFor={fieldId}>
       <RuntimeQuestionLabel label={label} config={config} />
-      <input type="search" placeholder="Buscar registro..." value={search} onChange={(event) => setSearch(event.target.value)} />
+      <input type="search" placeholder={t('runtime.searchRecord')} value={search} onChange={(event) => setSearch(event.target.value)} />
       <select id={fieldId} className="runtime-field" required={required} value={String(value ?? '')} onChange={(event) => onChange(event.target.value || null)}>
-        <option value="">Seleccione un registro enlazado</option>
+        <option value="">{t('runtime.selectLinkedRecord')}</option>
         {candidates.map((candidate) => <option key={candidate.id} value={candidate.id}>{labelForRecord(candidate, config.label_field)}</option>)}
       </select>
       {status ? <small role="status">{status}</small> : null}
@@ -103,6 +105,7 @@ function RuntimeParentChildField({ fieldId, label, config, value, required, onCh
 }
 
 export function RuntimeField(props: Props) {
+  const { t } = useI18n();
   const { component, templateId, projectId, values, onChange, uploadsDisabled } = props;
   const [uploadStatus, setUploadStatus] = useState('');
   const value = values[component.name] ?? '';
@@ -129,13 +132,13 @@ export function RuntimeField(props: Props) {
 
   if (type === 'HIDDEN') return null;
 
-  if (config.calculation) return <label className="runtime-field-group" htmlFor={fieldId}><RuntimeQuestionLabel label={component.label} config={config} /><input id={fieldId} className="runtime-field" value={String(value ?? '')} readOnly /><small>Calculado automáticamente</small></label>;
+  if (config.calculation) return <label className="runtime-field-group" htmlFor={fieldId}><RuntimeQuestionLabel label={component.label} config={config} /><input id={fieldId} className="runtime-field" value={String(value ?? '')} readOnly /><small>{t('runtime.autoCalculated')}</small></label>;
 
   if (type === 'LINKED_SUBFORM') {
     return (
       <div className="runtime-field-group">
         <RuntimeQuestionLabel label={component.label} config={config} />
-        <small className="runtime-field-unavailable">Guarda este registro para poder agregar filas de este subformulario enlazado.</small>
+        <small className="runtime-field-unavailable">{t('runtime.linkedSubformHint')}</small>
       </div>
     );
   }
@@ -163,7 +166,7 @@ export function RuntimeField(props: Props) {
       return (
         <div className="runtime-field-group">
           <RuntimeQuestionLabel label={component.label} config={config} />
-          <small className="runtime-field-unavailable">Este campo requiere iniciar sesión; no está disponible en el enlace público.</small>
+          <small className="runtime-field-unavailable">{t('runtime.requiresLogin')}</small>
         </div>
       );
     }
@@ -182,7 +185,7 @@ export function RuntimeField(props: Props) {
   }
 
   if (type === 'FINGERPRINT') {
-    if (uploadsDisabled) return <div className="runtime-field-group"><RuntimeQuestionLabel label={component.label} config={config} /><small>La verificación del dispositivo requiere iniciar sesión.</small></div>;
+    if (uploadsDisabled) return <div className="runtime-field-group"><RuntimeQuestionLabel label={component.label} config={config} /><small>{t('runtime.deviceVerificationRequiresLogin')}</small></div>;
     return <RuntimeDeviceVerification
       id={fieldId} componentId={component.id} templateId={templateId}
       label={component.label} required={config.required ?? false}
@@ -197,7 +200,7 @@ export function RuntimeField(props: Props) {
       return (
         <div className="runtime-field-group">
           <RuntimeQuestionLabel label={component.label} config={config} />
-          <small className="runtime-field-unavailable">Este campo requiere iniciar sesión; no está disponible en el enlace público.</small>
+          <small className="runtime-field-unavailable">{t('runtime.requiresLogin')}</small>
         </div>
       );
     }
@@ -207,13 +210,13 @@ export function RuntimeField(props: Props) {
 
     async function uploadFiles(files: FileList | null) {
       if (!files?.length || !projectId) return;
-      setUploadStatus('Cargando evidencia...');
+      setUploadStatus(t('runtime.uploadingEvidence'));
       try {
         const results = await Promise.all(Array.from(files, (file) => uploadRuntimeFile(projectId, type, file)));
         onChange(component.name, multiple ? [...uploaded, ...results] : results[0]);
-        setUploadStatus(`${results.length} archivo(s) cargado(s).`);
+        setUploadStatus(t('runtime.filesUploaded', { count: results.length }));
       } catch (error) {
-        setUploadStatus(error instanceof Error ? error.message : 'Error al cargar la evidencia.');
+        setUploadStatus(error instanceof Error ? error.message : t('runtime.uploadError'));
       }
     }
 
@@ -263,7 +266,7 @@ export function RuntimeField(props: Props) {
       <label className="runtime-field-group" htmlFor={fieldId}>
         <RuntimeQuestionLabel label={component.label} config={config} />
         <select {...commonProps} value={String(scalarValue ?? '')} onChange={(event) => onChange(component.name, event.target.value || null)}>
-          <option value="">Seleccione una opcion</option>
+          <option value="">{t('runtime.selectOption')}</option>
           {options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
         </select>
       </label>
@@ -351,7 +354,7 @@ export function RuntimeField(props: Props) {
         maxLength={config.max_length}
         pattern={config.pattern}
         inputMode={documentInputMode}
-        title={type === 'DOCUMENT_ID' ? 'Ingrese el documento con el formato permitido.' : undefined}
+        title={type === 'DOCUMENT_ID' ? t('runtime.enterDocumentFormat') : undefined}
         step={type === 'INTEGER' || type === 'YEAR' || type === 'NPS' ? 1 : numericTypes.includes(type) ? 'any' : undefined}
         onChange={(event) => onChange(component.name, numericTypes.includes(type) || type === 'YEAR' ? parseNumberInput(event.target.value) : event.target.value)}
       />

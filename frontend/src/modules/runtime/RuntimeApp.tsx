@@ -11,6 +11,7 @@ import { resolveFormValues, validateFormValues } from './formLogic';
 import { usePullData } from './pullData';
 import { useRuntimeDraft } from './useRuntimeDraft';
 import type { RuntimeFormValue, RuntimeTemplate } from './types';
+import { useI18n } from '../../i18n';
 
 function getTemplateIdFromPath(): string {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -19,8 +20,9 @@ function getTemplateIdFromPath(): string {
 }
 
 export function RuntimeApp() {
+  const { t } = useI18n();
   const [template, setTemplate] = useState<RuntimeTemplate | null>(null);
-  const [status, setStatus] = useState('Cargando formulario...');
+  const [status, setStatus] = useState(t('runtime.loadingForm'));
   const [participants, setParticipants] = useState<EligibleParticipant[]>([]);
   const [assignments, setAssignments] = useState<CaptureAssignment[]>([]);
   const [participantsReady, setParticipantsReady] = useState(false);
@@ -71,7 +73,7 @@ export function RuntimeApp() {
 
   useEffect(() => {
     if (!templateId) {
-      setStatus('Debe abrir una URL con formato /runtime/{template_id}.');
+      setStatus(t('runtime.invalidUrl'));
       return;
     }
 
@@ -79,7 +81,7 @@ export function RuntimeApp() {
       .then((result) => {
         setTemplate(result);
         setValues((current) => resolveFormValues(result, current));
-        setStatus(isPreview ? 'Vista previa: puedes probar las preguntas; aquí no se guarda ninguna respuesta.' : 'Borrador local activo.');
+        setStatus(isPreview ? t('runtime.previewMode') : t('runtime.draftActive'));
       })
       .catch((error: Error) => setStatus(error.message));
   }, [templateId]);
@@ -89,7 +91,7 @@ export function RuntimeApp() {
   }
 
   async function registerParticipant() {
-    if (!participantKey.trim() || !newName.trim()) { setStatus('Ingresa la llave y el nombre del participante.'); return; }
+    if (!participantKey.trim() || !newName.trim()) { setStatus(t('runtime.enterKeyAndName')); return; }
     setCreatingParticipant(true);
     try {
       await createParticipantInForm(templateId, { full_name: newName.trim(), document_id: keyField === 'document_id' ? participantKey.trim() : undefined,
@@ -100,24 +102,24 @@ export function RuntimeApp() {
       setAssignments(refreshed.assignments);
       setShowNewParticipant(false);
       setNewName(''); setNewMunicipality(''); setNewDepartment('');
-      setStatus('Participante registrado y asignado a tu usuario.');
-    } catch (error) { setStatus(error instanceof Error ? error.message : 'No fue posible registrar el participante.'); }
+      setStatus(t('runtime.participantRegistered'));
+    } catch (error) { setStatus(error instanceof Error ? error.message : t('runtime.registerFailed')); }
     finally { setCreatingParticipant(false); }
   }
 
   async function save() {
     if (saving) return;
     if (!template || !projectId) {
-      setStatus('Falta proyecto activo en la sesion o plantilla runtime.');
+      setStatus(t('runtime.missingProjectOrTemplate'));
       return;
     }
 
     setSaving(true);
     try {
-      if (!participantsReady) { setStatus('Espera a que se carguen los participantes asociados.'); return; }
-      if (!selectedParticipant) { setStatus('Ingresa una llave que identifique a un solo participante habilitado.'); return; }
-      if (!assignmentReady) { setStatus('Espera a que se confirme la asignación de este participante.'); return; }
-      if (pullError || !pullsReady) { setStatus(pullError || 'Espera a que termine la consulta del CSV.'); return; }
+      if (!participantsReady) { setStatus(t('runtime.waitParticipants')); return; }
+      if (!selectedParticipant) { setStatus(t('runtime.enterUniqueKey')); return; }
+      if (!assignmentReady) { setStatus(t('runtime.waitAssignment')); return; }
+      if (pullError || !pullsReady) { setStatus(pullError || t('runtime.waitCsv')); return; }
       const resolved = resolveFormValues(template, values, pulls);
       const invalid = validateFormValues(template, resolved);
       if (invalid) { setStatus(invalid); return; }
@@ -133,20 +135,20 @@ export function RuntimeApp() {
           .flatMap((column) => column.components)
           .some((component) => component.type.toUpperCase() === 'FINGERPRINT');
         if (hasDeviceField) {
-          throw new Error('Este formulario requiere verificar el dispositivo en línea; el envío sin conexión no está disponible. Conservamos tu borrador local.');
+          throw new Error(t('runtime.offlineNotAvailable'));
         }
         await enqueueRecord({ projectId, templateId: template.template_id, participantId, values: toRuntimeValueList(resolved) });
         clearDraft();
         setParticipantKey('');
-        setStatus('Respuesta guardada en este dispositivo. Se enviará al recuperar la conexión; verifica el estado de sincronización.');
+        setStatus(t('runtime.savedOffline'));
         return;
       }
       setAssignments((current) => current.map((assignment) => assignment.participant_id === participantId ? { ...assignment, status: 'completed', record_id: saved.id } : assignment));
       clearDraft();
       setParticipantKey('');
-      setStatus('Respuesta guardada y asociada correctamente.');
+      setStatus(t('runtime.savedSuccess'));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'No fue posible guardar la respuesta.');
+      setStatus(error instanceof Error ? error.message : t('runtime.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -154,49 +156,49 @@ export function RuntimeApp() {
 
   if (!template) {
     return (
-      <AppShell title="Runtime">
+      <AppShell title={t('runtime.titleRuntime')}>
         <main className="runtime-shell"><p>{status}</p></main>
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="Vista de Formulario">
+    <AppShell title={t('runtime.formViewTitle')}>
       <div className="runtime-themed" style={themeStyle(template.theme_json)}>
         <RuntimeRenderer template={template} projectId={projectId} values={values} onValueChange={updateValue}
           showQuestions={isPreview || Boolean(selectedParticipant && assignmentReady)}
-          participantSection={!isPreview && <section className="runtime-participant-picker" aria-label="Identificar participante">
-            <h2>Identificar participante</h2>
-            <p>Ingresa {keyField === 'document_id' ? 'el número de documento o cédula' : 'el código del participante'} para comenzar.</p>
-            <label>{keyField === 'document_id' ? 'Número de documento o cédula' : 'Código del participante'}
+          participantSection={!isPreview && <section className="runtime-participant-picker" aria-label={t('runtime.identifyParticipant')}>
+            <h2>{t('runtime.identifyParticipant')}</h2>
+            <p>{keyField === 'document_id' ? t('runtime.enterDocumentToStart') : t('runtime.enterCodeToStart')}</p>
+            <label>{keyField === 'document_id' ? t('runtime.documentIdLabel') : t('runtime.participantCodeLabel')}
               <input type="text" autoComplete="off" value={participantKey} disabled={!participantsReady}
-                onChange={(event) => { setParticipantKey(event.target.value); setShowNewParticipant(false); setStatus('Borrador local activo.'); }} />
+                onChange={(event) => { setParticipantKey(event.target.value); setShowNewParticipant(false); setStatus(t('runtime.draftActive')); }} />
             </label>
-            {!participantsReady && <small>Cargando participantes...</small>}
-            {participantsReady && !participants.length && accessMode !== 'open' && <p role="alert">No hay participantes habilitados para este formulario. Solicita al administrador que los asigne.</p>}
-            {participantsReady && participantKey.trim() && !matchingParticipants.length && !matchingAssignments.length && <p role="alert">No se encontró un participante asignado a tu usuario con esa llave.</p>}
+            {!participantsReady && <small>{t('runtime.loadingParticipants')}</small>}
+            {participantsReady && !participants.length && accessMode !== 'open' && <p role="alert">{t('runtime.noEnabledParticipants')}</p>}
+            {participantsReady && participantKey.trim() && !matchingParticipants.length && !matchingAssignments.length && <p role="alert">{t('runtime.participantNotFound')}</p>}
             {existingAssignment && <div className="runtime-existing-activity" role="alert">
-              <strong>Este participante ya tiene un registro asociado a esta actividad.</strong>
-              <span>{existingAssignment.participant_name} · {existingAssignment.status === 'closed' ? 'Actividad aprobada y cerrada' : 'Respuesta ya enviada'}</span>
-              {existingAssignment.record_id && <a href={`/records/${templateId}?recordId=${existingAssignment.record_id}`}>Ver registro asociado</a>}
+              <strong>{t('runtime.existingRecord')}</strong>
+              <span>{existingAssignment.participant_name} · {existingAssignment.status === 'closed' ? t('runtime.activityApprovedClosed') : t('runtime.responseAlreadySent')}</span>
+              {existingAssignment.record_id && <a href={`/records/${templateId}?recordId=${existingAssignment.record_id}`}>{t('runtime.viewLinkedRecord')}</a>}
             </div>}
             {accessMode === 'open' && participantKey.trim() && !matchingParticipants.length && !matchingAssignments.length && hasAnyCurrentProjectPermission(['participants.create', 'identity.users.manage']) && <>
-              <button type="button" onClick={() => setShowNewParticipant((value) => !value)}>Registrar participante nuevo</button>
+              <button type="button" onClick={() => setShowNewParticipant((value) => !value)}>{t('runtime.registerNewParticipant')}</button>
               {showNewParticipant && <div className="runtime-new-participant">
-                <label>Nombre completo<input value={newName} onChange={(event) => setNewName(event.target.value)} /></label>
-                <label>Departamento<input value={newDepartment} onChange={(event) => setNewDepartment(event.target.value)} /></label>
-                <label>Municipio<input value={newMunicipality} onChange={(event) => setNewMunicipality(event.target.value)} /></label>
-                <button type="button" disabled={creatingParticipant || !newName.trim()} onClick={() => void registerParticipant()}>{creatingParticipant ? 'Registrando...' : 'Guardar y continuar'}</button>
+                <label>{t('runtime.fullName')}<input value={newName} onChange={(event) => setNewName(event.target.value)} /></label>
+                <label>{t('runtime.department')}<input value={newDepartment} onChange={(event) => setNewDepartment(event.target.value)} /></label>
+                <label>{t('runtime.municipality')}<input value={newMunicipality} onChange={(event) => setNewMunicipality(event.target.value)} /></label>
+                <button type="button" disabled={creatingParticipant || !newName.trim()} onClick={() => void registerParticipant()}>{creatingParticipant ? t('runtime.registering') : t('runtime.saveAndContinue')}</button>
               </div>}
             </>}
-            {(matchingParticipants.length > 1 || matchingAssignments.length > 1) && <p role="alert">Esta llave coincide con varias personas. Solicita al administrador corregir los documentos o códigos duplicados.</p>}
+            {(matchingParticipants.length > 1 || matchingAssignments.length > 1) && <p role="alert">{t('runtime.duplicateKeys')}</p>}
             {selectedParticipant && <ParticipantSummaryTable person={selectedParticipant} assignmentReady={assignmentReady || accessMode === 'legacy'} />}
             {selectedParticipant && accessMode !== 'legacy' && <ParticipantPhoneCheck key={selectedParticipant.id}
               person={selectedParticipant} templateId={templateId} assignmentReady={assignmentReady}
               onUpdated={(updated) => setParticipants((current) => current.map((person) => person.id === updated.id ? updated : person))} />}
           </section>}
           footerContent={<div className="runtime-actions">
-            {!isPreview && selectedParticipant && assignmentReady && <button disabled={saving} onClick={save}>{saving ? 'Guardando...' : 'Guardar respuesta'}</button>}
+            {!isPreview && selectedParticipant && assignmentReady && <button disabled={saving} onClick={save}>{saving ? t('runtime.saving') : t('runtime.saveResponse')}</button>}
             {status ? <p>{status}</p> : null}{pullError && <p role="alert">{pullError}</p>}
           </div>} />
       </div>

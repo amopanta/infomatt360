@@ -4,6 +4,7 @@ import { RuntimeField } from './RuntimeField';
 import { RuntimeSectionNavigator } from './RuntimeSectionNavigator';
 import { RuntimeStepper } from './RuntimeStepper';
 import type { RuntimeFormValue, RuntimeFormValues, RuntimeTemplate } from './types';
+import { useI18n } from '../../i18n';
 
 type Props = {
   template: RuntimeTemplate;
@@ -39,6 +40,7 @@ export function themeStyle(themeJson?: string | null) {
 }
 
 export function RuntimeRenderer({ template, projectId, values, onValueChange, uploadsDisabled, participantSection, showQuestions = true, footerContent }: Props) {
+  const { t } = useI18n();
   const [activePageIndex, setActivePageIndex] = useState(0);
   const [activeSectionIndex, setActiveSectionIndex] = useState(0);
   const activePage = template.pages[activePageIndex];
@@ -52,7 +54,7 @@ export function RuntimeRenderer({ template, projectId, values, onValueChange, up
     return <main className="runtime-shell" style={themeStyle(template.theme_json)}>
       <h1>{template.name}</h1>
       {participantSection}
-      {showQuestions && !activePage && <p>Sin paginas configuradas.</p>}
+      {showQuestions && !activePage && <p>{t('runtime.noPagesConfigured')}</p>}
       {footerContent}
     </main>;
   }
@@ -80,11 +82,11 @@ export function RuntimeRenderer({ template, projectId, values, onValueChange, up
               </div>
             ))}
           </div>
-        ) : <p>Sin secciones configuradas.</p>}
+        ) : <p>{t('runtime.noSectionsConfigured')}</p>}
       </section>
       <div className="runtime-page-actions">
-        <button disabled={activePageIndex === 0} onClick={() => setActivePageIndex((current) => current - 1)}>Anterior</button>
-        <button disabled={activePageIndex >= template.pages.length - 1} onClick={() => setActivePageIndex((current) => current + 1)}>Siguiente</button>
+        <button disabled={activePageIndex === 0} onClick={() => setActivePageIndex((current) => current - 1)}>{t('runtime.previousButton')}</button>
+        <button disabled={activePageIndex >= template.pages.length - 1} onClick={() => setActivePageIndex((current) => current + 1)}>{t('runtime.nextButton')}</button>
       </div>
       {footerContent}
     </main>

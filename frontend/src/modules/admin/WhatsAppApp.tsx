@@ -1,30 +1,32 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
+import { useI18n } from '../../i18n';
 import { PROJECT_KEY } from '../auth/session';
 import { fetchWhatsAppNotifications } from './whatsappApi';
 import type { WhatsAppNotification } from './whatsappApi';
 
-function statusLabel(status: string) {
-  const labels: Record<string, string> = {
-    sent: 'Enviado',
-    failed: 'Fallido',
-    skipped: 'Omitido (sin proveedor configurado)',
-  };
-  return labels[status] ?? status;
-}
-
 export function WhatsAppApp() {
+  const { t } = useI18n();
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [notifications, setNotifications] = useState<WhatsAppNotification[]>([]);
   const [statusFilter, setStatusFilter] = useState('');
-  const [message, setMessage] = useState('Cargando notificaciones WhatsApp...');
+  const [message, setMessage] = useState(t('admin.whatsapp.loading'));
+
+  function statusLabel(status: string) {
+    const labels: Record<string, string> = {
+      sent: t('admin.whatsapp.statusSent'),
+      failed: t('admin.whatsapp.statusFailed'),
+      skipped: t('admin.whatsapp.statusSkipped'),
+    };
+    return labels[status] ?? status;
+  }
 
   useEffect(() => {
     fetchWhatsAppNotifications(projectId)
       .then((rows) => {
         setNotifications(rows);
-        setMessage(rows.length ? '' : 'Aún no se ha enviado ninguna notificación WhatsApp en este proyecto.');
+        setMessage(rows.length ? '' : t('admin.whatsapp.noNotificationsYet'));
       })
       .catch((error: Error) => setMessage(error.message));
   }, [projectId]);
@@ -41,41 +43,41 @@ export function WhatsAppApp() {
   }), [notifications]);
 
   return (
-    <AppShell title="WhatsApp">
+    <AppShell title={t('admin.whatsapp.title')}>
       <main className="audit-shell">
         <section className="wa-summary">
-          <article><strong>{notifications.length}</strong><span>Total</span></article>
-          <article><strong>{summary.sent}</strong><span>Enviados</span></article>
-          <article><strong>{summary.failed}</strong><span>Fallidos</span></article>
-          <article><strong>{summary.skipped}</strong><span>Omitidos</span></article>
+          <article><strong>{notifications.length}</strong><span>{t('admin.whatsapp.total')}</span></article>
+          <article><strong>{summary.sent}</strong><span>{t('admin.whatsapp.sent')}</span></article>
+          <article><strong>{summary.failed}</strong><span>{t('admin.whatsapp.failed')}</span></article>
+          <article><strong>{summary.skipped}</strong><span>{t('admin.whatsapp.skipped')}</span></article>
         </section>
         <section className="audit-panel">
           <header>
             <div>
-              <h2>Notificaciones de rechazo/devolución por WhatsApp</h2>
-              <p>Historial de envíos disparados al rechazar o devolver un registro para corrección (ver docs/85).</p>
+              <h2>{t('admin.whatsapp.notificationsTitle')}</h2>
+              <p>{t('admin.whatsapp.notificationsDescription')}</p>
             </div>
-            <select aria-label="Filtrar estado" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-              <option value="">Todos los estados</option>
-              <option value="sent">Enviado</option>
-              <option value="failed">Fallido</option>
-              <option value="skipped">Omitido</option>
+            <select aria-label={t('admin.whatsapp.filterStatusAria')} value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+              <option value="">{t('admin.whatsapp.allStatuses')}</option>
+              <option value="sent">{t('admin.whatsapp.filterSent')}</option>
+              <option value="failed">{t('admin.whatsapp.filterFailed')}</option>
+              <option value="skipped">{t('admin.whatsapp.filterSkipped')}</option>
             </select>
           </header>
           {message ? <p role="status">{message}</p> : null}
           {notifications.length && summary.skipped === notifications.length ? (
-            <p className="wa-hint">Todas las notificaciones quedaron "omitidas" porque este servidor no tiene un proveedor de WhatsApp (WAHA) configurado. Ver docs/85_WHATSAPP_WAHA_NOTIFICACIONES.md para activarlo.</p>
+            <p className="wa-hint">{t('admin.whatsapp.allSkippedHint')}</p>
           ) : null}
           <div className="audit-table-wrap">
             <table className="audit-table">
               <thead>
                 <tr>
-                  <th>Fecha</th>
-                  <th>Estado</th>
-                  <th>Destinatario</th>
-                  <th>Registro</th>
-                  <th>Mensaje</th>
-                  <th>Error</th>
+                  <th>{t('admin.whatsapp.colDate')}</th>
+                  <th>{t('admin.whatsapp.colStatus')}</th>
+                  <th>{t('admin.whatsapp.colRecipient')}</th>
+                  <th>{t('admin.whatsapp.colRecord')}</th>
+                  <th>{t('admin.whatsapp.colMessage')}</th>
+                  <th>{t('admin.whatsapp.colError')}</th>
                 </tr>
               </thead>
               <tbody>

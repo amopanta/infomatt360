@@ -11,9 +11,10 @@ import { fetchProjectTemplates } from '../records/api';
 import type { TemplateSummary } from '../records/api';
 import { fetchRuntimeTemplate } from '../runtime/api';
 import type { RuntimeComponent } from '../runtime/types';
+import { useI18n } from '../../i18n';
 
 function slugify(value: string) {
-  const normalized = value.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  const normalized = value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
   const slug = normalized.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   return slug || 'campo';
 }
@@ -60,7 +61,9 @@ function documentPattern(appearance?: BuilderPreviewField['documentAppearance'],
   return customPattern?.trim() || undefined;
 }
 
-const initialSections: BuilderPreviewSection[] = [{ id: 'general', title: 'Informacion General', fields: [] }];
+function makeInitialSections(title: string): BuilderPreviewSection[] {
+  return [{ id: 'general', title, fields: [] }];
+}
 
 function fieldFromRuntime(component: RuntimeComponent): BuilderPreviewField {
   let config: Record<string, any> = {};
@@ -97,10 +100,12 @@ function fieldConfig(field: BuilderPreviewField): string {
 }
 
 export function BuilderApp() {
+  const { t } = useI18n();
   const editingTemplateId = window.location.pathname.match(/^\/builder\/edit\/([^/]+)$/)?.[1] ?? '';
+  const initialSections = makeInitialSections(t('builder.editor.generalSection'));
   const [message, setMessage] = useState('');
   const [runtimeUrl, setRuntimeUrl] = useState('');
-  const [templateName, setTemplateName] = useState('Nueva plantilla');
+  const [templateName, setTemplateName] = useState(t('builder.editor.newTemplateName'));
   const [templateDescription, setTemplateDescription] = useState('');
   const [theme, setTheme] = useState({ primaryColor: '#0066cc', accentColor: '#00c2ff', backgroundColor: '#ffffff', radius: '18px' });
   const [sections, setSections] = useState<BuilderPreviewSection[]>(initialSections);
@@ -143,13 +148,13 @@ export function BuilderApp() {
 
   function resetTemplate() {
     const sectionId = crypto.randomUUID();
-    setTemplateName('Nueva plantilla');
+    setTemplateName(t('builder.editor.newTemplateName'));
     setTemplateDescription('');
     setTheme({ primaryColor: '#0066cc', accentColor: '#00c2ff', backgroundColor: '#ffffff', radius: '18px' });
-    setSections([{ id: sectionId, title: 'Informacion General', fields: [] }]);
+    setSections([{ id: sectionId, title: t('builder.editor.generalSection'), fields: [] }]);
     setActiveSectionId(sectionId);
     setRuntimeUrl('');
-    setMessage('Plantilla nueva lista. Agrega preguntas desde la paleta.');
+    setMessage(t('builder.editor.newTemplateReady'));
   }
 
   function addField(item: BuilderPaletteItem) {
@@ -165,20 +170,20 @@ export function BuilderApp() {
         required: false,
         optionsText: defaultOptionsText(item.type),
       };
-      const nextSections = currentSections.length ? [...currentSections] : [{ id: 'general', title: 'Informacion General', fields: [] }];
+      const nextSections = currentSections.length ? [...currentSections] : [{ id: 'general', title: t('builder.editor.generalSection'), fields: [] }];
       const targetIndex = Math.max(0, nextSections.findIndex((section) => section.id === activeSectionId));
       nextSections[targetIndex] = { ...nextSections[targetIndex], fields: [...nextSections[targetIndex].fields, field] };
       return nextSections;
     });
-    setMessage(`Pregunta agregada: ${item.label}`);
+    setMessage(t('builder.editor.questionAdded', { label: item.label }));
   }
 
   function addSection() {
     const nextNumber = sections.length + 1;
-    const section = { id: crypto.randomUUID(), title: `Grupo ${nextNumber}`, fields: [] };
+    const section = { id: crypto.randomUUID(), title: t('builder.editor.groupDefault', { number: nextNumber }), fields: [] };
     setSections((currentSections) => [...currentSections, section]);
     setActiveSectionId(section.id);
-    setMessage(`Grupo creado: ${section.title}. Las nuevas preguntas se agregaran alli.`);
+    setMessage(t('builder.editor.groupCreated', { title: section.title }));
   }
 
   function updateSection(sectionId: string, title: string) {
@@ -220,22 +225,22 @@ export function BuilderApp() {
       nextFields.splice(toIndex, 0, movedField);
       return { ...section, fields: nextFields };
     }));
-    setMessage('Orden de preguntas actualizado. Guarda el borrador para conservar este orden.');
+    setMessage(t('builder.editor.orderUpdated'));
   }
 
   async function saveTemplate() {
     if (!projectId) {
-      setMessage('Falta proyecto activo en la sesion.');
+      setMessage(t('builder.editor.missingProject'));
       return;
     }
     const fields = sections.flatMap((section) => section.fields);
     if (!fields.length) {
-      setMessage('Agrega al menos una pregunta antes de guardar.');
+      setMessage(t('builder.editor.addQuestionFirst'));
       return;
     }
-    if (!templateName.trim()) { setMessage('Escribe el nombre del formulario.'); return; }
+    if (!templateName.trim()) { setMessage(t('builder.editor.enterFormName')); return; }
     setSaving(true);
-    setMessage('Guardando plantilla...');
+    setMessage(t('builder.editor.savingTemplate'));
     try {
       if (editingTemplateId) {
         await updateTemplateProperties(editingTemplateId, { name: templateName.trim(), description: templateDescription || null, themeJson: JSON.stringify(theme) });
@@ -244,10 +249,10 @@ export function BuilderApp() {
         for (const sectionDraft of sections) {
           let sectionId = sectionDraft.id;
           if (existingSectionIds.has(sectionId)) {
-            await updateSectionTitle(sectionId, sectionDraft.title.trim() || 'Sección');
+            await updateSectionTitle(sectionId, sectionDraft.title.trim() || t('builder.editor.sectionDefault'));
           } else {
-            const page = await createPage({ templateId: editingTemplateId, title: sectionDraft.title.trim() || 'Sección', sortOrder: order });
-            const section = await createSection({ pageId: page.id, title: sectionDraft.title.trim() || 'Sección', sortOrder: order });
+            const page = await createPage({ templateId: editingTemplateId, title: sectionDraft.title.trim() || t('builder.editor.sectionDefault'), sortOrder: order });
+            const section = await createSection({ pageId: page.id, title: sectionDraft.title.trim() || t('builder.editor.sectionDefault'), sortOrder: order });
             sectionId = section.id;
           }
           for (const field of sectionDraft.fields) {
@@ -269,11 +274,11 @@ export function BuilderApp() {
             order += 1;
           }
         }
-        setMessage('Cambios guardados en el formulario.');
+        setMessage(t('builder.editor.changesSaved'));
         navigateTo(`/builder/form/${editingTemplateId}`);
         return;
       }
-      const template = await createTemplate({ projectId, name: templateName.trim() || 'Nueva plantilla', description: templateDescription || undefined, status: 'draft', themeJson: JSON.stringify(theme) });
+      const template = await createTemplate({ projectId, name: templateName.trim() || t('builder.editor.newTemplateName'), description: templateDescription || undefined, status: 'draft', themeJson: JSON.stringify(theme) });
       let sortOrder = 1;
       const usedNames = new Set<string>();
       for (const sectionDraft of sections) {
@@ -306,10 +311,10 @@ export function BuilderApp() {
       }
       const url = `/runtime/${template.id}`;
       setRuntimeUrl(url);
-      setMessage(`Borrador guardado: ${template.name}. Publícalo desde la ficha del formulario cuando esté listo.`);
+      setMessage(t('builder.editor.draftSaved', { name: template.name }));
       navigateTo(`/builder/form/${template.id}`);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible guardar la plantilla.');
+      setMessage(error instanceof Error ? error.message : t('builder.editor.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -317,73 +322,73 @@ export function BuilderApp() {
 
   async function createMvpTemplate() {
     if (!projectId) {
-      setMessage('Falta proyecto activo en la sesion.');
+      setMessage(t('builder.editor.missingProject'));
       return;
     }
     const template = await createDefaultCharacterizationTemplate(projectId);
     const url = `/runtime/${template.id}`;
     setRuntimeUrl(url);
-    setMessage(`Plantilla creada: ${template.id}`);
+    setMessage(t('builder.editor.templateCreated', { id: template.id }));
     navigateTo(`/builder/form/${template.id}`);
   }
 
   return (
-    <AppShell title="Constructor de Formularios">
-      <div className="builder-return"><a href={editingTemplateId ? `/builder/form/${editingTemplateId}` : '/builder'}>← Volver al formulario</a><span>{editingTemplateId ? `Editando formulario existente · ${submissionsCount} respuesta(s) conservada(s)` : 'Los formularios nuevos se guardan como borrador.'}</span></div>
-      {!loaded && <p role="status">{message || 'Cargando formulario existente…'}</p>}
+    <AppShell title={t('builder.editor.constructorTitle')}>
+      <div className="builder-return"><a href={editingTemplateId ? `/builder/form/${editingTemplateId}` : '/builder'}>{t('builder.editor.backToForm')}</a><span>{editingTemplateId ? t('builder.editor.editingExisting', { count: submissionsCount }) : t('builder.editor.newFormsSavedAsDraft')}</span></div>
+      {!loaded && <p role="status">{message || t('builder.editor.loadingExisting')}</p>}
       {loaded && <>
       <div className="builder-layout">
         <aside className="builder-sidebar-stack">
           <div className="builder-connect-panel">
             <div className="builder-panel-title">
-              <strong>Formulario</strong>
-              <p>Configura el nombre, tema visual y grupos antes de agregar preguntas.</p>
+              <strong>{t('builder.editor.formPanelTitle')}</strong>
+              <p>{t('builder.editor.formPanelDesc')}</p>
             </div>
-            <label>Nombre del formulario<input value={templateName} maxLength={180} onChange={(event) => setTemplateName(event.target.value)} /></label>
-            <label>Descripcion<input value={templateDescription} onChange={(event) => setTemplateDescription(event.target.value)} /></label>
+            <label>{t('builder.editor.formNameLabel')}<input value={templateName} maxLength={180} onChange={(event) => setTemplateName(event.target.value)} /></label>
+            <label>{t('builder.editor.descriptionLabel')}<input value={templateDescription} onChange={(event) => setTemplateDescription(event.target.value)} /></label>
             <details className="builder-theme-panel">
-              <summary>Tema visual</summary>
+              <summary>{t('builder.editor.visualTheme')}</summary>
               <div className="builder-theme-grid">
-                <label>Color principal<span className="builder-color-control"><input type="color" value={theme.primaryColor} onChange={(event) => setTheme({ ...theme, primaryColor: event.target.value })} /><code>{theme.primaryColor}</code></span></label>
-                <label>Color acento<span className="builder-color-control"><input type="color" value={theme.accentColor} onChange={(event) => setTheme({ ...theme, accentColor: event.target.value })} /><code>{theme.accentColor}</code></span></label>
-                <label>Fondo<span className="builder-color-control"><input type="color" value={theme.backgroundColor} onChange={(event) => setTheme({ ...theme, backgroundColor: event.target.value })} /><code>{theme.backgroundColor}</code></span></label>
-                <label>Bordes
+                <label>{t('builder.editor.primaryColor')}<span className="builder-color-control"><input type="color" value={theme.primaryColor} onChange={(event) => setTheme({ ...theme, primaryColor: event.target.value })} /><code>{theme.primaryColor}</code></span></label>
+                <label>{t('builder.editor.accentColor')}<span className="builder-color-control"><input type="color" value={theme.accentColor} onChange={(event) => setTheme({ ...theme, accentColor: event.target.value })} /><code>{theme.accentColor}</code></span></label>
+                <label>{t('builder.editor.background')}<span className="builder-color-control"><input type="color" value={theme.backgroundColor} onChange={(event) => setTheme({ ...theme, backgroundColor: event.target.value })} /><code>{theme.backgroundColor}</code></span></label>
+                <label>{t('builder.editor.borders')}
                   <select value={theme.radius} onChange={(event) => setTheme({ ...theme, radius: event.target.value })}>
-                    <option value="6px">Recto</option>
-                    <option value="14px">Suave</option>
-                    <option value="22px">Redondeado</option>
+                    <option value="6px">{t('builder.editor.borderStraight')}</option>
+                    <option value="14px">{t('builder.editor.borderSoft')}</option>
+                    <option value="22px">{t('builder.editor.borderRounded')}</option>
                   </select>
                 </label>
               </div>
             </details>
-            {!editingTemplateId && <button type="button" className="secondary" onClick={resetTemplate}>Nueva plantilla en blanco</button>}
-            {!editingTemplateId && <button onClick={createMvpTemplate}>Crear plantilla de caracterizacion</button>}
+            {!editingTemplateId && <button type="button" className="secondary" onClick={resetTemplate}>{t('builder.editor.newBlankTemplate')}</button>}
+            {!editingTemplateId && <button onClick={createMvpTemplate}>{t('builder.editor.createCharacterization')}</button>}
           </div>
 
           <div className="builder-structure-panel">
             <div className="builder-panel-title">
-              <strong>Grupos y secciones</strong>
-              <p>Divide el formulario en grupos compactos de captura.</p>
+              <strong>{t('builder.editor.groupsAndSections')}</strong>
+              <p>{t('builder.editor.groupsDesc')}</p>
             </div>
             <div className="builder-structure-list">
               {sections.map((section, index) => (
                 <button key={section.id} type="button" className={section.id === activeSectionId ? 'active' : ''} onClick={() => setActiveSectionId(section.id)}>
                   <span>{index + 1}</span>
-                  <strong>{section.title || `Grupo ${index + 1}`}</strong>
-                  <small>{section.fields.length} pregunta(s)</small>
+                  <strong>{section.title || t('builder.editor.groupDefault', { number: index + 1 })}</strong>
+                  <small>{t('builder.editor.questionCount', { count: section.fields.length })}</small>
                 </button>
               ))}
             </div>
             <div className="builder-group-panel">
-              <label>Agregar preguntas en
+              <label>{t('builder.editor.addQuestionsIn')}
                 <select value={activeSectionId} onChange={(event) => setActiveSectionId(event.target.value)}>
                   {sections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}
                 </select>
               </label>
-              <button type="button" className="secondary" onClick={addSection}>Agregar grupo</button>
+              <button type="button" className="secondary" onClick={addSection}>{t('builder.editor.addGroup')}</button>
             </div>
             {message ? <span>{message}</span> : null}
-            {runtimeUrl ? <a href={runtimeUrl}>Abrir Runtime</a> : null}
+            {runtimeUrl ? <a href={runtimeUrl}>{t('builder.editor.openRuntime')}</a> : null}
           </div>
         </aside>
         <BuilderCanvas
@@ -398,7 +403,7 @@ export function BuilderApp() {
           onFieldChange={updateField}
           onRemoveField={removeField}
           onMoveField={moveField}
-          onPreview={() => setMessage('La vista previa esta debajo: edita las preguntas antes de guardar.')}
+          onPreview={() => setMessage(t('builder.editor.previewHint'))}
           onSave={saveTemplate}
           saving={saving}
           lockedFieldIds={existingFieldIds}

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import type { ActaBlock, ActaFieldOption } from './types';
+import { useI18n } from '../../i18n';
 
 type Props = {
   blocks: ActaBlock[];
@@ -9,24 +10,28 @@ type Props = {
   onRemoveBlock: (index: number) => void;
 };
 
-const BLOCK_LABELS: Record<ActaBlock['type'], string> = {
-  logo: 'Logo',
-  header: 'Encabezado',
-  table: 'Tabla',
-  signature: 'Firma',
-};
+function blockLabels(t: (key: string) => string): Record<ActaBlock['type'], string> {
+  return {
+    logo: t('acta.blockLogo'),
+    header: t('acta.blockHeader'),
+    table: t('acta.blockTable'),
+    signature: t('acta.blockSignature'),
+  };
+}
 
 export function ActaCanvas({ blocks, fields, onReorder, onUpdateBlock, onRemoveBlock }: Props) {
+  const { t } = useI18n();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
   const textareaRefs = useRef<Record<number, HTMLTextAreaElement | null>>({});
+  const labels = blockLabels(t);
 
   if (blocks.length === 0) {
     return (
       <section className="acta-canvas">
         <div className="acta-canvas-empty">
-          <h3>Esta acta aun no tiene bloques</h3>
-          <p>Haz clic en un bloque de la paleta para empezar.</p>
+          <h3>{t('acta.noBlocksYet')}</h3>
+          <p>{t('acta.clickPaletteHint')}</p>
         </div>
       </section>
     );
@@ -69,7 +74,7 @@ export function ActaCanvas({ blocks, fields, onReorder, onUpdateBlock, onRemoveB
           <div className="acta-block-header">
             <span
               className="builder-drag-handle"
-              title="Arrastra para cambiar el orden"
+              title={t('acta.dragToReorder')}
               draggable
               onDragStart={(event) => {
                 event.dataTransfer.effectAllowed = 'move';
@@ -83,17 +88,17 @@ export function ActaCanvas({ blocks, fields, onReorder, onUpdateBlock, onRemoveB
             >
               ⋮⋮
             </span>
-            <strong>{BLOCK_LABELS[block.type]}</strong>
-            <button type="button" className="secondary" onClick={() => onRemoveBlock(index)}>Eliminar</button>
+            <strong>{labels[block.type]}</strong>
+            <button type="button" className="secondary" onClick={() => onRemoveBlock(index)}>{t('acta.removeBlock')}</button>
           </div>
 
           {block.type === 'logo' ? (
             <label>
-              <span>Alineacion</span>
+              <span>{t('acta.alignmentLabel')}</span>
               <select value={block.alignment} onChange={(event) => onUpdateBlock(index, { ...block, alignment: event.target.value as 'left' | 'center' | 'right' })}>
-                <option value="left">Izquierda</option>
-                <option value="center">Centro</option>
-                <option value="right">Derecha</option>
+                <option value="left">{t('acta.alignLeft')}</option>
+                <option value="center">{t('acta.alignCenter')}</option>
+                <option value="right">{t('acta.alignRight')}</option>
               </select>
             </label>
           ) : null}
@@ -101,7 +106,7 @@ export function ActaCanvas({ blocks, fields, onReorder, onUpdateBlock, onRemoveB
           {block.type === 'header' ? (
             <div className="acta-header-config">
               <label>
-                <span>Texto (puede usar {'{{campo}}'})</span>
+                <span>{t('acta.headerTextLabel')}</span>
                 <textarea
                   ref={(element) => { textareaRefs.current[index] = element; }}
                   value={block.text}
@@ -109,16 +114,16 @@ export function ActaCanvas({ blocks, fields, onReorder, onUpdateBlock, onRemoveB
                 />
               </label>
               <label>
-                <span>Tamaño</span>
+                <span>{t('acta.sizeLabel')}</span>
                 <select value={block.level} onChange={(event) => onUpdateBlock(index, { ...block, level: Number(event.target.value) as 1 | 2 | 3 })}>
-                  <option value={1}>Titulo</option>
-                  <option value={2}>Subtitulo</option>
-                  <option value={3}>Texto destacado</option>
+                  <option value={1}>{t('acta.sizeTitle')}</option>
+                  <option value={2}>{t('acta.sizeSubtitle')}</option>
+                  <option value={3}>{t('acta.sizeHighlight')}</option>
                 </select>
               </label>
               {fields.length > 0 ? (
                 <div className="acta-token-helper">
-                  <span>Insertar campo:</span>
+                  <span>{t('acta.insertField')}</span>
                   {fields.map((field) => (
                     <button key={field.name} type="button" className="secondary" onClick={() => insertTokenAtCursor(index, field.name)}>
                       {field.label}
@@ -131,7 +136,7 @@ export function ActaCanvas({ blocks, fields, onReorder, onUpdateBlock, onRemoveB
 
           {block.type === 'table' ? (
             <div className="acta-table-config">
-              {fields.length === 0 ? <p>Este formulario aun no tiene campos.</p> : null}
+              {fields.length === 0 ? <p>{t('acta.noFieldsYet')}</p> : null}
               {fields.map((field) => {
                 const checked = block.field_names.includes(field.name);
                 return (
@@ -155,7 +160,7 @@ export function ActaCanvas({ blocks, fields, onReorder, onUpdateBlock, onRemoveB
 
           {block.type === 'signature' ? (
             <label>
-              <span>Etiqueta (ej. "Firma del coordinador")</span>
+              <span>{t('acta.signatureLabelHint')}</span>
               <input value={block.label} onChange={(event) => onUpdateBlock(index, { ...block, label: event.target.value })} />
             </label>
           ) : null}

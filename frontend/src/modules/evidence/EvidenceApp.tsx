@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
+import { useI18n } from '../../i18n';
 import { PROJECT_KEY } from '../auth/session';
 import { fetchProjectParticipants } from '../participants/api';
 import type { Participant } from '../participants/api';
@@ -9,19 +10,21 @@ import type { TemplateSummary } from '../records/api';
 import { downloadEvidenceAsset, downloadEvidenceBatch, fetchProjectEvidence, fetchProjectUploaders } from './api';
 import type { EvidenceAsset, EvidenceFilters, EvidenceUploader } from './types';
 
-const STATUS_LABELS: Record<string, string> = {
-  draft: 'Borrador', submitted: 'Enviado', under_review: 'En revisión',
-  tech_approved: 'Aprobado técnico', coordinator_approved: 'Aprobado coordinación',
-  returned: 'Devuelto', corrected: 'Corregido', approved: 'Aprobado',
-  rejected: 'Rechazado', cancelled: 'Cancelado', archived: 'Archivado',
+const STATUS_KEYS: Record<string, string> = {
+  draft: 'evidence.statusDraft', submitted: 'evidence.statusSubmitted', under_review: 'evidence.statusUnderReview',
+  tech_approved: 'evidence.statusTechApproved', coordinator_approved: 'evidence.statusCoordinatorApproved',
+  returned: 'evidence.statusReturned', corrected: 'evidence.statusCorrected', approved: 'evidence.statusApproved',
+  rejected: 'evidence.statusRejected', cancelled: 'evidence.statusCancelled', archived: 'evidence.statusArchived',
 };
 
-const ASSET_TYPE_LABELS: Record<string, string> = {
-  FILE: 'Archivo', PDF: 'PDF', MULTIFILE: 'Múltiples archivos', IMAGE: 'Imagen', FINGERPRINT: 'Huella dactilar',
-  AUDIO: 'Audio', VIDEO: 'Video', SIGNATURE: 'Firma',
+const ASSET_TYPE_KEYS: Record<string, string> = {
+  FILE: 'evidence.assetTypeFile', PDF: 'evidence.assetTypePdf', MULTIFILE: 'evidence.assetTypeMultifile',
+  IMAGE: 'evidence.assetTypeImage', FINGERPRINT: 'evidence.assetTypeFingerprint',
+  AUDIO: 'evidence.assetTypeAudio', VIDEO: 'evidence.assetTypeVideo', SIGNATURE: 'evidence.assetTypeSignature',
 };
 
 export function EvidenceApp() {
+  const { t } = useI18n();
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [assets, setAssets] = useState<EvidenceAsset[]>([]);
   const [participants, setParticipants] = useState<Participant[]>([]);
@@ -29,7 +32,7 @@ export function EvidenceApp() {
   const [uploaders, setUploaders] = useState<EvidenceUploader[]>([]);
   const [filters, setFilters] = useState<EvidenceFilters>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [message, setMessage] = useState('Cargando evidencias...');
+  const [message, setMessage] = useState(t('evidence.loading'));
   const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
@@ -41,16 +44,16 @@ export function EvidenceApp() {
 
   useEffect(() => {
     if (!projectId) return;
-    setMessage('Cargando evidencias...');
+    setMessage(t('evidence.loading'));
     fetchProjectEvidence(projectId, filters)
       .then((rows) => {
         setAssets(rows);
         setSelected(new Set());
-        setMessage(rows.length ? '' : 'No hay evidencias que coincidan con los filtros.');
+        setMessage(rows.length ? '' : t('evidence.noResults'));
       })
       .catch((error: Error) => setMessage(error.message));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [projectId, filters.participantId, filters.templateId, filters.status, filters.createdBy, filters.dateFrom, filters.dateTo]);
+  }, [projectId, filters.participantId, filters.templateId, filters.status, filters.createdBy, filters.dateFrom, filters.dateTo, t]);
 
   const participantNames = new Map(participants.map((participant) => [participant.id, participant.full_name]));
   const uploaderNames = new Map(uploaders.map((uploader) => [uploader.id, uploader.full_name]));
@@ -84,49 +87,49 @@ export function EvidenceApp() {
   }
 
   return (
-    <AppShell title="Evidencias">
+    <AppShell title={t('evidence.title')}>
       <main className="evidence-shell">
         <header className="evidence-header">
           <div>
-            <h2>Evidencias</h2>
-            <p>Filtra y descarga en lote las evidencias capturadas en el proyecto, con renombrado automático.</p>
+            <h2>{t('evidence.title')}</h2>
+            <p>{t('evidence.subtitle')}</p>
           </div>
           <button type="button" onClick={handleDownloadBatch} disabled={downloading || assets.length === 0}>
-            {downloading ? 'Generando ZIP...' : selected.size ? `Descargar ZIP (${selected.size} seleccionadas)` : 'Descargar ZIP (filtro actual)'}
+            {downloading ? t('evidence.generatingZip') : selected.size ? t('evidence.downloadZipSelected', { count: selected.size }) : t('evidence.downloadZipFilter')}
           </button>
         </header>
 
         <div className="evidence-filters">
           <select value={filters.participantId ?? ''} onChange={(event) => updateFilter({ participantId: event.target.value || undefined })}>
-            <option value="">Todos los participantes</option>
+            <option value="">{t('evidence.allParticipants')}</option>
             {participants.map((participant) => (
               <option key={participant.id} value={participant.id}>{participant.full_name}</option>
             ))}
           </select>
           <select value={filters.templateId ?? ''} onChange={(event) => updateFilter({ templateId: event.target.value || undefined })}>
-            <option value="">Todos los formularios</option>
+            <option value="">{t('evidence.allForms')}</option>
             {templates.map((template) => (
               <option key={template.id} value={template.id}>{template.name}</option>
             ))}
           </select>
           <select value={filters.status ?? ''} onChange={(event) => updateFilter({ status: event.target.value || undefined })}>
-            <option value="">Todos los estados</option>
-            {Object.entries(STATUS_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
+            <option value="">{t('evidence.allStatuses')}</option>
+            {Object.entries(STATUS_KEYS).map(([value, key]) => (
+              <option key={value} value={value}>{t(key)}</option>
             ))}
           </select>
           <select value={filters.createdBy ?? ''} onChange={(event) => updateFilter({ createdBy: event.target.value || undefined })}>
-            <option value="">Todos los gestores</option>
+            <option value="">{t('evidence.allManagers')}</option>
             {uploaders.map((uploader) => (
               <option key={uploader.id} value={uploader.id}>{uploader.full_name}</option>
             ))}
           </select>
           <label>
-            Desde
+            {t('evidence.dateFrom')}
             <input type="date" value={filters.dateFrom ?? ''} onChange={(event) => updateFilter({ dateFrom: event.target.value || undefined })} />
           </label>
           <label>
-            Hasta
+            {t('evidence.dateTo')}
             <input type="date" value={filters.dateTo ?? ''} onChange={(event) => updateFilter({ dateTo: event.target.value || undefined })} />
           </label>
         </div>
@@ -137,25 +140,25 @@ export function EvidenceApp() {
           <table className="records-table">
             <thead>
               <tr>
-                <th><input type="checkbox" aria-label="Seleccionar todas las evidencias listadas" checked={assets.length > 0 && selected.size === assets.length} onChange={toggleSelectAll} /></th>
-                <th>Archivo</th>
-                <th>Tipo</th>
-                <th>Participante</th>
-                <th>Gestor</th>
-                <th>Fecha</th>
-                <th>Detalle</th>
+                <th><input type="checkbox" aria-label={t('evidence.selectAllAriaLabel')} checked={assets.length > 0 && selected.size === assets.length} onChange={toggleSelectAll} /></th>
+                <th>{t('evidence.columnFile')}</th>
+                <th>{t('evidence.columnType')}</th>
+                <th>{t('evidence.columnParticipant')}</th>
+                <th>{t('evidence.columnManager')}</th>
+                <th>{t('evidence.columnDate')}</th>
+                <th>{t('evidence.columnDetail')}</th>
               </tr>
             </thead>
             <tbody>
               {assets.map((asset) => (
                 <tr key={asset.id}>
-                  <td><input type="checkbox" aria-label={`Seleccionar evidencia ${asset.original_name}`} checked={selected.has(asset.id)} onChange={() => toggleSelection(asset.id)} /></td>
+                  <td><input type="checkbox" aria-label={t('evidence.selectItemAriaLabel', { name: asset.original_name })} checked={selected.has(asset.id)} onChange={() => toggleSelection(asset.id)} /></td>
                   <td>{asset.original_name}</td>
-                  <td>{ASSET_TYPE_LABELS[asset.asset_type] ?? asset.asset_type}</td>
+                  <td>{ASSET_TYPE_KEYS[asset.asset_type] ? t(ASSET_TYPE_KEYS[asset.asset_type]) : asset.asset_type}</td>
                   <td>{asset.participant_id ? participantNames.get(asset.participant_id) ?? '—' : '—'}</td>
                   <td>{asset.created_by ? uploaderNames.get(asset.created_by) ?? '—' : '—'}</td>
                   <td>{new Date(asset.created_at).toLocaleDateString()}</td>
-                  <td><button type="button" onClick={() => downloadEvidenceAsset(asset.id, asset.original_name)}>Descargar</button></td>
+                  <td><button type="button" onClick={() => downloadEvidenceAsset(asset.id, asset.original_name)}>{t('evidence.download')}</button></td>
                 </tr>
               ))}
             </tbody>

@@ -8,12 +8,14 @@ import { ActaPalette } from './ActaPalette';
 import { createActaLayoutTemplate, fetchActaTemplates, fetchTemplateFields, renderActaFromRecord, updateActaLayoutTemplate } from './api';
 import type { ActaBlock, ActaFieldOption } from './types';
 import { reorderBlocks } from './blockOrder';
+import { useI18n } from '../../i18n';
 
 type Props = { mode: 'create' } | { mode: 'edit'; actaTemplateId: string };
 
 export function ActaBuilderApp(props: Props) {
+  const { t } = useI18n();
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
-  const [name, setName] = useState('Nueva acta');
+  const [name, setName] = useState(t('acta.newActa'));
   const [formTemplateId, setFormTemplateId] = useState('');
   const [projectTemplates, setProjectTemplates] = useState<TemplateSummary[]>([]);
   const [fields, setFields] = useState<ActaFieldOption[]>([]);
@@ -38,7 +40,7 @@ export function ActaBuilderApp(props: Props) {
       .then((templates) => {
         const existing = templates.find((template) => template.id === props.actaTemplateId);
         if (!existing) {
-          setMessage('Plantilla de acta no encontrada.');
+          setMessage(t('acta.templateNotFound'));
           return;
         }
         if (!existing.layout_json || !existing.template_id) {
@@ -81,22 +83,22 @@ export function ActaBuilderApp(props: Props) {
 
   async function saveTemplate() {
     if (!projectId || !formTemplateId) {
-      setMessage('Selecciona un formulario para esta acta.');
+      setMessage(t('acta.selectFormForActa'));
       return;
     }
     if (blocks.length === 0) {
-      setMessage('Agrega al menos un bloque antes de guardar.');
+      setMessage(t('acta.addBlockFirst'));
       return;
     }
     setSaving(true);
-    setMessage('Guardando plantilla...');
+    setMessage(t('acta.savingTemplateMsg'));
     try {
-      const payload = { project_id: projectId, name: name.trim() || 'Nueva acta', template_id: formTemplateId, layout: { blocks } };
+      const payload = { project_id: projectId, name: name.trim() || t('acta.newActa'), template_id: formTemplateId, layout: { blocks } };
       const saved = actaTemplateId ? await updateActaLayoutTemplate(actaTemplateId, payload) : await createActaLayoutTemplate(payload);
       setActaTemplateId(saved.id);
-      setMessage('Plantilla guardada.');
+      setMessage(t('acta.templateSaved'));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible guardar la plantilla.');
+      setMessage(error instanceof Error ? error.message : t('acta.templateSaveFailed'));
     } finally {
       setSaving(false);
     }
@@ -104,11 +106,11 @@ export function ActaBuilderApp(props: Props) {
 
   async function generatePreview() {
     if (!actaTemplateId) {
-      setMessage('Guarda la plantilla antes de generar un PDF de prueba.');
+      setMessage(t('acta.saveBeforeGenerate'));
       return;
     }
     if (!previewRecordId) {
-      setMessage('Selecciona un registro para generar el PDF.');
+      setMessage(t('acta.selectRecordForPdf'));
       return;
     }
     setGenerating(true);
@@ -116,7 +118,7 @@ export function ActaBuilderApp(props: Props) {
     try {
       await renderActaFromRecord(actaTemplateId, previewRecordId, name.trim() || 'acta');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible generar el PDF.');
+      setMessage(error instanceof Error ? error.message : t('acta.pdfGenerateFailed'));
     } finally {
       setGenerating(false);
     }
@@ -124,27 +126,27 @@ export function ActaBuilderApp(props: Props) {
 
   if (legacyBlocked) {
     return (
-      <AppShell title="Actas">
+      <AppShell title={t('acta.title')}>
         <main className="acta-shell">
-          <p role="status">Esta plantilla usa el camino legado (HTML crudo) y no se puede editar con el constructor visual.</p>
-          <a href="/acta">Volver a la lista de plantillas</a>
+          <p role="status">{t('acta.legacyBlocked')}</p>
+          <a href="/acta">{t('acta.backToList')}</a>
         </main>
       </AppShell>
     );
   }
 
   return (
-    <AppShell title="Actas">
+    <AppShell title={t('acta.title')}>
       <main className="acta-shell acta-builder-shell">
         <header className="acta-builder-header">
           <label>
-            <span>Nombre de la plantilla</span>
+            <span>{t('acta.templateName')}</span>
             <input value={name} onChange={(event) => setName(event.target.value)} />
           </label>
           <label>
-            <span>Formulario para el que se genera</span>
+            <span>{t('acta.formTarget')}</span>
             <select value={formTemplateId} onChange={(event) => setFormTemplateId(event.target.value)} disabled={Boolean(actaTemplateId)}>
-              <option value="">Selecciona un formulario</option>
+              <option value="">{t('acta.selectForm')}</option>
               {projectTemplates.map((template) => (
                 <option key={template.id} value={template.id}>{template.name}</option>
               ))}
@@ -152,7 +154,7 @@ export function ActaBuilderApp(props: Props) {
           </label>
           <div className="acta-builder-actions">
             <button type="button" className="primary" onClick={() => void saveTemplate()} disabled={saving}>
-              {saving ? 'Guardando...' : 'Guardar plantilla'}
+              {saving ? t('acta.savingTemplate') : t('acta.saveTemplate')}
             </button>
           </div>
         </header>
@@ -164,17 +166,17 @@ export function ActaBuilderApp(props: Props) {
         </div>
 
         <section className="acta-preview-panel">
-          <h3>Generar PDF de prueba</h3>
-          <p>Sirve de vista previa real y, a la vez, es el mismo flujo de producción disponible desde Registros.</p>
+          <h3>{t('acta.generateTestPdf')}</h3>
+          <p>{t('acta.testPdfDescription')}</p>
           <div className="acta-preview-controls">
             <select value={previewRecordId} onChange={(event) => setPreviewRecordId(event.target.value)} disabled={previewRecords.length === 0}>
-              <option value="">Selecciona un registro</option>
+              <option value="">{t('acta.selectRecord')}</option>
               {previewRecords.map((record) => (
                 <option key={record.id} value={record.id}>{new Date(record.created_at).toLocaleString()} · {record.id.slice(0, 8)}</option>
               ))}
             </select>
             <button type="button" onClick={() => void generatePreview()} disabled={generating}>
-              {generating ? 'Generando...' : 'Generar PDF de prueba'}
+              {generating ? t('acta.generating') : t('acta.generateTestPdfButton')}
             </button>
           </div>
         </section>

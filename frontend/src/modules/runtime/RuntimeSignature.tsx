@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { uploadRuntimeFile } from './api';
 import { pointerToCanvasPoint } from './signatureEngine';
 import type { RuntimeFileValue } from './types';
+import { useI18n } from '../../i18n';
 
 type Props = {
   id: string;
@@ -14,17 +15,18 @@ type Props = {
   onChange: (value: RuntimeFileValue) => void;
 };
 
-function canvasBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+function canvasBlob(canvas: HTMLCanvasElement, t: (key: string) => string): Promise<Blob> {
   return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('No fue posible generar la firma.')), 'image/png');
+    canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error(t('runtime.signatureGenerateFailed'))), 'image/png');
   });
 }
 
 export function RuntimeSignature({ id, name, label, projectId, required, value, onChange }: Props) {
+  const { t } = useI18n();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawingRef = useRef(false);
   const [hasInk, setHasInk] = useState(false);
-  const [status, setStatus] = useState(value ? 'Firma cargada.' : '');
+  const [status, setStatus] = useState(value ? t('runtime.signatureLoaded') : '');
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -77,21 +79,21 @@ export function RuntimeSignature({ id, name, label, projectId, required, value, 
     const canvas = canvasRef.current;
     canvas?.getContext('2d')?.clearRect(0, 0, canvas.width, canvas.height);
     setHasInk(false);
-    setStatus('Lienzo limpio.');
+    setStatus(t('runtime.canvasCleared'));
   }
 
   async function confirm() {
     const canvas = canvasRef.current;
     if (!canvas || !hasInk || !projectId) return;
-    setStatus('Guardando firma...');
+    setStatus(t('runtime.savingSignature'));
     try {
-      const blob = await canvasBlob(canvas);
+      const blob = await canvasBlob(canvas, t);
       const file = new File([blob], `firma-${name}.png`, { type: 'image/png' });
       const uploaded = await uploadRuntimeFile(projectId, 'SIGNATURE', file);
       onChange(uploaded);
-      setStatus('Firma cargada correctamente.');
+      setStatus(t('runtime.signatureUploadSuccess'));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'No fue posible cargar la firma.');
+      setStatus(error instanceof Error ? error.message : t('runtime.signatureUploadFailed'));
     }
   }
 
@@ -108,12 +110,11 @@ export function RuntimeSignature({ id, name, label, projectId, required, value, 
         onPointerCancel={stopDrawing}
       />
       <div className="runtime-signature-actions">
-        <button type="button" onClick={clear}>Limpiar</button>
-        <button type="button" disabled={!hasInk} onClick={() => void confirm()}>Confirmar firma</button>
+        <button type="button" onClick={clear}>{t('runtime.clearCanvas')}</button>
+        <button type="button" disabled={!hasInk} onClick={() => void confirm()}>{t('runtime.confirmSignature')}</button>
       </div>
       {value ? <small>{value.name} ({value.size_bytes} bytes)</small> : null}
       {status ? <small role="status">{status}</small> : null}
     </fieldset>
   );
 }
-

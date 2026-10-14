@@ -2,6 +2,7 @@ import { useState } from 'react';
 
 import { beginDeviceVerification, finishDeviceVerification } from './api';
 import type { RuntimeDeviceVerificationValue } from './types';
+import { useI18n } from '../../i18n';
 
 type Props = {
   id: string;
@@ -27,7 +28,7 @@ function encodeBase64Url(value: ArrayBuffer): string {
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-function serializeCredential(credential: PublicKeyCredential): Record<string, unknown> {
+function serializeCredential(credential: PublicKeyCredential, t: (key: string) => string): Record<string, unknown> {
   const response = credential.response;
   const common = {
     id: credential.id,
@@ -51,24 +52,25 @@ function serializeCredential(credential: PublicKeyCredential): Record<string, un
       userHandle: response.userHandle ? encodeBase64Url(response.userHandle) : null,
     } };
   }
-  throw new Error('El dispositivo devolvió una respuesta no reconocida.');
+  throw new Error(t('runtime.deviceResponseUnrecognized'));
 }
 
 export function RuntimeDeviceVerification({ id, componentId, templateId, label, required, value, onChange }: Props) {
+  const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState('');
 
   async function verify(registerThisDevice = false) {
     if (!window.isSecureContext || !window.PublicKeyCredential || !navigator.credentials) {
-      setStatus('La verificación del dispositivo requiere un móvil compatible y una conexión HTTPS.');
+      setStatus(t('runtime.deviceRequiresHttps'));
       return;
     }
     if (!navigator.onLine) {
-      setStatus('Conéctate a internet para verificar el dispositivo antes de enviar el formulario.');
+      setStatus(t('runtime.deviceRequiresOnline'));
       return;
     }
     setBusy(true);
-    setStatus('Esperando confirmación del dispositivo...');
+    setStatus(t('runtime.waitingDeviceConfirmation'));
     try {
       const options = await beginDeviceVerification(templateId, componentId, registerThisDevice);
       const raw = options.public_key as Record<string, any>;
@@ -87,12 +89,12 @@ export function RuntimeDeviceVerification({ id, componentId, templateId, label, 
           allowCredentials: (raw.allowCredentials ?? []).map((item: Record<string, string>) => ({ ...item, id: decodeBase64Url(item.id) })),
         } as PublicKeyCredentialRequestOptions });
       }
-      if (!(credential instanceof PublicKeyCredential)) throw new Error('El dispositivo canceló la verificación.');
-      const proof = await finishDeviceVerification(options.verification_id, serializeCredential(credential));
+      if (!(credential instanceof PublicKeyCredential)) throw new Error(t('runtime.deviceCancelled'));
+      const proof = await finishDeviceVerification(options.verification_id, serializeCredential(credential, t));
       onChange(proof);
-      setStatus('Identidad del usuario confirmada en este dispositivo. Guarda el formulario ahora.');
+      setStatus(t('runtime.deviceIdentityConfirmed'));
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : 'No fue posible verificar el dispositivo.');
+      setStatus(error instanceof Error ? error.message : t('runtime.deviceVerificationFailed'));
     } finally {
       setBusy(false);
     }
@@ -101,10 +103,10 @@ export function RuntimeDeviceVerification({ id, componentId, templateId, label, 
   return (
     <fieldset className="runtime-field-group" id={id}>
       <legend>{label}{required ? ' *' : ''}</legend>
-      <p>Confirma tu identidad con la seguridad del móvil. Según el equipo, puede usar huella, rostro o PIN. No se guarda la imagen de tu huella ni se verifica la identidad del participante.</p>
-      <button type="button" disabled={busy} onClick={() => void verify()}>{busy ? 'Verificando...' : value ? 'Verificar de nuevo' : 'Verificar en este móvil'}</button>
-      <button type="button" disabled={busy} onClick={() => void verify(true)}>Registrar este móvil</button>
-      {value ? <small>Verificación confirmada. Vuelve a verificar si vence antes de enviar.</small> : null}
+      <p>{t('runtime.deviceDescription')}</p>
+      <button type="button" disabled={busy} onClick={() => void verify()}>{busy ? t('runtime.verifying') : value ? t('runtime.verifyAgain') : t('runtime.verifyOnMobile')}</button>
+      <button type="button" disabled={busy} onClick={() => void verify(true)}>{t('runtime.registerMobile')}</button>
+      {value ? <small>{t('runtime.verificationConfirmedHint')}</small> : null}
       {status ? <small role="status">{status}</small> : null}
     </fieldset>
   );

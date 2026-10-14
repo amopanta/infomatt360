@@ -1,16 +1,19 @@
+import { useI18n } from '../../i18n';
 import { barChartGeometry, pieChartGeometry } from './chartGeometry';
 import type { ChartPoint } from './types';
 
 export function ReportChart({ kind, points }: { kind: 'bar' | 'pie'; points: ChartPoint[] }) {
+  const { t } = useI18n();
+
   if (points.length === 0) {
-    return <p className="reports-chart-empty">Sin datos para graficar.</p>;
+    return <p className="reports-chart-empty">{t('reports.chart.noData')}</p>;
   }
 
   if (kind === 'pie') {
     const slices = pieChartGeometry(points, { cx: 120, cy: 120, r: 100 });
     return (
       <div className="reports-chart">
-        <svg viewBox="0 0 240 240" role="img" aria-label="Grafico de torta">
+        <svg viewBox="0 0 240 240" role="img" aria-label={t('reports.chart.pieAria')}>
           {slices.map((slice) => <path key={slice.label} d={slice.path} fill={slice.color} />)}
         </svg>
         <ul className="reports-chart-legend">
@@ -25,7 +28,7 @@ export function ReportChart({ kind, points }: { kind: 'bar' | 'pie'; points: Cha
   const bars = barChartGeometry(points, { width: 480, height: 240, padding: 24 });
   return (
     <div className="reports-chart">
-      <svg viewBox="0 0 480 240" role="img" aria-label="Grafico de barras">
+      <svg viewBox="0 0 480 240" role="img" aria-label={t('reports.chart.barAria')}>
         {bars.map((bar) => (
           <g key={bar.label}>
             <rect x={bar.x} y={bar.y} width={bar.width} height={bar.height} fill={bar.color} />

@@ -6,78 +6,75 @@ import { logout } from '../modules/auth/api';
 import { navigateTo } from '../routeConfig';
 import { useEffect, useState } from 'react';
 import { fetchMyProjectAssignmentCounts } from '../modules/builder/myFormsApi';
+import { useI18n, LanguageSelector } from '../i18n';
 
 type MenuItem = {
-  label: string;
+  labelKey: string;
   href: string;
   icon: string;
   permissions?: string[];
-  /** Marca el item que despliega el submenu de Formularios. */
   formsSubmenu?: boolean;
 };
 
 type MenuGroup = {
-  label: string;
+  labelKey: string;
   icon: string;
   items: MenuItem[];
 };
 
-// Navegacion agrupada. El orden y los permisos se conservan del menu plano
-// anterior; el filtrado por permiso sigue vivo (un grupo se oculta si no le
-// queda ningun item visible). Reagrupar es solo presentacion: mismos href.
 const MENU: MenuGroup[] = [
   {
-    label: 'Operación',
+    labelKey: 'nav.operation',
     icon: 'gOper',
     items: [
-      { label: 'Panel', href: '/', icon: 'dash' },
-      { label: 'Mis formularios', href: '/my-forms', icon: 'form', permissions: ['records.write'] },
-      { label: 'Formularios', href: '/builder', icon: 'form', permissions: ['builder.write'], formsSubmenu: true },
-      { label: 'Actas', href: '/acta', icon: 'acta', permissions: ['builder.write'] },
-      { label: 'Participantes', href: '/participants', icon: 'users' },
-      { label: 'Equipos de gestores', href: '/teams', icon: 'users', permissions: ['identity.users.manage'] },
-      { label: 'Registros', href: '/records', icon: 'records' },
-      { label: 'Evidencias', href: '/evidence', icon: 'photo' },
-      { label: 'Mapas', href: '/maps', icon: 'map' },
+      { labelKey: 'nav.dashboard', href: '/', icon: 'dash' },
+      { labelKey: 'nav.myForms', href: '/my-forms', icon: 'form', permissions: ['records.write'] },
+      { labelKey: 'nav.forms', href: '/builder', icon: 'form', permissions: ['builder.write'], formsSubmenu: true },
+      { labelKey: 'nav.actas', href: '/acta', icon: 'acta', permissions: ['builder.write'] },
+      { labelKey: 'nav.participants', href: '/participants', icon: 'users' },
+      { labelKey: 'nav.teams', href: '/teams', icon: 'users', permissions: ['identity.users.manage'] },
+      { labelKey: 'nav.records', href: '/records', icon: 'records' },
+      { labelKey: 'nav.evidence', href: '/evidence', icon: 'photo' },
+      { labelKey: 'nav.maps', href: '/maps', icon: 'map' },
     ],
   },
   {
-    label: 'Revisión',
+    labelKey: 'nav.review',
     icon: 'gRev',
     items: [
-      { label: 'Flujos de aprobación', href: '/admin/approval-flows', icon: 'check', permissions: ['records.approve'] },
-      { label: 'Mensajes', href: '/messages', icon: 'msg' },
-      { label: 'Auditoría', href: '/audit', icon: 'shield' },
-      { label: 'Auditoría IA', href: '/admin/ai-audit', icon: 'aiaudit', permissions: ['ai.audit.manage'] },
-      { label: 'Reportes', href: '/reports', icon: 'report' },
-      { label: 'Métricas', href: '/admin/metrics', icon: 'metric', permissions: ['identity.users.manage', 'integrations.api_keys.manage', 'records.approve', 'records.write'] },
+      { labelKey: 'nav.approvalFlows', href: '/admin/approval-flows', icon: 'check', permissions: ['records.approve'] },
+      { labelKey: 'nav.messages', href: '/messages', icon: 'msg' },
+      { labelKey: 'nav.audit', href: '/audit', icon: 'shield' },
+      { labelKey: 'nav.aiAudit', href: '/admin/ai-audit', icon: 'aiaudit', permissions: ['ai.audit.manage'] },
+      { labelKey: 'nav.reports', href: '/reports', icon: 'report' },
+      { labelKey: 'nav.metrics', href: '/admin/metrics', icon: 'metric', permissions: ['identity.users.manage', 'integrations.api_keys.manage', 'records.approve', 'records.write'] },
     ],
   },
   {
-    label: 'Datos e integraciones',
+    labelKey: 'nav.dataIntegrations',
     icon: 'gData',
     items: [
-      { label: 'Carga masiva Excel', href: '/admin/excel-import', icon: 'data', permissions: ['identity.users.manage'] },
-      { label: 'Importar/Exportar XLSForm', href: '/admin/xlsform', icon: 'exchange', permissions: ['builder.write'] },
-      { label: 'Donantes', href: '/admin/donor-sync', icon: 'plug', permissions: ['integrations.donor_sync.manage'] },
-      { label: 'API keys', href: '/admin/api-keys', icon: 'key', permissions: ['integrations.api_keys.manage'] },
-      { label: 'Sincronización', href: '/admin/bulk-jobs', icon: 'sync', permissions: ['integrations.api_keys.manage', 'records.write'] },
-      { label: 'Almacenamiento', href: '/admin/storage', icon: 'box', permissions: ['storage.manage'] },
-      { label: 'ERP', href: '/admin/erp', icon: 'erp', permissions: ['erp.manage'] },
-      { label: 'Formularios abiertos', href: '/admin/public-links', icon: 'link', permissions: ['builder.write'] },
+      { labelKey: 'nav.excelImport', href: '/admin/excel-import', icon: 'data', permissions: ['identity.users.manage'] },
+      { labelKey: 'nav.xlsformImport', href: '/admin/xlsform', icon: 'exchange', permissions: ['builder.write'] },
+      { labelKey: 'nav.donors', href: '/admin/donor-sync', icon: 'plug', permissions: ['integrations.donor_sync.manage'] },
+      { labelKey: 'nav.apiKeys', href: '/admin/api-keys', icon: 'key', permissions: ['integrations.api_keys.manage'] },
+      { labelKey: 'nav.sync', href: '/admin/bulk-jobs', icon: 'sync', permissions: ['integrations.api_keys.manage', 'records.write'] },
+      { labelKey: 'nav.storage', href: '/admin/storage', icon: 'box', permissions: ['storage.manage'] },
+      { labelKey: 'nav.erp', href: '/admin/erp', icon: 'erp', permissions: ['erp.manage'] },
+      { labelKey: 'nav.publicForms', href: '/admin/public-links', icon: 'link', permissions: ['builder.write'] },
     ],
   },
   {
-    label: 'Administración',
+    labelKey: 'nav.administration',
     icon: 'gAdmin',
     items: [
-      { label: 'Usuarios', href: '/admin/users', icon: 'users', permissions: ['identity.users.manage'] },
-      { label: 'Gobernanza', href: '/admin/governance', icon: 'gov', permissions: ['organizations.tenant_clean', 'identity.users.manage', 'support.tickets.manage'] },
-      { label: 'Marca', href: '/admin/branding', icon: 'brand', permissions: ['organizations.branding.manage', 'organizations.manage'] },
-      { label: 'Correo', href: '/admin/mail-profiles', icon: 'mail', permissions: ['messages.write'] },
-      { label: 'WhatsApp', href: '/admin/whatsapp', icon: 'msg', permissions: ['messages.read', 'records.review', 'records.approve'] },
-      { label: 'Backups', href: '/admin/backups', icon: 'backup', permissions: ['backups.manage'] },
-      { label: 'Mi seguridad', href: '/account/security', icon: 'lock' },
+      { labelKey: 'nav.users', href: '/admin/users', icon: 'users', permissions: ['identity.users.manage'] },
+      { labelKey: 'nav.governance', href: '/admin/governance', icon: 'gov', permissions: ['organizations.tenant_clean', 'identity.users.manage', 'support.tickets.manage'] },
+      { labelKey: 'nav.branding', href: '/admin/branding', icon: 'brand', permissions: ['organizations.branding.manage', 'organizations.manage'] },
+      { labelKey: 'nav.mail', href: '/admin/mail-profiles', icon: 'mail', permissions: ['messages.write'] },
+      { labelKey: 'nav.whatsapp', href: '/admin/whatsapp', icon: 'msg', permissions: ['messages.read', 'records.review', 'records.approve'] },
+      { labelKey: 'nav.backups', href: '/admin/backups', icon: 'backup', permissions: ['backups.manage'] },
+      { labelKey: 'nav.mySecurity', href: '/account/security', icon: 'lock' },
     ],
   },
 ];
@@ -88,6 +85,7 @@ type Props = {
 };
 
 export function AppShell({ title, children }: Props) {
+  const { t } = useI18n();
   const projects = currentSessionProjects();
   const selectedProjectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const permissions = currentProjectPermissions();
@@ -119,30 +117,30 @@ export function AppShell({ title, children }: Props) {
     }
   }
 
-  // Solo grupos con al menos un item visible por permiso.
   const visibleGroups = MENU
     .map((group) => ({ ...group, items: group.items.filter(canSee) }))
     .filter((group) => group.items.length > 0);
 
   function renderItem(item: MenuItem) {
+    const label = t(item.labelKey);
     if (item.formsSubmenu) {
       return (
-        <details key={item.label} className="app-nav-group" open={currentPath.startsWith('/builder')}>
-          <summary><Icon name={item.icon} /><span>Formularios</span></summary>
+        <details key={item.labelKey} className="app-nav-group" open={currentPath.startsWith('/builder')}>
+          <summary><Icon name={item.icon} /><span>{t('nav.forms')}</span></summary>
           <div className="app-nav-submenu">
-            <a href="/builder" className={currentPath === '/builder' ? 'active' : undefined}>Todos los formularios</a>
-            <a href="/builder/drafts" className={currentPath === '/builder/drafts' || currentPath === '/builder/new' ? 'active' : undefined}>En construcción</a>
-            <a href="/builder/active" className={currentPath === '/builder/active' ? 'active' : undefined}>Formularios activos</a>
-            <a href="/builder/archived" className={currentPath === '/builder/archived' ? 'active' : undefined}>Formularios archivados</a>
-            <a href="/builder/pull" className={currentPath === '/builder/pull' ? 'active' : undefined}>Grupos Pull</a>
+            <a href="/builder" className={currentPath === '/builder' ? 'active' : undefined}>{t('nav.allForms')}</a>
+            <a href="/builder/drafts" className={currentPath === '/builder/drafts' || currentPath === '/builder/new' ? 'active' : undefined}>{t('nav.inProgress')}</a>
+            <a href="/builder/active" className={currentPath === '/builder/active' ? 'active' : undefined}>{t('nav.activeForms')}</a>
+            <a href="/builder/archived" className={currentPath === '/builder/archived' ? 'active' : undefined}>{t('nav.archivedForms')}</a>
+            <a href="/builder/pull" className={currentPath === '/builder/pull' ? 'active' : undefined}>{t('nav.pullGroups')}</a>
           </div>
         </details>
       );
     }
     const active = isActiveMenuItem(item.href);
     return (
-      <a key={item.label} href={item.href} className={active ? 'active' : undefined} aria-current={active ? 'page' : undefined}>
-        <Icon name={item.icon} /><span>{item.label}</span>
+      <a key={item.labelKey} href={item.href} className={active ? 'active' : undefined} aria-current={active ? 'page' : undefined}>
+        <Icon name={item.icon} /><span>{label}</span>
       </a>
     );
   }
@@ -155,10 +153,10 @@ export function AppShell({ title, children }: Props) {
           {visibleGroups.map((group) => {
             const hasActive = group.items.some((item) => item.formsSubmenu ? currentPath.startsWith('/builder') : isActiveMenuItem(item.href));
             return (
-              <details key={group.label} className="app-nav-section" open={hasActive || group.label === 'Operación'}>
+              <details key={group.labelKey} className="app-nav-section" open={hasActive || group.labelKey === 'nav.operation'}>
                 <summary>
                   <Icon name={group.icon} className="app-nav-section-icon" />
-                  <span>{group.label}</span>
+                  <span>{t(group.labelKey)}</span>
                   <Icon name="chevron" className="app-nav-caret" />
                 </summary>
                 <div className="app-nav-section-items">
@@ -168,6 +166,7 @@ export function AppShell({ title, children }: Props) {
             );
           })}
         </nav>
+        <LanguageSelector className="app-lang-selector" />
         <small>InfoMatt360</small>
       </aside>
       <section className="app-main">
@@ -176,14 +175,14 @@ export function AppShell({ title, children }: Props) {
           <div className="app-header-actions">
             {projects.length > 1 ? (
               <label>
-                Proyecto
+                {t('auth.project')}
                 <select value={selectedProjectId} onChange={(event) => changeProject(event.target.value)}>
-                  {projects.map((project) => <option key={project.id} value={project.id}>{project.name}{projectCounts[project.id] ? ` · ${projectCounts[project.id]} asignados` : ''}</option>)}
+                  {projects.map((project) => <option key={project.id} value={project.id}>{project.name}{projectCounts[project.id] ? ` · ${projectCounts[project.id]} ${t('auth.assigned')}` : ''}</option>)}
                 </select>
               </label>
             ) : projects[0] ? <span>{projects[0].name}</span> : null}
             <OfflineSyncStatus />
-            <button className="app-logout" onClick={() => void closeSession()}>Cerrar sesión</button>
+            <button className="app-logout" onClick={() => void closeSession()}>{t('auth.logout')}</button>
           </div>
         </header>
         {children}
@@ -191,4 +190,3 @@ export function AppShell({ title, children }: Props) {
     </div>
   );
 }
-

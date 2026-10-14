@@ -3,6 +3,7 @@ import { detectDeviceProfile } from './deviceProfile';
 import { reconcileRepeatItems, repeatItemsEqual } from './repeatEngine';
 import type { RepeatItem } from './types';
 import { getVirtualWindow } from './useVirtualWindow';
+import { useI18n } from '../../i18n';
 
 type Props = {
   name: string;
@@ -13,6 +14,7 @@ type Props = {
 };
 
 export function RuntimeRepeat({ name, label, count, items, onChange }: Props) {
+  const { t } = useI18n();
   const [activeIndex, setActiveIndex] = useState(0);
   const profile = useMemo(() => detectDeviceProfile(), []);
   const reconciledItems = useMemo(
@@ -34,14 +36,14 @@ export function RuntimeRepeat({ name, label, count, items, onChange }: Props) {
   return (
     <section className="runtime-repeat">
       <header>{label}</header>
-      <small>Modo {profile.mode}. Mostrando {visibleStart}-{end} de {reconciledItems.length}</small>
+      <small>{t('runtime.repeatMode', { mode: profile.mode, start: visibleStart, end, total: reconciledItems.length })}</small>
       <div className="runtime-repeat-controls">
-        <button disabled={activeIndex === 0} onClick={() => setActiveIndex((current) => Math.max(0, current - 1))}>Anterior</button>
-        <button disabled={activeIndex >= reconciledItems.length - 1} onClick={() => setActiveIndex((current) => Math.min(reconciledItems.length - 1, current + 1))}>Siguiente</button>
+        <button disabled={activeIndex === 0} onClick={() => setActiveIndex((current) => Math.max(0, current - 1))}>{t('runtime.previousButton')}</button>
+        <button disabled={activeIndex >= reconciledItems.length - 1} onClick={() => setActiveIndex((current) => Math.min(reconciledItems.length - 1, current + 1))}>{t('runtime.nextButton')}</button>
       </div>
       {visibleItems.map((item) => (
         <article key={item.id} className="runtime-repeat-item">
-          <strong>Registro {item.index + 1}</strong>
+          <strong>{t('runtime.recordIndex', { index: item.index + 1 })}</strong>
         </article>
       ))}
     </section>

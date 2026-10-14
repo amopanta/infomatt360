@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { BuilderPreviewSection } from './types';
 import type { TemplateSummary } from '../records/api';
+import { useI18n } from '../../i18n';
 
 const optionTypes = new Set(['SELECT', 'MULTISELECT', 'DROPDOWN', 'LIKERT_5', 'LIKERT_7', 'RATING', 'RANKING']);
 const numericTypes = new Set(['NUMBER', 'INTEGER', 'DECIMAL', 'PERCENTAGE', 'CURRENCY', 'NPS', 'YEAR', 'RANGE']);
@@ -47,6 +48,7 @@ export function BuilderCanvas({
   lockTechnicalNames = false,
   disableReorder = false,
 }: Props) {
+  const { t } = useI18n();
   const [draggedField, setDraggedField] = useState<{ sectionId: string; fieldIndex: number } | null>(null);
   const [dropTarget, setDropTarget] = useState<{ sectionId: string; fieldIndex: number } | null>(null);
   const themeVars = {
@@ -60,47 +62,47 @@ export function BuilderCanvas({
     <section className="builder-canvas" style={themeVars}>
       <div className="builder-toolbar">
         <div>
-          <h2>Lienzo del formulario</h2>
-          <p>Construye por grupos: cada bloque organiza una sección de captura de InfoMatt360.</p>
+          <h2>{t('builder.canvas.canvasTitle')}</h2>
+          <p>{t('builder.canvas.canvasDescription')}</p>
         </div>
         <div className="builder-actions">
-          <button type="button" onClick={onPreview}>Vista previa</button>
-          <button type="button" className="primary" onClick={onSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar plantilla'}</button>
+          <button type="button" onClick={onPreview}>{t('builder.canvas.preview')}</button>
+          <button type="button" className="primary" onClick={onSave} disabled={saving}>{saving ? t('builder.canvas.saving') : t('builder.canvas.saveTemplate')}</button>
         </div>
       </div>
-      <div className="builder-theme-preview" aria-label="Vista previa del tema visual">
-        <span>Vista del tema elegido</span>
-        <strong style={{ color: theme.primaryColor }}>Titulo de seccion</strong>
-        <button type="button">Boton principal</button>
+      <div className="builder-theme-preview" aria-label={t('builder.canvas.themePreviewAria')}>
+        <span>{t('builder.canvas.themePreviewLabel')}</span>
+        <strong style={{ color: theme.primaryColor }}>{t('builder.canvas.sectionTitlePreview')}</strong>
+        <button type="button">{t('builder.canvas.mainButtonPreview')}</button>
       </div>
       <div className="builder-flow-legend">
-        <span>1. Grupo</span>
-        <span>2. Pregunta</span>
-        <span>3. Validacion</span>
-        <span>4. Guardar/Publicar</span>
+        <span>{t('builder.canvas.stepGroup')}</span>
+        <span>{t('builder.canvas.stepQuestion')}</span>
+        <span>{t('builder.canvas.stepValidation')}</span>
+        <span>{t('builder.canvas.stepSavePublish')}</span>
       </div>
       {sections.every((section) => section.fields.length === 0) ? (
         <div className="builder-empty">
-          <h3>Tu plantilla aun no tiene preguntas</h3>
-          <p>Haz clic en un componente de la paleta para agregar la primera pregunta.</p>
+          <h3>{t('builder.canvas.emptyTitle')}</h3>
+          <p>{t('builder.canvas.emptyDescription')}</p>
         </div>
       ) : null}
       {sections.map((section) => (
         <article key={section.id} className={`builder-section-card ${section.id === activeSectionId ? 'active' : ''}`}>
           <header>
             <label>
-              <span>Nombre del grupo / seccion</span>
+              <span>{t('builder.canvas.groupSectionLabel')}</span>
               <input value={section.title} onChange={(event) => onSectionTitleChange(section.id, event.target.value)} />
             </label>
             <div>
               <button type="button" className={section.id === activeSectionId ? 'primary' : 'secondary'} onClick={() => onActiveSectionChange(section.id)}>
-                {section.id === activeSectionId ? 'Grupo activo' : 'Agregar aqui'}
+                {section.id === activeSectionId ? t('builder.canvas.activeGroup') : t('builder.canvas.addHere')}
               </button>
-              <button type="button" className="secondary danger" disabled={sections.length <= 1 || lockedSectionIds.has(section.id)} onClick={() => onRemoveSection(section.id)}>Eliminar grupo</button>
+              <button type="button" className="secondary danger" disabled={sections.length <= 1 || lockedSectionIds.has(section.id)} onClick={() => onRemoveSection(section.id)}>{t('builder.canvas.deleteGroup')}</button>
             </div>
           </header>
           {section.fields.length === 0 ? (
-            <p className="builder-section-empty">Este grupo aun no tiene preguntas. Seleccionalo como grupo activo y haz clic en un tipo de pregunta.</p>
+            <p className="builder-section-empty">{t('builder.canvas.emptySectionHint')}</p>
           ) : null}
           <div className="builder-grid">
             {section.fields.map((field, fieldIndex) => (
@@ -123,7 +125,7 @@ export function BuilderCanvas({
                 <div className="builder-field-header">
                   <span
                     className="builder-drag-handle"
-                    title="Arrastra para cambiar el orden"
+                    title={t('builder.canvas.dragHint')}
                     draggable={!disableReorder && !lockedFieldIds.has(field.id)}
                     onDragStart={(event) => {
                       event.dataTransfer.effectAllowed = 'move';
@@ -137,111 +139,111 @@ export function BuilderCanvas({
                   >
                     ⋮⋮
                   </span>
-                  <strong>{field.label || 'Pregunta sin titulo'}</strong>
+                  <strong>{field.label || t('builder.canvas.untitledQuestion')}</strong>
                   <small>{field.type}</small>
-                  <button type="button" className="secondary" disabled={lockedFieldIds.has(field.id)} onClick={() => onRemoveField(field.id)}>Eliminar</button>
+                  <button type="button" className="secondary" disabled={lockedFieldIds.has(field.id)} onClick={() => onRemoveField(field.id)}>{t('builder.canvas.delete')}</button>
                 </div>
                 <div className="builder-field-row">
                   <label>
-                    <span>Etiqueta visible</span>
+                    <span>{t('builder.canvas.visibleLabel')}</span>
                     <input value={field.label} onChange={(event) => onFieldChange(field.id, { label: event.target.value })} />
                   </label>
                   <label>
-                    <span>Nombre tecnico</span>
+                    <span>{t('builder.canvas.technicalName')}</span>
                     <input value={field.name} disabled={lockTechnicalNames && lockedFieldIds.has(field.id)} onChange={(event) => onFieldChange(field.id, { name: event.target.value })} />
                   </label>
                   <label>
-                    <span>Ayuda / placeholder</span>
+                    <span>{t('builder.canvas.helpPlaceholder')}</span>
                     <input value={field.placeholder ?? ''} onChange={(event) => onFieldChange(field.id, { placeholder: event.target.value })} />
                   </label>
                   <label className="builder-checkbox">
                     <input type="checkbox" checked={field.required ?? false} onChange={(event) => onFieldChange(field.id, { required: event.target.checked })} />
-                    Obligatorio
+                    {t('builder.canvas.required')}
                   </label>
                 </div>
                 {optionTypes.has(field.type) ? (
                   <label className="builder-wide-control">
-                    <span>Opciones, una por linea</span>
-                    <textarea value={field.optionsText ?? ''} placeholder={'Opcion 1\nOpcion 2\nOpcion 3'} onChange={(event) => onFieldChange(field.id, { optionsText: event.target.value })} />
+                    <span>{t('builder.canvas.optionsPerLine')}</span>
+                    <textarea value={field.optionsText ?? ''} placeholder={t('builder.canvas.optionsPlaceholder')} onChange={(event) => onFieldChange(field.id, { optionsText: event.target.value })} />
                   </label>
                 ) : null}
                 {field.type === 'DOCUMENT_ID' ? (
                   <details className="builder-document-panel">
-                    <summary>Apariencia del documento</summary>
+                    <summary>{t('builder.canvas.documentAppearance')}</summary>
                     <div className="builder-field-row">
                       <label>
-                        <span>Formato permitido</span>
+                        <span>{t('builder.canvas.allowedFormat')}</span>
                         <select value={field.documentAppearance ?? 'alphanumeric'} onChange={(event) => onFieldChange(field.id, { documentAppearance: event.target.value as BuilderPreviewSection['fields'][number]['documentAppearance'] })}>
-                          <option value="numeric">Solo numeros: cedula o DNI</option>
-                          <option value="alphanumeric">Letras y numeros: extranjeria</option>
-                          <option value="passport">Pasaporte: letras, numeros y guion</option>
-                          <option value="tax_id">NIT/RUT: numeros, letras, punto y guion</option>
-                          <option value="custom">Personalizado por patron</option>
+                          <option value="numeric">{t('builder.canvas.numericOnly')}</option>
+                          <option value="alphanumeric">{t('builder.canvas.alphanumeric')}</option>
+                          <option value="passport">{t('builder.canvas.passport')}</option>
+                          <option value="tax_id">{t('builder.canvas.taxId')}</option>
+                          <option value="custom">{t('builder.canvas.customByPattern')}</option>
                         </select>
                       </label>
                       <label>
-                        <span>Patron personalizado</span>
+                        <span>{t('builder.canvas.customPatternLabel')}</span>
                         <input
                           value={field.pattern ?? ''}
                           disabled={(field.documentAppearance ?? 'alphanumeric') !== 'custom'}
-                          placeholder="Ej: ^[A-Z]{2}[0-9]{6}$"
+                          placeholder={t('builder.canvas.customPatternPlaceholder')}
                           onChange={(event) => onFieldChange(field.id, { pattern: event.target.value })}
                         />
                       </label>
                     </div>
-                    <p>Se guarda como texto controlado para conservar letras, numeros y ceros iniciales.</p>
+                    <p>{t('builder.canvas.documentHint')}</p>
                   </details>
                 ) : null}
                 {field.type === 'LINKED_SUBFORM' ? (
                   <details className="builder-linked-subform-panel">
-                    <summary>Plantilla hija enlazada</summary>
+                    <summary>{t('builder.canvas.linkedSubformTitle')}</summary>
                     <div className="builder-field-row">
                       <label>
-                        <span>Formulario hijo</span>
+                        <span>{t('builder.canvas.childForm')}</span>
                         <select value={field.childTemplateId ?? ''} onChange={(event) => onFieldChange(field.id, { childTemplateId: event.target.value })}>
-                          <option value="">Selecciona una plantilla existente</option>
+                          <option value="">{t('builder.canvas.selectExistingTemplate')}</option>
                           {projectTemplates.map((template) => <option key={template.id} value={template.id}>{template.name} ({template.status})</option>)}
                         </select>
                       </label>
                     </div>
-                    <p>Cada fila que se agregue en Runtime se guarda como un registro propio de esa plantilla, enlazado a este registro (no como un grupo embebido, a diferencia de "Tabla repetida").</p>
+                    <p>{t('builder.canvas.linkedSubformHint')}</p>
                   </details>
                 ) : null}
                 {field.type === 'PARENT_CHILD' ? (
                   <details className="builder-parent-child-panel">
-                    <summary>Enlace a otro registro</summary>
+                    <summary>{t('builder.canvas.parentChildTitle')}</summary>
                     <div className="builder-field-row">
                       <label>
-                        <span>Formulario enlazado</span>
+                        <span>{t('builder.canvas.linkedForm')}</span>
                         <select value={field.linkedTemplateId ?? ''} onChange={(event) => onFieldChange(field.id, { linkedTemplateId: event.target.value })}>
-                          <option value="">Selecciona una plantilla existente</option>
+                          <option value="">{t('builder.canvas.selectExistingTemplate')}</option>
                           {projectTemplates.map((template) => <option key={template.id} value={template.id}>{template.name} ({template.status})</option>)}
                         </select>
                       </label>
                       <label>
-                        <span>Campo mostrado como etiqueta</span>
-                        <input value={field.labelField ?? ''} placeholder="Ej: nombre_completo" onChange={(event) => onFieldChange(field.id, { labelField: event.target.value })} />
+                        <span>{t('builder.canvas.labelFieldLabel')}</span>
+                        <input value={field.labelField ?? ''} placeholder={t('builder.canvas.labelFieldPlaceholder')} onChange={(event) => onFieldChange(field.id, { labelField: event.target.value })} />
                       </label>
                     </div>
-                    <p>En Runtime se muestra como un selector de registros existentes de esa plantilla, guardando el id del registro enlazado.</p>
+                    <p>{t('builder.canvas.parentChildHint')}</p>
                   </details>
                 ) : null}
                 <details className="builder-validation-panel">
-                  <summary>Reglas de validacion</summary>
+                  <summary>{t('builder.canvas.validationRules')}</summary>
                   <div className="builder-field-row">
                     {numericTypes.has(field.type) ? (
                       <>
                         <label>
-                          <span>Valor minimo</span>
+                          <span>{t('builder.canvas.minValue')}</span>
                           <input type="number" value={field.min ?? ''} onChange={(event) => onFieldChange(field.id, { min: event.target.value })} />
                         </label>
                         <label>
-                          <span>Valor maximo</span>
+                          <span>{t('builder.canvas.maxValue')}</span>
                           <input type="number" value={field.max ?? ''} onChange={(event) => onFieldChange(field.id, { max: event.target.value })} />
                         </label>
                         {field.type === 'RANGE' ? (
                           <label>
-                            <span>Paso</span>
+                            <span>{t('builder.canvas.step')}</span>
                             <input type="number" value={field.step ?? ''} onChange={(event) => onFieldChange(field.id, { step: event.target.value })} />
                           </label>
                         ) : null}
@@ -250,72 +252,72 @@ export function BuilderCanvas({
                     {textTypes.has(field.type) ? (
                       <>
                         <label>
-                          <span>Min. caracteres</span>
+                          <span>{t('builder.canvas.minChars')}</span>
                           <input type="number" min="0" value={field.minLength ?? ''} onChange={(event) => onFieldChange(field.id, { minLength: event.target.value })} />
                         </label>
                         <label>
-                          <span>Max. caracteres</span>
+                          <span>{t('builder.canvas.maxChars')}</span>
                           <input type="number" min="0" value={field.maxLength ?? ''} onChange={(event) => onFieldChange(field.id, { maxLength: event.target.value })} />
                         </label>
                         <label>
-                          <span>Patron / regex</span>
-                          <input value={field.pattern ?? ''} placeholder="Ej: ^[0-9]+$" onChange={(event) => onFieldChange(field.id, { pattern: event.target.value })} />
+                          <span>{t('builder.canvas.patternRegex')}</span>
+                          <input value={field.pattern ?? ''} placeholder={t('builder.canvas.patternPlaceholder')} onChange={(event) => onFieldChange(field.id, { pattern: event.target.value })} />
                         </label>
                       </>
                     ) : null}
-                    {!numericTypes.has(field.type) && !textTypes.has(field.type) ? <p>Este tipo usa validaciones propias del campo.</p> : null}
+                    {!numericTypes.has(field.type) && !textTypes.has(field.type) ? <p>{t('builder.canvas.builtInValidation')}</p> : null}
                   </div>
                 </details>
                 <details className="builder-condition-panel">
-                  <summary>Condicion de activacion</summary>
+                  <summary>{t('builder.canvas.activationCondition')}</summary>
                   <div className="builder-field-row">
                     <label>
-                      <span>Mostrar si este campo</span>
+                      <span>{t('builder.canvas.showIfField')}</span>
                       <select value={field.relevantField ?? ''} onChange={(event) => onFieldChange(field.id, { relevantField: event.target.value })}>
-                        <option value="">Siempre visible</option>
+                        <option value="">{t('builder.canvas.alwaysVisible')}</option>
                         {availableFields.filter((candidate) => candidate.id !== field.id).map((candidate) => (
                           <option key={candidate.id} value={candidate.name}>{candidate.label || candidate.name}</option>
                         ))}
                       </select>
                     </label>
                     <label>
-                      <span>Condicion</span>
+                      <span>{t('builder.canvas.condition')}</span>
                       <select
                         value={field.relevantOperator ?? 'equals'}
                         disabled={!field.relevantField}
                         onChange={(event) => onFieldChange(field.id, { relevantOperator: event.target.value as BuilderPreviewSection['fields'][number]['relevantOperator'] })}
                       >
-                        <option value="equals">es igual a</option>
-                        <option value="not_equals">es diferente de</option>
-                        <option value="not_empty">tiene respuesta</option>
-                        <option value="empty">esta vacio</option>
+                        <option value="equals">{t('builder.canvas.equalsOp')}</option>
+                        <option value="not_equals">{t('builder.canvas.notEqualsOp')}</option>
+                        <option value="not_empty">{t('builder.canvas.notEmptyOp')}</option>
+                        <option value="empty">{t('builder.canvas.emptyOp')}</option>
                       </select>
                     </label>
                     <label>
-                      <span>Valor esperado</span>
+                      <span>{t('builder.canvas.expectedValue')}</span>
                       <input
                         value={field.relevantValue ?? ''}
                         disabled={!field.relevantField || ['not_empty', 'empty'].includes(field.relevantOperator ?? '')}
-                        placeholder="Ej: si, 1, opcion_1"
+                        placeholder={t('builder.canvas.expectedValuePlaceholder')}
                         onChange={(event) => onFieldChange(field.id, { relevantValue: event.target.value })}
                       />
                     </label>
                   </div>
-                  <p>La pregunta se ocultara en Runtime si la condicion no se cumple.</p>
+                  <p>{t('builder.canvas.conditionHint')}</p>
                 </details>
                 <details className="builder-visual-panel">
-                  <summary>Decoracion visual</summary>
+                  <summary>{t('builder.canvas.visualDecoration')}</summary>
                   <div className="builder-field-row">
                     <label>
-                      <span>Tipo visual</span>
+                      <span>{t('builder.canvas.visualType')}</span>
                       <select value={field.mediaType ?? 'none'} onChange={(event) => onFieldChange(field.id, { mediaType: event.target.value as BuilderPreviewSection['fields'][number]['mediaType'] })}>
-                        <option value="none">Sin icono/imagen</option>
-                        <option value="emoji">Icono emoji</option>
-                        <option value="image">Imagen por URL</option>
+                        <option value="none">{t('builder.canvas.noIcon')}</option>
+                        <option value="emoji">{t('builder.canvas.emojiIcon')}</option>
+                        <option value="image">{t('builder.canvas.imageUrl')}</option>
                       </select>
                     </label>
                     <label>
-                      <span>{field.mediaType === 'image' ? 'URL de imagen' : 'Emoji o icono'}</span>
+                      <span>{field.mediaType === 'image' ? t('builder.canvas.imageUrlLabel') : t('builder.canvas.emojiLabel')}</span>
                       <input
                         value={field.mediaValue ?? ''}
                         disabled={!field.mediaType || field.mediaType === 'none'}
@@ -324,37 +326,37 @@ export function BuilderCanvas({
                       />
                     </label>
                     <label>
-                      <span>Posicion</span>
+                      <span>{t('builder.canvas.position')}</span>
                       <select
                         value={field.mediaPosition ?? 'before'}
                         disabled={!field.mediaType || field.mediaType === 'none'}
                         onChange={(event) => onFieldChange(field.id, { mediaPosition: event.target.value as BuilderPreviewSection['fields'][number]['mediaPosition'] })}
                       >
-                        <option value="before">Antes de la pregunta</option>
-                        <option value="after">Despues de la pregunta</option>
+                        <option value="before">{t('builder.canvas.beforeQuestion')}</option>
+                        <option value="after">{t('builder.canvas.afterQuestion')}</option>
                       </select>
                     </label>
                     <label>
-                      <span>Tamano</span>
+                      <span>{t('builder.canvas.size')}</span>
                       <select
                         value={field.mediaSize ?? 'medium'}
                         disabled={!field.mediaType || field.mediaType === 'none'}
                         onChange={(event) => onFieldChange(field.id, { mediaSize: event.target.value as BuilderPreviewSection['fields'][number]['mediaSize'] })}
                       >
-                        <option value="small">Pequeno</option>
-                        <option value="medium">Mediano</option>
-                        <option value="large">Grande</option>
+                        <option value="small">{t('builder.canvas.small')}</option>
+                        <option value="medium">{t('builder.canvas.medium')}</option>
+                        <option value="large">{t('builder.canvas.large')}</option>
                       </select>
                     </label>
                   </div>
                   {field.mediaType && field.mediaType !== 'none' && field.mediaValue ? (
                     <div className="builder-visual-preview">
-                      <span>Vista previa:</span>
+                      <span>{t('builder.canvas.previewLabel')}</span>
                       {field.mediaType === 'image'
                         ? <img src={field.mediaValue} alt="" />
                         : <strong>{field.mediaValue}</strong>}
                     </div>
-                  ) : <p>Opcional: agrega un icono o imagen para hacer mas clara la pregunta.</p>}
+                  ) : <p>{t('builder.canvas.visualOptionalHint')}</p>}
                 </details>
               </div>
             ))}

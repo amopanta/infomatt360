@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useI18n } from '../../i18n';
 import { fetchTemplateFields } from '../acta/api';
 import type { ActaFieldOption } from '../acta/types';
 import { fetchProjectTemplates } from '../records/api';
@@ -17,18 +18,19 @@ type Props = {
   onCancel: () => void;
 };
 
-const AGGREGATIONS: Array<{ value: Aggregation; label: string }> = [
-  { value: 'count', label: 'Conteo' },
-  { value: 'sum', label: 'Suma' },
-  { value: 'average', label: 'Promedio' },
-  { value: 'min', label: 'Minimo' },
-  { value: 'max', label: 'Maximo' },
-];
-
 export function ReportBoardEditor({ projectId, widgets, saving, onChange, onSave, onCancel }: Props) {
+  const { t } = useI18n();
   const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | null>(null);
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
+
+  const AGGREGATIONS: Array<{ value: Aggregation; label: string }> = [
+    { value: 'count', label: t('reports.board.aggCount') },
+    { value: 'sum', label: t('reports.board.aggSum') },
+    { value: 'average', label: t('reports.board.aggAverage') },
+    { value: 'min', label: t('reports.board.aggMin') },
+    { value: 'max', label: t('reports.board.aggMax') },
+  ];
 
   useEffect(() => {
     if (!projectId) return;
@@ -54,27 +56,27 @@ export function ReportBoardEditor({ projectId, widgets, saving, onChange, onSave
   return (
     <div className="reports-editor">
       <aside className="reports-palette">
-        <h3>Bloques disponibles</h3>
-        <p className="builder-help">Haz clic en un bloque para agregarlo al final del tablero.</p>
-        <button type="button" className="reports-palette-item" onClick={() => addWidget({ type: 'kpi', title: 'Nuevo KPI', source: { kind: 'records_total' } })}>
-          <strong>KPI</strong>
-          <span>Una sola cifra destacada.</span>
+        <h3>{t('reports.board.availableBlocks')}</h3>
+        <p className="builder-help">{t('reports.board.blockHelp')}</p>
+        <button type="button" className="reports-palette-item" onClick={() => addWidget({ type: 'kpi', title: t('reports.board.newKpi'), source: { kind: 'records_total' } })}>
+          <strong>{t('reports.board.kpiLabel')}</strong>
+          <span>{t('reports.board.kpiDescription')}</span>
         </button>
-        <button type="button" className="reports-palette-item" onClick={() => addWidget({ type: 'table', title: 'Resumen por formulario' } satisfies TableWidget)}>
-          <strong>Tabla</strong>
-          <span>Resumen por formulario (mismo detalle de siempre).</span>
+        <button type="button" className="reports-palette-item" onClick={() => addWidget({ type: 'table', title: t('reports.board.tableSummary') } satisfies TableWidget)}>
+          <strong>{t('reports.board.tableLabel')}</strong>
+          <span>{t('reports.board.tableDescription')}</span>
         </button>
-        <button type="button" className="reports-palette-item" onClick={() => addWidget({ type: 'chart', title: 'Nuevo grafico', chart_kind: 'bar', source: { kind: 'status_breakdown' } })}>
-          <strong>Grafico</strong>
-          <span>Barra o torta sobre una metrica.</span>
+        <button type="button" className="reports-palette-item" onClick={() => addWidget({ type: 'chart', title: t('reports.board.newChart'), chart_kind: 'bar', source: { kind: 'status_breakdown' } })}>
+          <strong>{t('reports.board.chartLabel')}</strong>
+          <span>{t('reports.board.chartDescription')}</span>
         </button>
       </aside>
 
       <section className="reports-editor-canvas">
         {widgets.length === 0 ? (
           <div className="acta-canvas-empty">
-            <h3>Este tablero aun no tiene bloques</h3>
-            <p>Haz clic en un bloque de la paleta para empezar.</p>
+            <h3>{t('reports.board.emptyTitle')}</h3>
+            <p>{t('reports.board.emptyHint')}</p>
           </div>
         ) : null}
         {widgets.map((widget, index) => (
@@ -97,7 +99,7 @@ export function ReportBoardEditor({ projectId, widgets, saving, onChange, onSave
             <div className="acta-block-header">
               <span
                 className="builder-drag-handle"
-                title="Arrastra para cambiar el orden"
+                title={t('reports.board.dragHint')}
                 draggable
                 onDragStart={(event) => {
                   event.dataTransfer.effectAllowed = 'move';
@@ -111,12 +113,12 @@ export function ReportBoardEditor({ projectId, widgets, saving, onChange, onSave
               >
                 ⋮⋮
               </span>
-              <strong>{widget.type === 'kpi' ? 'KPI' : widget.type === 'table' ? 'Tabla' : 'Gráfico'}</strong>
-              <button type="button" className="secondary" onClick={() => removeWidget(index)}>Eliminar</button>
+              <strong>{widget.type === 'kpi' ? t('reports.board.blockKpi') : widget.type === 'table' ? t('reports.board.blockTable') : t('reports.board.blockChart')}</strong>
+              <button type="button" className="secondary" onClick={() => removeWidget(index)}>{t('reports.board.deleteBlock')}</button>
             </div>
 
             <label>
-              <span>Título</span>
+              <span>{t('reports.board.titleLabel')}</span>
               <input value={widget.title} onChange={(event) => updateWidget(index, { ...widget, title: event.target.value })} />
             </label>
 
@@ -127,10 +129,10 @@ export function ReportBoardEditor({ projectId, widgets, saving, onChange, onSave
             {widget.type === 'chart' ? (
               <>
                 <label>
-                  <span>Tipo de gráfico</span>
+                  <span>{t('reports.board.chartKindLabel')}</span>
                   <select value={widget.chart_kind} onChange={(event) => updateWidget(index, { ...widget, chart_kind: event.target.value as ChartWidget['chart_kind'] })}>
-                    <option value="bar">Barras</option>
-                    <option value="pie">Torta</option>
+                    <option value="bar">{t('reports.board.chartBar')}</option>
+                    <option value="pie">{t('reports.board.chartPie')}</option>
                   </select>
                 </label>
                 <ChartSourceEditor templates={templates} source={widget.source} onChange={(source) => updateWidget(index, { ...widget, source })} />
@@ -141,18 +143,19 @@ export function ReportBoardEditor({ projectId, widgets, saving, onChange, onSave
       </section>
 
       <div className="reports-editor-actions">
-        <button type="button" className="primary" onClick={onSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar tablero'}</button>
-        <button type="button" className="secondary" onClick={onCancel}>Cancelar</button>
+        <button type="button" className="primary" onClick={onSave} disabled={saving}>{saving ? t('reports.board.saving') : t('reports.board.saveBoard')}</button>
+        <button type="button" className="secondary" onClick={onCancel}>{t('reports.board.cancel')}</button>
       </div>
     </div>
   );
 }
 
 function KpiSourceEditor({ templates, source, onChange }: { templates: TemplateSummary[]; source: KpiSource; onChange: (source: KpiSource) => void }) {
+  const { t } = useI18n();
   return (
     <div className="reports-source-config">
       <label>
-        <span>Fuente</span>
+        <span>{t('reports.board.sourceLabel')}</span>
         <select
           value={source.kind}
           onChange={(event) => {
@@ -163,16 +166,16 @@ function KpiSourceEditor({ templates, source, onChange }: { templates: TemplateS
             else onChange({ kind: 'custom_metric', template_id: templates[0]?.id ?? '', field_name: '', aggregation: 'count' });
           }}
         >
-          <option value="records_total">Total de registros</option>
-          <option value="status_count">Registros por estado</option>
-          <option value="template_count">Registros de un formulario</option>
-          <option value="custom_metric">Métrica personalizada (campo + agregación)</option>
+          <option value="records_total">{t('reports.board.sourceRecordsTotal')}</option>
+          <option value="status_count">{t('reports.board.sourceStatusCount')}</option>
+          <option value="template_count">{t('reports.board.sourceTemplateCount')}</option>
+          <option value="custom_metric">{t('reports.board.sourceCustomMetric')}</option>
         </select>
       </label>
       {source.kind === 'status_count' ? (
         <label>
-          <span>Estado</span>
-          <input value={source.status} onChange={(event) => onChange({ ...source, status: event.target.value })} placeholder="ej. submitted" />
+          <span>{t('reports.board.statusLabel')}</span>
+          <input value={source.status} onChange={(event) => onChange({ ...source, status: event.target.value })} placeholder={t('reports.board.statusPlaceholder')} />
         </label>
       ) : null}
       {source.kind === 'template_count' ? (
@@ -186,10 +189,11 @@ function KpiSourceEditor({ templates, source, onChange }: { templates: TemplateS
 }
 
 function ChartSourceEditor({ templates, source, onChange }: { templates: TemplateSummary[]; source: ChartSource; onChange: (source: ChartSource) => void }) {
+  const { t } = useI18n();
   return (
     <div className="reports-source-config">
       <label>
-        <span>Fuente</span>
+        <span>{t('reports.board.sourceLabel')}</span>
         <select
           value={source.kind}
           onChange={(event) => {
@@ -198,9 +202,9 @@ function ChartSourceEditor({ templates, source, onChange }: { templates: Templat
             else onChange({ kind: 'custom_metric_by_status', template_id: templates[0]?.id ?? '', field_name: '', aggregation: 'count' });
           }}
         >
-          <option value="status_breakdown">Registros por estado</option>
-          <option value="template_totals">Registros por formulario</option>
-          <option value="custom_metric_by_status">Métrica personalizada por estado</option>
+          <option value="status_breakdown">{t('reports.board.sourceStatusBreakdown')}</option>
+          <option value="template_totals">{t('reports.board.sourceTemplateTotals')}</option>
+          <option value="custom_metric_by_status">{t('reports.board.sourceCustomByStatus')}</option>
         </select>
       </label>
       {source.kind === 'custom_metric_by_status' ? (
@@ -211,11 +215,12 @@ function ChartSourceEditor({ templates, source, onChange }: { templates: Templat
 }
 
 function TemplateSelect({ templates, value, onChange }: { templates: TemplateSummary[]; value: string; onChange: (templateId: string) => void }) {
+  const { t } = useI18n();
   return (
     <label>
-      <span>Formulario</span>
+      <span>{t('reports.board.formLabel')}</span>
       <select value={value} onChange={(event) => onChange(event.target.value)}>
-        <option value="">Selecciona un formulario</option>
+        <option value="">{t('reports.board.selectForm')}</option>
         {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
       </select>
     </label>
@@ -235,8 +240,17 @@ function CustomMetricFields({
   aggregation: Aggregation;
   onChange: (patch: { template_id?: string; field_name?: string; aggregation?: Aggregation }) => void;
 }) {
+  const { t } = useI18n();
   const [fields, setFields] = useState<ActaFieldOption[]>([]);
   const [fieldTypes, setFieldTypes] = useState<Record<string, string>>({});
+
+  const AGGREGATIONS: Array<{ value: Aggregation; label: string }> = [
+    { value: 'count', label: t('reports.board.aggCount') },
+    { value: 'sum', label: t('reports.board.aggSum') },
+    { value: 'average', label: t('reports.board.aggAverage') },
+    { value: 'min', label: t('reports.board.aggMin') },
+    { value: 'max', label: t('reports.board.aggMax') },
+  ];
 
   useEffect(() => {
     if (!templateId) {
@@ -254,21 +268,21 @@ function CustomMetricFields({
     <>
       <TemplateSelect templates={templates} value={templateId} onChange={(template_id) => onChange({ template_id, field_name: '' })} />
       <label>
-        <span>Campo</span>
+        <span>{t('reports.board.fieldLabel')}</span>
         <select value={fieldName} onChange={(event) => onChange({ field_name: event.target.value })} disabled={fields.length === 0}>
-          <option value="">Selecciona un campo</option>
+          <option value="">{t('reports.board.selectField')}</option>
           {fields.map((field) => <option key={field.name} value={field.name}>{field.label}</option>)}
         </select>
       </label>
       <label>
-        <span>Agregación</span>
+        <span>{t('reports.board.aggregationLabel')}</span>
         <select value={aggregation} onChange={(event) => onChange({ aggregation: event.target.value as Aggregation })}>
           {AGGREGATIONS.map((item) => (
             <option key={item.value} value={item.value} disabled={item.value !== 'count' && !selectedIsNumeric}>{item.label}</option>
           ))}
         </select>
       </label>
-      {!selectedIsNumeric && aggregation !== 'count' ? <p className="reports-field-warning">Este campo no es numérico; solo admite "Conteo".</p> : null}
+      {!selectedIsNumeric && aggregation !== 'count' ? <p className="reports-field-warning">{t('reports.board.fieldNotNumeric')}</p> : null}
     </>
   );
 }

@@ -41,16 +41,18 @@ import { EvidenceApp } from './modules/evidence/EvidenceApp';
 import { RuntimeApp } from './modules/runtime/RuntimeApp';
 import { APP_NAVIGATION_EVENT, navigateTo, resolveAppRoute } from './routeConfig';
 import type { AppRoute } from './routeConfig';
+import { I18nProvider, useI18n } from './i18n';
 import './styles.css';
 
 function PermissionGate({ permissions, children }: { permissions: string[]; children: React.ReactNode }) {
+  const { t } = useI18n();
   if (hasAnyCurrentProjectPermission(permissions)) return <>{children}</>;
   return (
-    <AppShell title="Acceso restringido">
+    <AppShell title={t('errors.forbidden')}>
       <main className="access-denied">
-        <h2>No tienes permiso para abrir este modulo</h2>
-        <p>Si necesitas acceso, solicita al administrador del proyecto que ajuste tu rol o tus permisos.</p>
-        <a href="/">Volver al dashboard</a>
+        <h2>{t('errors.forbidden')}</h2>
+        <p>{t('auth.noProjects')}</p>
+        <a href="/">{t('app.back')}</a>
       </main>
     </AppShell>
   );
@@ -133,6 +135,8 @@ void loadOrganizationBranding();
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <AuthGate><AppRouter /></AuthGate>
+    <I18nProvider>
+      <AuthGate><AppRouter /></AuthGate>
+    </I18nProvider>
   </React.StrictMode>,
 );

@@ -5,6 +5,7 @@ import { resolveFormValues } from '../runtime/formLogic';
 import { usePullData } from '../runtime/pullData';
 import { fetchPublicForm, submitPublicForm } from './api';
 import { PublicSurveyRenderer } from './PublicSurveyRenderer';
+import { useI18n } from '../../i18n';
 
 type Status = 'loading' | 'ready' | 'submitting' | 'success' | 'error';
 
@@ -15,6 +16,7 @@ function tokenFromPath(): string {
 }
 
 export function PublicFormApp() {
+  const { t } = useI18n();
   const [token] = useState(tokenFromPath);
   const [template, setTemplate] = useState<RuntimeTemplate | null>(null);
   const [values, setValues] = useState<RuntimeFormValues>({});
@@ -29,7 +31,7 @@ export function PublicFormApp() {
   useEffect(() => {
     if (!token) {
       setStatus('error');
-      setMessage('Este enlace esta incompleto: falta el codigo de acceso.');
+      setMessage(t('publicForm.incompleteLinkCode'));
       return;
     }
     fetchPublicForm(token)
@@ -52,19 +54,19 @@ export function PublicFormApp() {
     setStatus('submitting');
     setMessage('');
     try {
-      if (pullError || !pullsReady) throw new Error(pullError || 'Espera a que termine la consulta del CSV.');
+      if (pullError || !pullsReady) throw new Error(pullError || t('publicForm.waitCsv'));
       await submitPublicForm(token, template ? resolveFormValues(template, values, pulls) : values);
       setStatus('success');
     } catch (error) {
       setStatus('ready');
-      setMessage(error instanceof Error ? error.message : 'No fue posible enviar la respuesta.');
+      setMessage(error instanceof Error ? error.message : t('publicForm.submitFailed'));
     }
   }
 
   if (status === 'loading') {
     return (
       <div className="auth-page">
-        <main className="runtime-shell"><p>Cargando formulario...</p></main>
+        <main className="runtime-shell"><p>{t('publicForm.loadingForm')}</p></main>
       </div>
     );
   }
@@ -83,8 +85,8 @@ export function PublicFormApp() {
     return (
       <div className="auth-page">
         <main className="runtime-shell public-form-success">
-          <h1>¡Gracias!</h1>
-          <p>Tu respuesta fue registrada correctamente.</p>
+          <h1>{t('publicForm.thankYou')}</h1>
+          <p>{t('publicForm.responseRecorded')}</p>
         </main>
       </div>
     );

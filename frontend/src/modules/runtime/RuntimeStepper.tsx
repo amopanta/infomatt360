@@ -1,4 +1,5 @@
 import type { RuntimePage } from './types';
+import { useI18n } from '../../i18n';
 
 type Props = {
   pages: RuntimePage[];
@@ -7,8 +8,9 @@ type Props = {
 };
 
 export function RuntimeStepper({ pages, activePageIndex, onSelect }: Props) {
+  const { t } = useI18n();
   return (
-    <nav className="runtime-stepper" aria-label="Paginas del formulario">
+    <nav className="runtime-stepper" aria-label={t('runtime.formPages')}>
       {pages.map((page, index) => (
         <button key={page.id} className={index === activePageIndex ? 'active' : ''} onClick={() => onSelect(index)}>
           {index + 1}. {page.title}

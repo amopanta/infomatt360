@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { PrinterInfo } from './desktopBridge';
+import { useI18n } from '../../i18n';
 
 /** Selector de impresora + copias reutilizado por GenerateActaPanel y
  * BulkActaBar (docs/96 item #10). Solo se monta cuando isDesktopApp() es
@@ -15,6 +16,7 @@ export function PrinterPicker({
   copies: number;
   onCopiesChange: (value: number) => void;
 }) {
+  const { t } = useI18n();
   const [printers, setPrinters] = useState<PrinterInfo[]>([]);
 
   useEffect(() => {
@@ -32,11 +34,11 @@ export function PrinterPicker({
   return (
     <span className="printer-picker">
       <select value={printerName} onChange={(event) => onPrinterNameChange(event.target.value)} disabled={printers.length === 0}>
-        {printers.length === 0 && <option value="">Sin impresoras detectadas</option>}
+        {printers.length === 0 && <option value="">{t('desktop.noPrintersDetected')}</option>}
         {printers.map((printer) => (
           <option key={printer.name} value={printer.name}>
             {printer.displayName}
-            {printer.isDefault ? ' (predeterminada)' : ''}
+            {printer.isDefault ? ` ${t('desktop.defaultPrinter')}` : ''}
           </option>
         ))}
       </select>

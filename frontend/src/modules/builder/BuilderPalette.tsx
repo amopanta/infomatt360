@@ -1,13 +1,15 @@
 import type { BuilderPaletteItem } from './types';
 import { FIELD_CATALOG } from './fieldCatalog';
+import { useI18n } from '../../i18n';
 
 const categories = Array.from(new Set(FIELD_CATALOG.map((item) => item.category)));
 
 export function BuilderPalette({ onAddField }: { onAddField?: (item: BuilderPaletteItem) => void }) {
+  const { t } = useI18n();
   return (
     <aside className="builder-palette">
-      <h3>Banco de preguntas</h3>
-      <p className="builder-help">Elige un componente para agregarlo al grupo activo.</p>
+      <h3>{t('builder.palette.title')}</h3>
+      <p className="builder-help">{t('builder.palette.help')}</p>
       {categories.map((category) => (
         <section key={category} className="builder-palette-group">
           <h4>{category}</h4>

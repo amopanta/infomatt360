@@ -1,37 +1,18 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
+import { useI18n } from '../../i18n';
 import { PROJECT_KEY } from '../auth/session';
 import { analyzeRecord, createAuditConfig, fetchAuditConfig, fetchChecks } from './aiAuditApi';
 import type { AiAuditConfig, AiCheck } from './aiAuditApi';
 
 type Tab = 'alerts' | 'config';
 
-function statusLabel(status: string) {
-  const labels: Record<string, string> = {
-    none: 'Sin riesgo',
-    possible: 'Posible riesgo',
-    high: 'Riesgo alto',
-    skipped: 'Omitido (sin proveedor de IA configurado)',
-    error: 'Error del proveedor',
-  };
-  return labels[status] ?? status;
-}
-
 function statusClass(status: string) {
   if (status === 'none') return 'sent';
   if (status === 'possible') return 'skipped';
   if (status === 'high' || status === 'error') return 'failed';
   return 'skipped';
-}
-
-function modeLabel(mode: string) {
-  const labels: Record<string, string> = {
-    human: 'Solo alerta (un humano decide)',
-    automatic: 'Rechazo automatico ante cualquier riesgo',
-    mixed: 'Mixto (rechazo automatico solo en riesgo alto)',
-  };
-  return labels[mode] ?? mode;
 }
 
 function parseResult(resultJson?: string | null): { reasoning?: string; flagged_phrases?: string[]; reason?: string; error?: string } {
@@ -44,6 +25,7 @@ function parseResult(resultJson?: string | null): { reasoning?: string; flagged_
 }
 
 export function AiAuditApp() {
+  const { t } = useI18n();
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [tab, setTab] = useState<Tab>('alerts');
   const [message, setMessage] = useState('');
@@ -58,11 +40,31 @@ export function AiAuditApp() {
   const [lookupResult, setLookupResult] = useState<AiAuditConfig | null | undefined>(undefined);
   const [analyzeRecordId, setAnalyzeRecordId] = useState('');
 
+  function statusLabel(status: string) {
+    const labels: Record<string, string> = {
+      none: t('admin.aiAudit.statusNone'),
+      possible: t('admin.aiAudit.statusPossible'),
+      high: t('admin.aiAudit.statusHigh'),
+      skipped: t('admin.aiAudit.statusSkipped'),
+      error: t('admin.aiAudit.statusError'),
+    };
+    return labels[status] ?? status;
+  }
+
+  function modeLabel(mode: string) {
+    const labels: Record<string, string> = {
+      human: t('admin.aiAudit.modeHuman'),
+      automatic: t('admin.aiAudit.modeAutomatic'),
+      mixed: t('admin.aiAudit.modeMixed'),
+    };
+    return labels[mode] ?? mode;
+  }
+
   async function loadChecks() {
     try {
       setChecks(await fetchChecks(projectId));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible cargar las alertas.');
+      setMessage(error instanceof Error ? error.message : t('admin.aiAudit.errorLoadAlerts'));
     }
   }
 
@@ -71,12 +73,12 @@ export function AiAuditApp() {
   async function submitConfig() {
     try {
       await createAuditConfig({ templateId: configTemplateId, textFieldName: configTextField, mode: configMode });
-      setMessage('Plantilla vinculada a la auditoria semantica.');
+      setMessage(t('admin.aiAudit.templateLinked'));
       setConfigTemplateId('');
       setConfigTextField('');
       setConfigMode('human');
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible vincular la plantilla.');
+      setMessage(error instanceof Error ? error.message : t('admin.aiAudit.errorLinkTemplate'));
     }
   }
 
@@ -84,26 +86,26 @@ export function AiAuditApp() {
     try {
       setLookupResult(await fetchAuditConfig(lookupTemplateId.trim()));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible consultar la configuracion.');
+      setMessage(error instanceof Error ? error.message : t('admin.aiAudit.errorLookupConfig'));
     }
   }
 
   async function submitAnalyze() {
     try {
       const result = await analyzeRecord(analyzeRecordId.trim());
-      setMessage(result ? `Analisis completado: ${statusLabel(result.status)}.` : 'Este registro no tiene una plantilla con auditoria semantica configurada.');
+      setMessage(result ? t('admin.aiAudit.analysisCompleted', { status: statusLabel(result.status) }) : t('admin.aiAudit.noSemanticConfig'));
       await loadChecks();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible reanalizar el registro.');
+      setMessage(error instanceof Error ? error.message : t('admin.aiAudit.errorReanalyze'));
     }
   }
 
   return (
-    <AppShell title="Auditoria semantica con IA">
+    <AppShell title={t('admin.aiAudit.title')}>
       <main className="audit-shell">
         <nav className="erp-tabs">
-          <button className={tab === 'alerts' ? 'active' : undefined} onClick={() => setTab('alerts')}>Alertas</button>
-          <button className={tab === 'config' ? 'active' : undefined} onClick={() => setTab('config')}>Configuracion por plantilla</button>
+          <button className={tab === 'alerts' ? 'active' : undefined} onClick={() => setTab('alerts')}>{t('admin.aiAudit.tabAlerts')}</button>
+          <button className={tab === 'config' ? 'active' : undefined} onClick={() => setTab('config')}>{t('admin.aiAudit.tabConfig')}</button>
         </nav>
         {message ? <p role="status" className="erp-message">{message}</p> : null}
 
@@ -111,28 +113,28 @@ export function AiAuditApp() {
           <section className="audit-panel">
             <header>
               <div>
-                <h2>Alertas de auditoria semantica</h2>
-                <p>Analisis automatico de observaciones de campo en busca de contradicciones o indicios de fraude (ver docs/88).</p>
+                <h2>{t('admin.aiAudit.alertsTitle')}</h2>
+                <p>{t('admin.aiAudit.alertsDescription')}</p>
               </div>
-              <button onClick={() => void loadChecks()}>Actualizar</button>
+              <button onClick={() => void loadChecks()}>{t('admin.aiAudit.refresh')}</button>
             </header>
             <div className="ai-analyze-inline">
               <label>
-                Reanalizar un registro manualmente (ID)
+                {t('admin.aiAudit.reanalyzeLabel')}
                 <input value={analyzeRecordId} onChange={(event) => setAnalyzeRecordId(event.target.value)} placeholder="record_id" />
               </label>
-              <button disabled={!analyzeRecordId.trim()} onClick={() => void submitAnalyze()}>Analizar</button>
+              <button disabled={!analyzeRecordId.trim()} onClick={() => void submitAnalyze()}>{t('admin.aiAudit.analyze')}</button>
             </div>
-            {!semanticChecks.length ? <p>Aun no hay analisis de auditoria semantica en este proyecto.</p> : null}
+            {!semanticChecks.length ? <p>{t('admin.aiAudit.noChecksYet')}</p> : null}
             <div className="audit-table-wrap">
               <table className="audit-table">
                 <thead>
                   <tr>
-                    <th>Fecha</th>
-                    <th>Estado</th>
-                    <th>Registro</th>
-                    <th>Razonamiento</th>
-                    <th>Frases senaladas</th>
+                    <th>{t('admin.aiAudit.colDate')}</th>
+                    <th>{t('admin.aiAudit.colStatus')}</th>
+                    <th>{t('admin.aiAudit.colRecord')}</th>
+                    <th>{t('admin.aiAudit.colReasoning')}</th>
+                    <th>{t('admin.aiAudit.colFlaggedPhrases')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -157,30 +159,30 @@ export function AiAuditApp() {
         {tab === 'config' ? (
           <section className="ds-maps">
             <div className="ds-map-create">
-              <h2>Vincular plantilla a la auditoria semantica</h2>
-              <p>El campo de texto indicado se analiza automaticamente cada vez que se guarda un registro de esta plantilla.</p>
-              <label>ID de la plantilla (Builder)<input value={configTemplateId} onChange={(event) => setConfigTemplateId(event.target.value)} placeholder="template_id" /></label>
-              <label>Campo de texto libre a analizar<input value={configTextField} onChange={(event) => setConfigTextField(event.target.value)} placeholder="observaciones" /></label>
+              <h2>{t('admin.aiAudit.linkTemplateTitle')}</h2>
+              <p>{t('admin.aiAudit.linkTemplateDescription')}</p>
+              <label>{t('admin.aiAudit.templateIdLabel')}<input value={configTemplateId} onChange={(event) => setConfigTemplateId(event.target.value)} placeholder="template_id" /></label>
+              <label>{t('admin.aiAudit.textFieldLabel')}<input value={configTextField} onChange={(event) => setConfigTextField(event.target.value)} placeholder={t('admin.aiAudit.textFieldPlaceholder')} /></label>
               <label>
-                Modo de reaccion
+                {t('admin.aiAudit.reactionModeLabel')}
                 <select value={configMode} onChange={(event) => setConfigMode(event.target.value)}>
-                  <option value="human">Solo alerta (un humano decide)</option>
-                  <option value="mixed">Mixto (rechazo automatico solo en riesgo alto)</option>
-                  <option value="automatic">Rechazo automatico ante cualquier riesgo</option>
+                  <option value="human">{t('admin.aiAudit.modeHuman')}</option>
+                  <option value="mixed">{t('admin.aiAudit.modeMixed')}</option>
+                  <option value="automatic">{t('admin.aiAudit.modeAutomatic')}</option>
                 </select>
               </label>
-              <button className="primary" disabled={!configTemplateId.trim() || !configTextField.trim()} onClick={() => void submitConfig()}>Vincular</button>
+              <button className="primary" disabled={!configTemplateId.trim() || !configTextField.trim()} onClick={() => void submitConfig()}>{t('admin.aiAudit.link')}</button>
             </div>
             <div className="ds-map-list">
-              <h2>Consultar configuracion existente</h2>
-              <label>ID de la plantilla<input value={lookupTemplateId} onChange={(event) => setLookupTemplateId(event.target.value)} placeholder="template_id" /></label>
-              <button onClick={() => void lookupConfig()}>Consultar</button>
-              {lookupResult === null ? <p>Esta plantilla no tiene configuracion de auditoria semantica.</p> : null}
+              <h2>{t('admin.aiAudit.lookupTitle')}</h2>
+              <label>{t('admin.aiAudit.templateIdShort')}<input value={lookupTemplateId} onChange={(event) => setLookupTemplateId(event.target.value)} placeholder="template_id" /></label>
+              <button onClick={() => void lookupConfig()}>{t('admin.aiAudit.lookup')}</button>
+              {lookupResult === null ? <p>{t('admin.aiAudit.noAuditConfig')}</p> : null}
               {lookupResult ? (
                 <article className="ds-map-card">
-                  <strong>Campo analizado: {lookupResult.text_field_name}</strong>
-                  <span>Modo: {modeLabel(lookupResult.mode)}</span>
-                  <small>Configurado: {new Date(lookupResult.created_at).toLocaleString()}</small>
+                  <strong>{t('admin.aiAudit.analyzedField', { field: lookupResult.text_field_name })}</strong>
+                  <span>{t('admin.aiAudit.modePrefix', { mode: modeLabel(lookupResult.mode) })}</span>
+                  <small>{t('admin.aiAudit.configuredAt', { date: new Date(lookupResult.created_at).toLocaleString() })}</small>
                 </article>
               ) : null}
             </div>

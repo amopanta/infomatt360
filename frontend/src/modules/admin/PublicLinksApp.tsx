@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
+import { useI18n } from '../../i18n';
 import { PROJECT_KEY } from '../auth/session';
 import { fetchProjectTemplates } from '../records/api';
 import type { TemplateSummary } from '../records/api';
@@ -12,6 +13,7 @@ function publicFormUrl(token: string): string {
 }
 
 export function PublicLinksApp() {
+  const { t } = useI18n();
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [templateId, setTemplateId] = useState('');
@@ -38,7 +40,7 @@ export function PublicLinksApp() {
     try {
       setLinks(await fetchPublicLinks(id));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible consultar los enlaces publicos.');
+      setMessage(error instanceof Error ? error.message : t('admin.publicLinks.queryError'));
     }
   }
 
@@ -60,7 +62,7 @@ export function PublicLinksApp() {
       setExpiresInHours('');
       await loadLinks(templateId);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible generar el enlace publico.');
+      setMessage(error instanceof Error ? error.message : t('admin.publicLinks.createError'));
     } finally {
       setCreating(false);
     }
@@ -69,47 +71,47 @@ export function PublicLinksApp() {
   async function submitRevoke(linkId: string) {
     try {
       await revokePublicLink(linkId);
-      setMessage('Enlace revocado.');
+      setMessage(t('admin.publicLinks.linkRevoked'));
       await loadLinks(templateId);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible revocar el enlace.');
+      setMessage(error instanceof Error ? error.message : t('admin.publicLinks.revokeError'));
     }
   }
 
   function linkStatus(link: PublicFormLink): { label: string; className: string } {
-    if (link.revoked_at) return { label: 'Revocado', className: 'failed' };
-    if (link.expires_at && new Date(link.expires_at).getTime() <= Date.now()) return { label: 'Vencido', className: 'failed' };
-    if (link.max_submissions !== null && link.max_submissions !== undefined && link.submission_count >= link.max_submissions) return { label: 'Agotado', className: 'skipped' };
-    return { label: 'Activo', className: 'sent' };
+    if (link.revoked_at) return { label: t('admin.publicLinks.statusRevoked'), className: 'failed' };
+    if (link.expires_at && new Date(link.expires_at).getTime() <= Date.now()) return { label: t('admin.publicLinks.statusExpired'), className: 'failed' };
+    if (link.max_submissions !== null && link.max_submissions !== undefined && link.submission_count >= link.max_submissions) return { label: t('admin.publicLinks.statusExhausted'), className: 'skipped' };
+    return { label: t('admin.publicLinks.statusActive'), className: 'sent' };
   }
 
   return (
-    <AppShell title="Formularios abiertos (captura pública)">
+    <AppShell title={t('admin.publicLinks.title')}>
       <main className="audit-shell">
         <section className="audit-panel">
           <header>
             <div>
-              <h2>Generar enlace público</h2>
-              <p>Cualquier persona con el enlace puede responder el formulario sin cuenta, similar a una encuesta de LimeSurvey (ver docs/92).</p>
+              <h2>{t('admin.publicLinks.generateTitle')}</h2>
+              <p>{t('admin.publicLinks.generateDescription')}</p>
             </div>
           </header>
           {message ? <p role="status" className="erp-message">{message}</p> : null}
           <div className="ai-analyze-inline">
-            <label>Formulario
+            <label>{t('admin.publicLinks.formLabel')}
               <select value={templateId} onChange={(event) => setTemplateId(event.target.value)}>
                 {templates.map((template) => <option key={template.id} value={template.id}>{template.name} ({template.status})</option>)}
               </select>
             </label>
-            <label>Etiqueta (opcional)<input value={label} onChange={(event) => setLabel(event.target.value)} placeholder="Feria comercial Bogotá" /></label>
-            <label>Máximo de respuestas (vacío = ilimitado)<input type="number" min={1} value={maxSubmissions} onChange={(event) => setMaxSubmissions(event.target.value)} /></label>
-            <label>Vence en horas (vacío = sin vencimiento)<input type="number" min={1} value={expiresInHours} onChange={(event) => setExpiresInHours(event.target.value)} /></label>
+            <label>{t('admin.publicLinks.labelOptional')}<input value={label} onChange={(event) => setLabel(event.target.value)} placeholder={t('admin.publicLinks.labelPlaceholder')} /></label>
+            <label>{t('admin.publicLinks.maxSubmissions')}<input type="number" min={1} value={maxSubmissions} onChange={(event) => setMaxSubmissions(event.target.value)} /></label>
+            <label>{t('admin.publicLinks.expiresInHours')}<input type="number" min={1} value={expiresInHours} onChange={(event) => setExpiresInHours(event.target.value)} /></label>
             <button className="primary" disabled={creating || !templateId} onClick={() => void submitCreate()}>
-              {creating ? 'Generando…' : 'Generar enlace'}
+              {creating ? t('admin.publicLinks.generating') : t('admin.publicLinks.generateLink')}
             </button>
           </div>
           {issued ? (
             <article className="ds-map-card">
-              <strong>Enlace generado (se muestra una sola vez el token completo):</strong>
+              <strong>{t('admin.publicLinks.linkGenerated')}</strong>
               <span>{publicFormUrl(issued.token)}</span>
             </article>
           ) : null}
@@ -118,18 +120,18 @@ export function PublicLinksApp() {
         <section className="audit-panel">
           <header>
             <div>
-              <h2>Enlaces del formulario seleccionado</h2>
+              <h2>{t('admin.publicLinks.linksTitle')}</h2>
             </div>
           </header>
-          {!links.length ? <p>Este formulario aún no tiene enlaces públicos.</p> : null}
+          {!links.length ? <p>{t('admin.publicLinks.noLinks')}</p> : null}
           <div className="audit-table-wrap">
             <table className="audit-table">
               <thead>
                 <tr>
-                  <th>Etiqueta</th>
-                  <th>Respuestas</th>
-                  <th>Vence</th>
-                  <th>Estado</th>
+                  <th>{t('admin.publicLinks.labelColumn')}</th>
+                  <th>{t('admin.publicLinks.responsesColumn')}</th>
+                  <th>{t('admin.publicLinks.expiresColumn')}</th>
+                  <th>{t('admin.publicLinks.statusColumn')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -140,9 +142,9 @@ export function PublicLinksApp() {
                     <tr key={link.id}>
                       <td>{link.label || '—'}</td>
                       <td>{link.submission_count}{link.max_submissions ? ` / ${link.max_submissions}` : ''}</td>
-                      <td>{link.expires_at ? new Date(link.expires_at).toLocaleString() : 'Sin vencimiento'}</td>
+                      <td>{link.expires_at ? new Date(link.expires_at).toLocaleString() : t('admin.publicLinks.noExpiry')}</td>
                       <td><span className={`wa-status ${state.className}`}>{state.label}</span></td>
-                      <td>{!link.revoked_at ? <button onClick={() => void submitRevoke(link.id)}>Revocar</button> : null}</td>
+                      <td>{!link.revoked_at ? <button onClick={() => void submitRevoke(link.id)}>{t('admin.publicLinks.revoke')}</button> : null}</td>
                     </tr>
                   );
                 })}

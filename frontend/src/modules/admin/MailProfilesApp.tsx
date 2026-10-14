@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
+import { useI18n } from '../../i18n';
 import { PROJECT_KEY } from '../auth/session';
 import { createMailProfile, fetchMailProfiles, suggestMailAutoconfig, testSendMailProfile } from './mailApi';
 import type { MailProfile } from './mailApi';
@@ -22,6 +23,7 @@ const SMTP_PRESETS = {
 type SmtpPreset = keyof typeof SMTP_PRESETS | 'custom';
 
 export function MailProfilesApp() {
+  const { t } = useI18n();
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [profiles, setProfiles] = useState<MailProfile[]>([]);
   const [mailPollTasks, setMailPollTasks] = useState<ScheduledTask[]>([]);
@@ -48,7 +50,7 @@ export function MailProfilesApp() {
     try {
       setProfiles(await fetchMailProfiles(projectId));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible consultar los perfiles de correo.');
+      setMessage(error instanceof Error ? error.message : t('admin.mail.errorLoadProfiles'));
     }
   }
 
@@ -68,10 +70,10 @@ export function MailProfilesApp() {
     setActivatingId(profile.id);
     try {
       await createScheduledMailPollTask(projectId, profile.id, profile.name);
-      setMessage('Sondeo IMAP activado: se ejecuta cada hora desde el worker de tareas programadas.');
+      setMessage(t('admin.mail.imapPollingActivated'));
       await loadMailPollTasks();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible activar el sondeo IMAP.');
+      setMessage(error instanceof Error ? error.message : t('admin.mail.errorActivatePolling'));
     } finally {
       setActivatingId(null);
     }
@@ -86,9 +88,9 @@ export function MailProfilesApp() {
         setServerHost(suggestion.server_host ?? '');
         setServerPort(suggestion.server_port ?? '');
         setSecurity(suggestion.use_tls === false ? 'none' : 'starttls');
-        setAutoconfigNote(`Servidor sugerido automaticamente para ${email.split('@')[1]}.`);
+        setAutoconfigNote(t('admin.mail.autoconfigSuggested', { domain: email.split('@')[1] }));
       } else {
-        setAutoconfigNote('Usa los datos SMTP de tu proveedor o de tu hosting: servidor, puerto, seguridad y credenciales.');
+        setAutoconfigNote(t('admin.mail.autoconfigManual'));
       }
     } catch {
       setAutoconfigNote('');
@@ -100,7 +102,7 @@ export function MailProfilesApp() {
     if (next === 'custom') {
       setServerHost('');
       setServerPort('');
-      setAutoconfigNote('Para correo del hosting, consulta servidor SMTP, puerto y seguridad en el panel de tu proveedor.');
+      setAutoconfigNote(t('admin.mail.autoconfigCustom'));
       return;
     }
     const preset = SMTP_PRESETS[next];
@@ -128,8 +130,8 @@ export function MailProfilesApp() {
       });
       setMessage(
         provider === 'imap'
-          ? 'Perfil IMAP creado. Actívalo en la tabla de abajo para empezar a sondear la bandeja externa.'
-          : 'Perfil de correo creado. Usa "Enviar prueba" para validar el envio real.',
+          ? t('admin.mail.imapProfileCreated')
+          : t('admin.mail.smtpProfileCreated'),
       );
       setName('');
       setSenderEmail('');
@@ -143,7 +145,7 @@ export function MailProfilesApp() {
       setAutoconfigNote('');
       await loadProfiles();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible crear el perfil de correo.');
+      setMessage(error instanceof Error ? error.message : t('admin.mail.errorCreateProfile'));
     } finally {
       setCreating(false);
     }
@@ -155,72 +157,72 @@ export function MailProfilesApp() {
       const result = await testSendMailProfile(profileId);
       setTestMessages((current) => ({ ...current, [profileId]: result.detail }));
     } catch (error) {
-      setTestMessages((current) => ({ ...current, [profileId]: error instanceof Error ? error.message : 'No fue posible enviar el correo de prueba.' }));
+      setTestMessages((current) => ({ ...current, [profileId]: error instanceof Error ? error.message : t('admin.mail.errorSendTest') }));
     } finally {
       setTestingId(null);
     }
   }
 
   return (
-    <AppShell title="Cuentas de correo">
+    <AppShell title={t('admin.mail.title')}>
       <main className="audit-shell">
         {message ? <p role="status" className="erp-message">{message}</p> : null}
 
         <section className="audit-panel">
           <header>
             <div>
-              <h2>Nuevo perfil de correo</h2>
-              <p>Selecciona tu servicio para completar automáticamente el servidor y la seguridad, o usa los datos de tu hosting.</p>
+              <h2>{t('admin.mail.newProfileTitle')}</h2>
+              <p>{t('admin.mail.newProfileDescription')}</p>
             </div>
           </header>
           <div className="ai-analyze-inline">
-            <label>Tipo
+            <label>{t('admin.mail.typeLabel')}
               <select value={provider} onChange={(event) => { setProvider(event.target.value as 'smtp' | 'imap'); setSmtpPreset('custom'); setServerHost(''); setServerPort(''); setAutoconfigNote(''); }}>
-                <option value="smtp">Envío (SMTP)</option>
-                <option value="imap">Bandeja externa de solo lectura (IMAP)</option>
+                <option value="smtp">{t('admin.mail.typeSMTP')}</option>
+                <option value="imap">{t('admin.mail.typeIMAP')}</option>
               </select>
             </label>
-            {provider === 'smtp' ? <label>Servicio de correo
+            {provider === 'smtp' ? <label>{t('admin.mail.emailServiceLabel')}
               <select value={smtpPreset} onChange={(event) => chooseSmtpPreset(event.target.value as SmtpPreset)}>
-                <option value="custom">Otro proveedor o correo del hosting</option>
+                <option value="custom">{t('admin.mail.customProvider')}</option>
                 {Object.entries(SMTP_PRESETS).map(([key, preset]) => <option key={key} value={key}>{preset.label}</option>)}
               </select>
             </label> : null}
-            <label>Nombre<input value={name} onChange={(event) => setName(event.target.value)} placeholder="Correo institucional" /></label>
-            <label>{provider === 'imap' ? 'Casilla a leer' : 'Correo remitente'}<input type="email" value={senderEmail} onChange={(event) => { const previous = senderEmail.trim(); const next = event.target.value; setSenderEmail(next); if (!username.trim() || username.trim() === previous) setUsername(next); }} onBlur={() => void handleEmailBlur()} placeholder="notificaciones@midominio.com" /></label>
-            <label>Servidor {provider === 'imap' ? 'IMAP' : 'SMTP'}<input value={serverHost} onChange={(event) => setServerHost(event.target.value)} placeholder={provider === 'imap' ? 'imap.midominio.com' : 'smtp.midominio.com'} /></label>
-            <label>Puerto<input value={serverPort} onChange={(event) => setServerPort(event.target.value)} placeholder={provider === 'imap' ? '993' : security === 'ssl' ? '465' : '587'} /></label>
-            <label>Usuario<input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="Normalmente, el correo completo" /></label>
-            <label>Contraseña<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-            {provider === 'smtp' ? <label>Seguridad SMTP<select value={security} onChange={(event) => { const next = event.target.value as 'starttls' | 'ssl' | 'none'; setSecurity(next); if (!serverPort || serverPort === '465' || serverPort === '587') setServerPort(next === 'ssl' ? '465' : '587'); }}><option value="starttls">STARTTLS (puerto 587)</option><option value="ssl">SSL/TLS (puerto 465)</option><option value="none">Sin cifrado (solo redes confiables)</option></select></label> : null}
-            <label><input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} /> Predeterminado</label>
+            <label>{t('admin.mail.nameLabel')}<input value={name} onChange={(event) => setName(event.target.value)} placeholder={t('admin.mail.namePlaceholder')} /></label>
+            <label>{provider === 'imap' ? t('admin.mail.imapMailboxLabel') : t('admin.mail.senderEmailLabel')}<input type="email" value={senderEmail} onChange={(event) => { const previous = senderEmail.trim(); const next = event.target.value; setSenderEmail(next); if (!username.trim() || username.trim() === previous) setUsername(next); }} onBlur={() => void handleEmailBlur()} placeholder={t('admin.mail.emailPlaceholder')} /></label>
+            <label>{provider === 'imap' ? t('admin.mail.imapServerLabel') : t('admin.mail.smtpServerLabel')}<input value={serverHost} onChange={(event) => setServerHost(event.target.value)} placeholder={provider === 'imap' ? t('admin.mail.imapServerPlaceholder') : t('admin.mail.smtpServerPlaceholder')} /></label>
+            <label>{t('admin.mail.portLabel')}<input value={serverPort} onChange={(event) => setServerPort(event.target.value)} placeholder={provider === 'imap' ? '993' : security === 'ssl' ? '465' : '587'} /></label>
+            <label>{t('admin.mail.usernameLabel')}<input value={username} onChange={(event) => setUsername(event.target.value)} placeholder={t('admin.mail.usernamePlaceholder')} /></label>
+            <label>{t('admin.mail.passwordLabel')}<input type="password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+            {provider === 'smtp' ? <label>{t('admin.mail.smtpSecurityLabel')}<select value={security} onChange={(event) => { const next = event.target.value as 'starttls' | 'ssl' | 'none'; setSecurity(next); if (!serverPort || serverPort === '465' || serverPort === '587') setServerPort(next === 'ssl' ? '465' : '587'); }}><option value="starttls">{t('admin.mail.securityStartTLS')}</option><option value="ssl">{t('admin.mail.securitySSL')}</option><option value="none">{t('admin.mail.securityNone')}</option></select></label> : null}
+            <label><input type="checkbox" checked={isDefault} onChange={(event) => setIsDefault(event.target.checked)} /> {t('admin.mail.defaultCheckbox')}</label>
             <button className="primary" disabled={creating || !senderEmail.trim() || !serverHost.trim() || !serverPort.trim()} onClick={() => void submitCreate()}>
-              {creating ? 'Creando…' : 'Crear perfil'}
+              {creating ? t('admin.mail.creating') : t('admin.mail.createProfile')}
             </button>
           </div>
-          {provider === 'imap' ? <p>Bandeja de solo lectura: se sondea INBOX cada hora, sin adjuntos ni respuesta desde la app (ver docs/116).</p> : null}
-          {provider === 'smtp' ? <p>Para usar esta cuenta en recuperación de contraseña, márcala como predeterminada y confirma el envío con “Enviar prueba”. Algunos proveedores requieren una contraseña de aplicación.</p> : null}
+          {provider === 'imap' ? <p>{t('admin.mail.imapNote')}</p> : null}
+          {provider === 'smtp' ? <p>{t('admin.mail.smtpNote')}</p> : null}
           {autoconfigNote ? <p>{autoconfigNote}</p> : null}
         </section>
 
         <section className="audit-panel">
           <header>
             <div>
-              <h2>Perfiles del proyecto</h2>
-              <p>Envia un correo de prueba real antes de dar por buena la configuracion.</p>
+              <h2>{t('admin.mail.profilesTitle')}</h2>
+              <p>{t('admin.mail.profilesDescription')}</p>
             </div>
           </header>
-          {!profiles.length ? <p>Aun no hay perfiles de correo para este proyecto.</p> : null}
+          {!profiles.length ? <p>{t('admin.mail.noProfilesYet')}</p> : null}
           <div className="audit-table-wrap">
             <table className="audit-table">
               <thead>
                 <tr>
-                  <th>Nombre</th>
-                  <th>Tipo</th>
-                  <th>Remitente</th>
-                  <th>Servidor</th>
-                  <th>Predeterminado</th>
-                  <th>Estado</th>
+                  <th>{t('admin.mail.colName')}</th>
+                  <th>{t('admin.mail.colType')}</th>
+                  <th>{t('admin.mail.colSender')}</th>
+                  <th>{t('admin.mail.colServer')}</th>
+                  <th>{t('admin.mail.colDefault')}</th>
+                  <th>{t('admin.mail.colStatus')}</th>
                   <th></th>
                 </tr>
               </thead>
@@ -230,27 +232,27 @@ export function MailProfilesApp() {
                   return (
                     <tr key={profile.id}>
                       <td>{profile.name}</td>
-                      <td>{profile.provider === 'imap' ? 'IMAP (lectura)' : 'SMTP'}</td>
+                      <td>{profile.provider === 'imap' ? t('admin.mail.typeImapRead') : t('admin.mail.typeSMTPShort')}</td>
                       <td>{profile.sender_email}</td>
                       <td>{profile.server_host ? `${profile.server_host}:${profile.server_port ?? ''}` : '—'}</td>
-                      <td>{profile.is_default ? 'Si' : 'No'}</td>
+                      <td>{profile.is_default ? t('admin.mail.defaultYes') : t('admin.mail.defaultNo')}</td>
                       <td>
                         {profile.provider === 'imap'
                           ? mailPollTask
-                            ? `Sondeo activo (cada hora) — ${mailPollTask.last_result ?? 'aún sin ejecutar'}`
-                            : 'Sondeo inactivo'
+                            ? t('admin.mail.pollingActive', { result: mailPollTask.last_result ?? t('admin.mail.pollingNotRun') })
+                            : t('admin.mail.pollingInactive')
                           : testMessages[profile.id] ?? '—'}
                       </td>
                       <td>
                         {profile.provider === 'imap' ? (
                           mailPollTask ? null : (
                             <button disabled={activatingId === profile.id} onClick={() => void submitActivatePolling(profile)}>
-                              {activatingId === profile.id ? 'Activando…' : 'Activar sondeo IMAP'}
+                              {activatingId === profile.id ? t('admin.mail.activatingPolling') : t('admin.mail.activatePolling')}
                             </button>
                           )
                         ) : (
                           <button disabled={testingId === profile.id} onClick={() => void submitTestSend(profile.id)}>
-                            {testingId === profile.id ? 'Enviando…' : 'Enviar prueba'}
+                            {testingId === profile.id ? t('admin.mail.sending') : t('admin.mail.sendTest')}
                           </button>
                         )}
                       </td>

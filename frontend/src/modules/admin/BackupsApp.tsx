@@ -1,21 +1,12 @@
 import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
+import { useI18n } from '../../i18n';
 import { PROJECT_KEY } from '../auth/session';
 import { fetchBackups, runBackup } from './backupsApi';
 import type { BackupJob } from './backupsApi';
 import { createScheduledBackupTask, fetchScheduledTasks } from './schedulerApi';
 import type { ScheduledTask } from './schedulerApi';
-
-function frequencyLabel(frequency: string) {
-  const labels: Record<string, string> = { hourly: 'Cada hora', daily: 'Diario', weekly: 'Semanal' };
-  return labels[frequency] ?? frequency;
-}
-
-function statusLabel(status: string) {
-  const labels: Record<string, string> = { success: 'Exitoso', failed: 'Fallido', running: 'En progreso' };
-  return labels[status] ?? status;
-}
 
 function statusClass(status: string) {
   if (status === 'success') return 'sent';
@@ -31,6 +22,7 @@ function formatSize(bytes?: number | null) {
 }
 
 export function BackupsApp() {
+  const { t } = useI18n();
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [backups, setBackups] = useState<BackupJob[]>([]);
   const [message, setMessage] = useState('');
@@ -39,11 +31,21 @@ export function BackupsApp() {
   const [frequency, setFrequency] = useState('daily');
   const [scheduling, setScheduling] = useState(false);
 
+  function frequencyLabel(freq: string) {
+    const labels: Record<string, string> = { hourly: t('admin.backups.frequencyHourly'), daily: t('admin.backups.frequencyDaily'), weekly: t('admin.backups.frequencyWeekly') };
+    return labels[freq] ?? freq;
+  }
+
+  function statusLabel(status: string) {
+    const labels: Record<string, string> = { success: t('admin.backups.statusSuccess'), failed: t('admin.backups.statusFailed'), running: t('admin.backups.statusRunning') };
+    return labels[status] ?? status;
+  }
+
   async function loadBackups() {
     try {
       setBackups(await fetchBackups(projectId));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible cargar el historial de respaldos.');
+      setMessage(error instanceof Error ? error.message : t('admin.backups.errorLoadBackups'));
     }
   }
 
@@ -53,7 +55,7 @@ export function BackupsApp() {
       const tasks = await fetchScheduledTasks(projectId);
       setScheduledTask(tasks.find((task) => task.task_type === 'backup') ?? null);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible consultar la programacion de respaldos.');
+      setMessage(error instanceof Error ? error.message : t('admin.backups.errorLoadSchedule'));
     }
   }
 
@@ -64,9 +66,9 @@ export function BackupsApp() {
     try {
       const task = await createScheduledBackupTask(projectId, frequency);
       setScheduledTask(task);
-      setMessage('Respaldo automatico programado.');
+      setMessage(t('admin.backups.backupScheduled'));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible programar el respaldo automatico.');
+      setMessage(error instanceof Error ? error.message : t('admin.backups.errorSchedule'));
     } finally {
       setScheduling(false);
     }
@@ -76,42 +78,42 @@ export function BackupsApp() {
     setRunning(true);
     try {
       const job = await runBackup(projectId);
-      setMessage(job.status === 'success' ? `Respaldo completado (${formatSize(job.size_bytes)}).` : `Respaldo con estado: ${statusLabel(job.status)}.`);
+      setMessage(job.status === 'success' ? t('admin.backups.backupCompleted', { size: formatSize(job.size_bytes) }) : t('admin.backups.backupStatus', { status: statusLabel(job.status) }));
       await loadBackups();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible ejecutar el respaldo.');
+      setMessage(error instanceof Error ? error.message : t('admin.backups.errorRunBackup'));
     } finally {
       setRunning(false);
     }
   }
 
   return (
-    <AppShell title="Backups programables">
+    <AppShell title={t('admin.backups.title')}>
       <main className="audit-shell">
         <section className="audit-panel">
           <header>
             <div>
-              <h2>Respaldo automático</h2>
-              <p>Un worker (<code>python -m app.cli.run_scheduled_tasks --loop</code>) ejecuta este respaldo por su cuenta, sin depender de que alguien entre a la web (ver docs/78).</p>
+              <h2>{t('admin.backups.autoBackupTitle')}</h2>
+              <p>{t('admin.backups.autoBackupDescription')}</p>
             </div>
           </header>
           {scheduledTask ? (
             <div className="ai-analyze-inline">
-              <span>Frecuencia: <strong>{frequencyLabel(scheduledTask.frequency)}</strong></span>
-              <span>Próxima ejecución: {scheduledTask.next_run_at ? new Date(scheduledTask.next_run_at).toLocaleString() : 'pendiente del worker'}</span>
-              <span>Último resultado: {scheduledTask.last_result ?? 'aún no se ha ejecutado'}</span>
+              <span>{t('admin.backups.frequencyPrefix', { frequency: frequencyLabel(scheduledTask.frequency) })}</span>
+              <span>{t('admin.backups.nextRunPrefix', { date: scheduledTask.next_run_at ? new Date(scheduledTask.next_run_at).toLocaleString() : t('admin.backups.pendingWorker') })}</span>
+              <span>{t('admin.backups.lastResultPrefix', { result: scheduledTask.last_result ?? t('admin.backups.notYetRun') })}</span>
             </div>
           ) : (
             <div className="ai-analyze-inline">
-              <label>Frecuencia
+              <label>{t('admin.backups.frequencyLabel')}
                 <select value={frequency} onChange={(event) => setFrequency(event.target.value)}>
-                  <option value="hourly">Cada hora</option>
-                  <option value="daily">Diario</option>
-                  <option value="weekly">Semanal</option>
+                  <option value="hourly">{t('admin.backups.frequencyHourly')}</option>
+                  <option value="daily">{t('admin.backups.frequencyDaily')}</option>
+                  <option value="weekly">{t('admin.backups.frequencyWeekly')}</option>
                 </select>
               </label>
               <button className="primary" disabled={scheduling} onClick={() => void submitSchedule()}>
-                {scheduling ? 'Programando…' : 'Programar respaldo automático'}
+                {scheduling ? t('admin.backups.scheduling') : t('admin.backups.scheduleAutoBackup')}
               </button>
             </div>
           )}
@@ -120,22 +122,22 @@ export function BackupsApp() {
         <section className="audit-panel">
           <header>
             <div>
-              <h2>Respaldos de base de datos</h2>
-              <p>Ejecuta un volcado (pg_dump) del proyecto actual y consulta el historial (ver docs/78).</p>
+              <h2>{t('admin.backups.dbBackupsTitle')}</h2>
+              <p>{t('admin.backups.dbBackupsDescription')}</p>
             </div>
-            <button disabled={running} onClick={() => void submitRunBackup()}>{running ? 'Ejecutando…' : 'Ejecutar respaldo ahora'}</button>
+            <button disabled={running} onClick={() => void submitRunBackup()}>{running ? t('admin.backups.running') : t('admin.backups.runBackupNow')}</button>
           </header>
           {message ? <p role="status" className="erp-message">{message}</p> : null}
-          {!backups.length ? <p>Aun no hay respaldos ejecutados para este proyecto.</p> : null}
+          {!backups.length ? <p>{t('admin.backups.noBackupsYet')}</p> : null}
           <div className="audit-table-wrap">
             <table className="audit-table">
               <thead>
                 <tr>
-                  <th>Inicio</th>
-                  <th>Estado</th>
-                  <th>Tamaño</th>
-                  <th>Archivo</th>
-                  <th>Error</th>
+                  <th>{t('admin.backups.colStart')}</th>
+                  <th>{t('admin.backups.colStatus')}</th>
+                  <th>{t('admin.backups.colSize')}</th>
+                  <th>{t('admin.backups.colFile')}</th>
+                  <th>{t('admin.backups.colError')}</th>
                 </tr>
               </thead>
               <tbody>

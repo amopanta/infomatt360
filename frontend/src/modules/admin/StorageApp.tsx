@@ -1,18 +1,15 @@
 import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
+import { useI18n } from '../../i18n';
 import { PROJECT_KEY } from '../auth/session';
 import { authorizeGoogleDrive, configureGoogleDrive, connectS3Storage, fetchGoogleDriveStatus, fetchStorageProfiles, googleDriveCallbackUrl, selectDefaultStorage } from './storageApi';
 import type { StorageProfile } from './storageApi';
 
 type Tab = 's3' | 'gdrive';
 
-function providerLabel(provider: string) {
-  const labels: Record<string, string> = { local: 'Disco local', s3: 'S3 / MinIO', gdrive: 'Google Drive' };
-  return labels[provider] ?? provider;
-}
-
 export function StorageApp() {
+  const { t } = useI18n();
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [tab, setTab] = useState<Tab>('s3');
   const [message, setMessage] = useState('');
@@ -33,12 +30,17 @@ export function StorageApp() {
   const [driveRedirectUri, setDriveRedirectUri] = useState(googleDriveCallbackUrl());
   const [savingDrive, setSavingDrive] = useState(false);
 
+  function providerLabel(provider: string) {
+    const labels: Record<string, string> = { local: t('admin.storage.providerLocal'), s3: t('admin.storage.providerS3'), gdrive: t('admin.storage.providerGdrive') };
+    return labels[provider] ?? provider;
+  }
+
   async function loadProfiles() {
     if (!projectId) return;
     try {
       setProfiles(await fetchStorageProfiles(projectId));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible consultar los destinos de almacenamiento.');
+      setMessage(error instanceof Error ? error.message : t('admin.storage.queryError'));
     }
   }
 
@@ -54,9 +56,9 @@ export function StorageApp() {
       setDriveConfigured(true);
       setDriveClientSecret('');
       await loadProfiles();
-      setMessage('Cliente OAuth guardado. Ahora conecta y autoriza la cuenta de Google Drive.');
+      setMessage(t('admin.storage.oauthSaved'));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible guardar la configuración.');
+      setMessage(error instanceof Error ? error.message : t('admin.storage.saveConfigError'));
     } finally {
       setSavingDrive(false);
     }
@@ -66,14 +68,14 @@ export function StorageApp() {
     setConnecting(true);
     try {
       await connectS3Storage({ projectId, bucketName: bucketName.trim(), endpointUrl: endpointUrl.trim(), region: region.trim(), accessKeyId: accessKeyId.trim(), secretAccessKey });
-      setMessage('Boveda S3/MinIO conectada. Las subidas de evidencias nuevas iran a este destino.');
+      setMessage(t('admin.storage.s3Connected'));
       setBucketName('');
       setEndpointUrl('');
       setAccessKeyId('');
       setSecretAccessKey('');
       await loadProfiles();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible conectar la boveda S3/MinIO.');
+      setMessage(error instanceof Error ? error.message : t('admin.storage.s3ConnectError'));
     } finally {
       setConnecting(false);
     }
@@ -86,10 +88,10 @@ export function StorageApp() {
       const { authorization_url: authorizationUrl } = await authorizeGoogleDrive(projectId);
       if (popup) popup.location.href = authorizationUrl;
       else window.location.assign(authorizationUrl);
-      setMessage('Autoriza Google Drive en la pestaña nueva y luego actualiza la lista. Después selecciona «Usar para nuevas subidas».');
+      setMessage(t('admin.storage.gdriveAuthorizeHint'));
     } catch (error) {
       popup?.close();
-      setMessage(error instanceof Error ? error.message : 'No fue posible iniciar la autorizacion de Google Drive.');
+      setMessage(error instanceof Error ? error.message : t('admin.storage.gdriveAuthorizeError'));
     } finally {
       setAuthorizing(false);
     }
@@ -100,20 +102,20 @@ export function StorageApp() {
     try {
       await selectDefaultStorage(projectId, profile.id);
       await loadProfiles();
-      setMessage(`${providerLabel(profile.provider)} recibirá las nuevas evidencias del proyecto. Los archivos existentes conservan su destino.`);
+      setMessage(t('admin.storage.defaultChanged', { provider: providerLabel(profile.provider) }));
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'No fue posible cambiar el destino.');
+      setMessage(error instanceof Error ? error.message : t('admin.storage.changeDefaultError'));
     } finally {
       setSelecting(null);
     }
   }
 
   return (
-    <AppShell title="Almacenamiento de multimedia">
+    <AppShell title={t('admin.storage.title')}>
       <main className="audit-shell">
         <nav className="erp-tabs">
-          <button className={tab === 's3' ? 'active' : undefined} onClick={() => setTab('s3')}>S3 / MinIO</button>
-          <button className={tab === 'gdrive' ? 'active' : undefined} onClick={() => setTab('gdrive')}>Google Drive</button>
+          <button className={tab === 's3' ? 'active' : undefined} onClick={() => setTab('s3')}>{t('admin.storage.providerS3')}</button>
+          <button className={tab === 'gdrive' ? 'active' : undefined} onClick={() => setTab('gdrive')}>{t('admin.storage.providerGdrive')}</button>
         </nav>
         {message ? <p role="status" className="erp-message">{message}</p> : null}
 
@@ -121,18 +123,18 @@ export function StorageApp() {
           <section className="audit-panel">
             <header>
               <div>
-                <h2>Conectar boveda S3/MinIO</h2>
-                <p>Las fotos, audios y videos se convierten a WebP y se suben con hash SHA-256 (ver docs/89). Las credenciales se cifran; nunca se muestran despues de guardarlas.</p>
+                <h2>{t('admin.storage.s3Title')}</h2>
+                <p>{t('admin.storage.s3Description')}</p>
               </div>
             </header>
             <div className="ai-analyze-inline">
-              <label>Bucket<input value={bucketName} onChange={(event) => setBucketName(event.target.value)} placeholder="infomatt360-evidencias" /></label>
-              <label>Endpoint (opcional, MinIO)<input value={endpointUrl} onChange={(event) => setEndpointUrl(event.target.value)} placeholder="http://localhost:9000" /></label>
-              <label>Region<input value={region} onChange={(event) => setRegion(event.target.value)} /></label>
-              <label>Access key ID<input value={accessKeyId} onChange={(event) => setAccessKeyId(event.target.value)} /></label>
-              <label>Secret access key<input type="password" value={secretAccessKey} onChange={(event) => setSecretAccessKey(event.target.value)} /></label>
+              <label>{t('admin.storage.bucketLabel')}<input value={bucketName} onChange={(event) => setBucketName(event.target.value)} placeholder={t('admin.storage.bucketPlaceholder')} /></label>
+              <label>{t('admin.storage.endpointLabel')}<input value={endpointUrl} onChange={(event) => setEndpointUrl(event.target.value)} placeholder={t('admin.storage.endpointPlaceholder')} /></label>
+              <label>{t('admin.storage.regionLabel')}<input value={region} onChange={(event) => setRegion(event.target.value)} /></label>
+              <label>{t('admin.storage.accessKeyLabel')}<input value={accessKeyId} onChange={(event) => setAccessKeyId(event.target.value)} /></label>
+              <label>{t('admin.storage.secretKeyLabel')}<input type="password" value={secretAccessKey} onChange={(event) => setSecretAccessKey(event.target.value)} /></label>
               <button className="primary" disabled={connecting || !bucketName.trim() || !accessKeyId.trim() || !secretAccessKey} onClick={() => void submitConnectS3()}>
-                {connecting ? 'Conectando…' : 'Conectar'}
+                {connecting ? t('admin.storage.connecting') : t('admin.storage.connect')}
               </button>
             </div>
           </section>
@@ -142,43 +144,43 @@ export function StorageApp() {
           <section className="audit-panel">
             <header>
               <div>
-                <h2>Conectar Google Drive</h2>
-                <p>Configura un cliente OAuth del proyecto y autoriza una cuenta de Google Drive. Después activa el destino en la tabla para las nuevas evidencias.</p>
+                <h2>{t('admin.storage.gdriveTitle')}</h2>
+                <p>{t('admin.storage.gdriveDescription')}</p>
               </div>
               <button className="primary" disabled={authorizing || !driveConfigured} onClick={() => void submitAuthorizeGdrive()}>
-                {authorizing ? 'Abriendo…' : 'Conectar Google Drive'}
+                {authorizing ? t('admin.storage.opening') : t('admin.storage.gdriveConnect')}
               </button>
             </header>
-            <p role="status">{driveConfigured ? 'Cliente OAuth configurado. Puedes autorizar la cuenta de Drive.' : 'Falta configurar el cliente OAuth para este proyecto.'}</p>
+            <p role="status">{driveConfigured ? t('admin.storage.oauthConfigured') : t('admin.storage.oauthMissing')}</p>
             <div className="ai-analyze-inline">
-              <label>Client ID<input value={driveClientId} onChange={(event) => setDriveClientId(event.target.value)} placeholder="ID del cliente OAuth" autoComplete="off" /></label>
-              <label>Client Secret<input type="password" value={driveClientSecret} onChange={(event) => setDriveClientSecret(event.target.value)} placeholder="No se mostrará después de guardarlo" autoComplete="new-password" /></label>
-              <label>URL de retorno<input value={driveRedirectUri} onChange={(event) => setDriveRedirectUri(event.target.value)} /></label>
-              <button disabled={savingDrive || !driveClientId.trim() || !driveClientSecret.trim() || !driveRedirectUri.trim()} onClick={() => void saveDriveConfig()}>{savingDrive ? 'Guardando…' : 'Guardar cliente OAuth'}</button>
+              <label>{t('admin.storage.clientIdLabel')}<input value={driveClientId} onChange={(event) => setDriveClientId(event.target.value)} placeholder={t('admin.storage.clientIdPlaceholder')} autoComplete="off" /></label>
+              <label>{t('admin.storage.clientSecretLabel')}<input type="password" value={driveClientSecret} onChange={(event) => setDriveClientSecret(event.target.value)} placeholder={t('admin.storage.secretPlaceholder')} autoComplete="new-password" /></label>
+              <label>{t('admin.storage.redirectUriLabel')}<input value={driveRedirectUri} onChange={(event) => setDriveRedirectUri(event.target.value)} /></label>
+              <button disabled={savingDrive || !driveClientId.trim() || !driveClientSecret.trim() || !driveRedirectUri.trim()} onClick={() => void saveDriveConfig()}>{savingDrive ? t('admin.storage.saving') : t('admin.storage.saveOAuth')}</button>
             </div>
-            <small>Registra exactamente esta URL de retorno en la consola de Google Cloud. Cambiar el cliente desconecta la cuenta actual hasta volver a autorizarla.</small>
+            <small>{t('admin.storage.redirectHint')}</small>
           </section>
         ) : null}
 
         <section className="audit-panel">
           <header>
             <div>
-              <h2>Destinos conectados</h2>
-              <p>Solo un destino predeterminado recibe las subidas nuevas del proyecto. Cambiarlo no mueve los archivos anteriores.</p>
+              <h2>{t('admin.storage.connectedTitle')}</h2>
+              <p>{t('admin.storage.connectedDescription')}</p>
             </div>
-            <button onClick={() => void loadProfiles()}>Actualizar lista</button>
+            <button onClick={() => void loadProfiles()}>{t('admin.storage.refreshList')}</button>
           </header>
-          {!profiles.length ? <p>Aun no hay destinos de almacenamiento distintos al disco local para este proyecto.</p> : null}
+          {!profiles.length ? <p>{t('admin.storage.noProfiles')}</p> : null}
           <div className="audit-table-wrap">
             <table className="audit-table">
               <thead>
                 <tr>
-                  <th>Nombre</th>
-                  <th>Proveedor</th>
-                  <th>Bucket / ruta</th>
-                  <th>Predeterminado</th>
-                  <th>Estado</th>
-                  <th>Acción</th>
+                  <th>{t('admin.storage.nameColumn')}</th>
+                  <th>{t('admin.storage.providerColumn')}</th>
+                  <th>{t('admin.storage.bucketPathColumn')}</th>
+                  <th>{t('admin.storage.defaultColumn')}</th>
+                  <th>{t('admin.storage.statusColumn')}</th>
+                  <th>{t('admin.storage.actionColumn')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -187,9 +189,9 @@ export function StorageApp() {
                     <td>{profile.name}</td>
                     <td>{providerLabel(profile.provider)}</td>
                     <td>{profile.bucket_name ?? profile.base_path ?? '—'}</td>
-                    <td>{profile.is_default ? 'Si' : 'No'}</td>
-                    <td>{profile.connected === false ? 'Pendiente de conexión' : profile.status}</td>
-                    <td>{profile.is_default ? 'En uso' : <button disabled={selecting === profile.id || profile.status !== 'active' || profile.connected === false} onClick={() => void chooseDefault(profile)}>{selecting === profile.id ? 'Activando…' : 'Usar para nuevas subidas'}</button>}</td>
+                    <td>{profile.is_default ? t('admin.storage.yes') : t('admin.storage.no')}</td>
+                    <td>{profile.connected === false ? t('admin.storage.pendingConnection') : profile.status}</td>
+                    <td>{profile.is_default ? t('admin.storage.inUse') : <button disabled={selecting === profile.id || profile.status !== 'active' || profile.connected === false} onClick={() => void chooseDefault(profile)}>{selecting === profile.id ? t('admin.storage.activating') : t('admin.storage.useForUploads')}</button>}</td>
                   </tr>
                 ))}
               </tbody>
@@ -200,4 +202,3 @@ export function StorageApp() {
     </AppShell>
   );
 }
-

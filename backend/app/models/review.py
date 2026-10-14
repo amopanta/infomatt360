@@ -25,4 +25,4 @@ class ReviewAction(Base):
     user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     approval_flow_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     approval_flow_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)

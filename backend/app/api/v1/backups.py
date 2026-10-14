@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
@@ -13,9 +15,9 @@ router = APIRouter()
 
 
 @router.post("/run", response_model=BackupJobRead, summary="Ejecutar respaldo de base de datos")
-def run_backup(project_id: str, storage_profile_id: str | None = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> BackupJobRead:
+async def run_backup(project_id: str, storage_profile_id: str | None = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> BackupJobRead:
     require_project_permission(db, current_user.id, project_id, BACKUPS_MANAGE)
-    return backup_service.run_backup(db, project_id, current_user.id, storage_profile_id)
+    return await asyncio.to_thread(backup_service.run_backup, db, project_id, current_user.id, storage_profile_id)
 
 
 @router.get("/project/{project_id}", response_model=list[BackupJobRead], summary="Listar historial de respaldos")

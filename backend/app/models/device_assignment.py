@@ -38,6 +38,6 @@ class UserDeviceAssignment(Base):
     status: Mapped[str] = mapped_column(String(30), default="active", nullable=False)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_sync_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    registered_by: Mapped[str] = mapped_column(String(36), nullable=False)
+    registered_by: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

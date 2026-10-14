@@ -20,6 +20,6 @@ class ParticipantFormAssignment(Base):
     participant_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     responsible_user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     status: Mapped[str] = mapped_column(String(30), default="assigned", nullable=False)
-    assigned_by: Mapped[str] = mapped_column(String(36), nullable=False)
+    assigned_by: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

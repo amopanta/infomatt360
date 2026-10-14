@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
@@ -38,11 +40,11 @@ def project_report_summary(project_id: str, db: Session = Depends(get_db), curre
 
 
 @router.get("/project/{project_id}/summary.xlsx")
-def export_project_report_summary(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Response:
+async def export_project_report_summary(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Response:
     if not assignment_service.user_has_project_access(db, current_user.id, project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
     require_unrestricted_territory(db, current_user.id, project_id)
-    content = report_service.export_project_summary_xlsx(db, project_id)
+    content = await asyncio.to_thread(report_service.export_project_summary_xlsx, db, project_id)
     safe_name = "".join(character if character.isascii() and (character.isalnum() or character in "-_") else "_" for character in project_id).strip("_") or "proyecto"
     return Response(
         content=content,

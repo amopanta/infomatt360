@@ -37,5 +37,5 @@ class DeviceVerification(Base):
     credential_id: Mapped[str | None] = mapped_column(String(512), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
     verified_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-    consumed_record_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    consumed_record_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=utc_now)

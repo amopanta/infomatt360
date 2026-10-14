@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
@@ -87,7 +89,7 @@ def render_acta_from_record(template_id: str, payload: ActaRenderFromRecordReque
 
 
 @router.post("/{template_id}/render-batch", summary="Generar actas en lote (ZIP)")
-def render_acta_batch(template_id: str, payload: ActaRenderBatchRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Response:
+async def render_acta_batch(template_id: str, payload: ActaRenderBatchRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Response:
     template = acta_service.get_template(db, template_id)
     if template is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Plantilla de acta no encontrada")
@@ -119,7 +121,7 @@ def render_acta_batch(template_id: str, payload: ActaRenderBatchRequest, db: Ses
     if len(record_ids) > settings.acta_batch_max_records:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=f"El lote excede el maximo permitido ({settings.acta_batch_max_records} registros); reduce la seleccion o el filtro.")
 
-    zip_bytes = acta_service.render_pdf_batch(db, template, record_ids)
+    zip_bytes = await asyncio.to_thread(acta_service.render_pdf_batch, db, template, record_ids)
     return _zip_response(zip_bytes, template.name)
 
 

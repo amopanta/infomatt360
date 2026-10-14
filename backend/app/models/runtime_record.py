@@ -9,7 +9,7 @@ Notas: No se crean tablas fisicas por formulario; los valores se guardan en estr
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import DateTime, Integer, String, Text
+from sqlalchemy import DateTime, Index, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -29,6 +29,17 @@ class RuntimeRecord(Base):
     """
 
     __tablename__ = "runtime_records"
+    __table_args__ = (
+        # Cubre el patron de consulta mas comun:
+        # WHERE template_id = ? AND status = ? ORDER BY created_at DESC
+        Index("ix_runtime_records_template_status_created", "template_id", "status", "created_at"),
+        # Cubre dashboard/report GROUP BY:
+        # WHERE project_id = ? GROUP BY template_id, status
+        Index("ix_runtime_records_project_template_status", "project_id", "template_id", "status"),
+        # Cubre chequeo de duplicados:
+        # WHERE project_id = ? AND template_id = ? AND content_hash = ? AND created_at >= ?
+        Index("ix_runtime_records_dup_check", "project_id", "template_id", "content_hash", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
     project_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
@@ -51,7 +62,7 @@ class RuntimeRecord(Base):
     approval_flow_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     approval_flow_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
     approval_flow_snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(String(40), default="submitted", nullable=False)
+    status: Mapped[str] = mapped_column(String(40), default="submitted", nullable=False, index=True)
     submitted_by: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     device_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(80), nullable=True)
@@ -61,8 +72,8 @@ class RuntimeRecord(Base):
     # campo (ver runtime_record_service.correct_field). No tiene relacion
     # con `version_id` (la version de la PLANTILLA usada al capturar).
     lock_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False, index=True)
 
 
 class RuntimeRecordValue(Base):

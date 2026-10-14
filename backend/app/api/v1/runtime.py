@@ -6,6 +6,8 @@ Dependencias: FastAPI, servicios Runtime y RuntimeRecord.
 Notas: Este modulo cierra el flujo MVP Builder -> Runtime -> Guardar -> Consultar.
 """
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
@@ -396,7 +398,7 @@ def search_runtime_records(
 
 
 @router.get("/template/{template_id}/records/export.csv")
-def export_runtime_records(
+async def export_runtime_records(
     template_id: str,
     search: str | None = Query(default=None, max_length=120),
     status_filter: str | None = Query(default=None, alias="status", max_length=30),
@@ -404,7 +406,7 @@ def export_runtime_records(
     current_user: User = Depends(get_current_user),
 ) -> Response:
     template = require_template_access(db, current_user.id, template_id)
-    content = runtime_record_service.export_template_csv(db, template_id, search=search, status=status_filter, allowed_participant_ids=allowed_form_participant_ids(db, current_user.id, template, review=True))
+    content = await asyncio.to_thread(runtime_record_service.export_template_csv, db, template_id, search=search, status=status_filter, allowed_participant_ids=allowed_form_participant_ids(db, current_user.id, template, review=True))
     safe_name = "".join(character if character.isascii() and (character.isalnum() or character in "-_") else "_" for character in template.name).strip("_") or "registros"
     return Response(
         content=content.encode("utf-8"),

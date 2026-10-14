@@ -18,12 +18,12 @@ class Record(Base):
     project_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     form_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     participant_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
-    status: Mapped[str] = mapped_column(String(40), default="draft", nullable=False)
+    status: Mapped[str] = mapped_column(String(40), default="draft", nullable=False, index=True)
     source_channel: Mapped[str] = mapped_column(String(40), default="web", nullable=False)
     payload_json: Mapped[str] = mapped_column(Text, nullable=False)
     created_by: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     updated_by: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
@@ -35,4 +35,4 @@ class RecordEvent(Base):
     event_type: Mapped[str] = mapped_column(String(60), nullable=False)
     user_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)

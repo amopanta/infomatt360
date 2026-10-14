@@ -23,4 +23,4 @@ class Participant(Base):
     status: Mapped[str] = mapped_column(String(40), default="active", nullable=False)
     duplicate_flag: Mapped[str] = mapped_column(String(20), default="none", nullable=False)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)

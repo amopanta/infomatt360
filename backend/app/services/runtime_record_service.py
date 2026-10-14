@@ -35,6 +35,7 @@ from app.services.metrics_service import metrics_service
 from app.services.template_availability import ensure_accepting
 from app.services.participant_source_service import ensure_eligible
 from app.services.form_assignment_service import require_capture_assignment, set_assignment_status
+from app.services.query_cache_service import query_cache
 
 logger = logging.getLogger(__name__)
 
@@ -178,6 +179,8 @@ class RuntimeRecordService:
             db.rollback()
             raise
 
+        query_cache.invalidate_prefix(f"project_summary:{record.project_id}")
+        query_cache.invalidate_prefix(f"templates_list:{record.project_id}")
         db.refresh(record)
 
         # Auditoria semantica con IA (ver docs/88): se ejecuta despues de que

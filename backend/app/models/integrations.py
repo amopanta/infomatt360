@@ -66,6 +66,6 @@ class IntegrationJob(Base):
     map_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     reference_record_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     mode: Mapped[str] = mapped_column(String(60), default="manual", nullable=False)
-    status: Mapped[str] = mapped_column(String(40), default="pending", nullable=False)
+    status: Mapped[str] = mapped_column(String(40), default="pending", nullable=False, index=True)
     last_result: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

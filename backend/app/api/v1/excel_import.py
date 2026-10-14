@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
@@ -54,12 +56,12 @@ def confirm_mapping(job_id: str, payload: ExcelImportMappingUpdate, db: Session 
 
 
 @router.post("/{job_id}/approve", response_model=ExcelImportJobRead, summary="Aprobar e importar el lote")
-def approve_excel_import(job_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ExcelImportJobRead:
+async def approve_excel_import(job_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> ExcelImportJobRead:
     job = excel_import_service.get_job(db, job_id)
     if job is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lote no encontrado")
     require_project_permission(db, current_user.id, job.project_id, IDENTITY_USERS_MANAGE)
-    return excel_import_service.approve_and_import(db, job_id, current_user.id)
+    return await asyncio.to_thread(excel_import_service.approve_and_import, db, job_id, current_user.id)
 
 
 @router.get("/{job_id}", response_model=ExcelImportJobRead, summary="Consultar estado del lote")

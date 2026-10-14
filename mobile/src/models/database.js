@@ -243,6 +243,16 @@ function initDatabase() {
     CREATE INDEX IF NOT EXISTS idx_caso_eventos_caso ON caso_eventos(caso_id);
     CREATE INDEX IF NOT EXISTS idx_territories_proyecto ON user_territories(proyecto_id);
     CREATE INDEX IF NOT EXISTS idx_territories_user ON user_territories(user_id);
+
+    -- ═══ ÍNDICES ADICIONALES (sync y FK faltantes) ═══
+    CREATE INDEX IF NOT EXISTS idx_registros_offline_id ON registros(offline_id);
+    CREATE INDEX IF NOT EXISTS idx_registros_synced_at ON registros(synced_at);
+    CREATE INDEX IF NOT EXISTS idx_casos_created_by ON casos(created_by);
+    CREATE INDEX IF NOT EXISTS idx_caso_eventos_from_user ON caso_eventos(from_user_id);
+    CREATE INDEX IF NOT EXISTS idx_proyectos_org ON proyectos(organizacion_id);
+    CREATE INDEX IF NOT EXISTS idx_plantillas_proyecto ON plantillas(proyecto_id);
+    CREATE INDEX IF NOT EXISTS idx_refresh_tokens_usuario ON refresh_tokens(usuario_id);
+    CREATE INDEX IF NOT EXISTS idx_sync_queue_registro ON sync_queue(registro_id);
   `);
 
   console.log('✅ Base de datos inicializada correctamente');

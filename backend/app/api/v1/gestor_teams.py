@@ -1,5 +1,6 @@
 """Gestor teams are organizational membership, not form access grants."""
 
+import asyncio
 import csv
 import json
 from io import BytesIO, StringIO
@@ -208,7 +209,12 @@ def bulk_template(project_id: str, db: Session = Depends(get_db), actor: User = 
 async def bulk_import(project_id: str, preview_only: bool = Form(True), upload: UploadFile = File(...),
                       db: Session = Depends(get_db), actor: User = Depends(get_current_user)) -> dict:
     _manage(db, actor, project_id)
-    rows = _bulk_rows(upload.filename or "", await upload.read())
+    content = await upload.read()
+    rows = _bulk_rows(upload.filename or "", content)
+    return await asyncio.to_thread(_process_bulk_import, db, project_id, actor, rows, preview_only)
+
+
+def _process_bulk_import(db: Session, project_id: str, actor, rows, preview_only: bool) -> dict:
     teams = {team.name.casefold(): team for team in db.query(GestorTeam).filter_by(project_id=project_id).all()}
     valid_users = _project_user_ids(db, project_id)
     user_keys: dict[str, set[str]] = {}

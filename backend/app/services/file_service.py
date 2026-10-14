@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import hashlib
 import io
@@ -210,7 +211,7 @@ class FileService:
                 if len(buffer) > max_bytes:
                     raise ValueError(f"El archivo supera el limite de {profile.max_file_size_mb} MB")
             content = bytes(buffer)
-            result = gdrive_storage_service.upload_file(db, profile, original_name, content, upload.content_type or "application/octet-stream")
+            result = await asyncio.to_thread(gdrive_storage_service.upload_file, db, profile, original_name, content, upload.content_type or "application/octet-stream")
             return self.create_asset(db, FileAssetCreate(
                 project_id=project_id, participant_id=participant_id, record_id=record_id,
                 asset_type=asset_type.upper(), original_name=original_name,
@@ -242,7 +243,8 @@ class FileService:
                 if len(buffer) > max_bytes:
                     raise ValueError(f"El archivo supera el limite de {profile.max_file_size_mb} MB")
 
-            result = s3_storage_service.upload_file(
+            result = await asyncio.to_thread(
+                s3_storage_service.upload_file,
                 db,
                 profile,
                 project_id=project_id,

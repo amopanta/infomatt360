@@ -12,6 +12,7 @@ from app.models.identity import User
 from app.models.runtime_record import RuntimeRecord
 from app.schemas.builder import BuilderComponentCreate, BuilderComponentPropertiesUpdate, BuilderComponentRead, BuilderTemplateCreate, BuilderTemplatePropertiesUpdate, BuilderTemplateRead, BuilderVersionCreate, BuilderVersionRead, ParticipantSource
 from app.services.participant_source_service import validate_source
+from app.services.query_cache_service import query_cache
 from app.services.template_availability import availability
 
 
@@ -48,12 +49,16 @@ class BuilderService:
     que los routers contengan reglas de negocio.
     """
 
+    def _invalidate_template_cache(self, project_id: str) -> None:
+        query_cache.invalidate_prefix(f"templates_list:{project_id}")
+
     def create_template(self, db: Session, payload: BuilderTemplateCreate, user_id: str | None = None) -> BuilderTemplateRead:
         now = utc_now()
         row = BuilderTemplate(**payload.model_dump(), created_by=user_id, updated_at=now, published_at=now if payload.status == "published" else None)
         db.add(row)
         db.commit()
         db.refresh(row)
+        self._invalidate_template_cache(row.project_id)
         owner = db.get(User, user_id) if user_id else None
         return template_to_read(row, owner.full_name if owner else None)
 
@@ -96,6 +101,11 @@ class BuilderService:
         return self.get_template(db, clone.id)
 
     def list_templates(self, db: Session, project_id: str) -> list[BuilderTemplateRead]:
+        cache_key = f"templates_list:{project_id}"
+        cached = query_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         rows = db.query(BuilderTemplate).filter(BuilderTemplate.project_id == project_id, BuilderTemplate.status != "deleted").order_by(BuilderTemplate.created_at.desc()).all()
         if not rows:
             return []
@@ -103,7 +113,9 @@ class BuilderService:
         counts = dict(db.query(RuntimeRecord.template_id, func.count(RuntimeRecord.id)).filter(RuntimeRecord.template_id.in_(ids)).group_by(RuntimeRecord.template_id).all())
         owner_ids = [row.created_by for row in rows if row.created_by]
         owners = {user.id: user.full_name for user in db.query(User).filter(User.id.in_(owner_ids)).all()} if owner_ids else {}
-        return [template_to_read(row, owners.get(row.created_by), counts.get(row.id, 0)) for row in rows]
+        result = [template_to_read(row, owners.get(row.created_by), counts.get(row.id, 0)) for row in rows]
+        query_cache.set(cache_key, result)
+        return result
 
     def get_template(self, db: Session, template_id: str) -> BuilderTemplateRead:
         row = db.get(BuilderTemplate, template_id)
@@ -128,6 +140,7 @@ class BuilderService:
                 row.published_at = row.updated_at
             db.commit()
             db.refresh(row)
+            self._invalidate_template_cache(row.project_id)
         return self.get_template(db, template_id)
 
     def set_template_properties(self, db: Session, template_id: str, payload: BuilderTemplatePropertiesUpdate) -> BuilderTemplateRead:
@@ -141,6 +154,7 @@ class BuilderService:
         row.theme_json = payload.theme_json
         row.updated_at = utc_now()
         db.commit()
+        self._invalidate_template_cache(row.project_id)
         return self.get_template(db, template_id)
 
     def set_template_schedule(self, db: Session, template_id: str, starts_at, ends_at) -> BuilderTemplateRead:

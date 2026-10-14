@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -61,9 +63,9 @@ def create_export(project_id: str, payload: SavedExportCreate, db: Session = Dep
 
 
 @router.post("/{export_id}/run")
-def run_export(export_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+async def run_export(export_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     row = _export(db, user, export_id)
-    file = run_saved_export(db, row)
+    file = await asyncio.to_thread(run_saved_export, db, row)
     return {"file_id": file.id, "bytes": len(file.content)}
 
 

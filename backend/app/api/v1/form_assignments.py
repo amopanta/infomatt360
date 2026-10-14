@@ -1,5 +1,6 @@
 """Form access and participant assignments."""
 
+import asyncio
 import json
 import csv
 from datetime import datetime
@@ -270,6 +271,22 @@ async def bulk_assign_participants(
         raise HTTPException(status_code=422, detail="Selecciona primero el modo abierto o cerrado del formulario")
     if not assignment_service.user_has_project_access(db, responsible_user_id, template.project_id):
         raise HTTPException(status_code=422, detail="El responsable no tiene acceso al proyecto")
+    upload_content: bytes | None = None
+    if mode == "excel":
+        if upload is None:
+            raise HTTPException(status_code=422, detail="Selecciona el archivo Excel")
+        upload_content = await upload.read()
+    return await asyncio.to_thread(
+        _process_bulk_assign, db, template, template_id, responsible_user_id,
+        mode, group_name, team_id, preview_only, upload, upload_content, user,
+    )
+
+
+def _process_bulk_assign(
+    db: Session, template, template_id: str, responsible_user_id: str,
+    mode: str, group_name: str, team_id: str, preview_only: bool,
+    upload, upload_content: bytes | None, user,
+) -> BulkAssignmentPreview:
     candidates = eligible_participants(db, template, enforce_assignments=False)
     issues: list[str] = []
     if mode == "group":
@@ -293,9 +310,7 @@ async def bulk_assign_participants(
         member_ids = {row[0] for row in db.query(GestorTeamParticipant.participant_id).filter_by(team_id=team.id).all()}
         selected = [person for person in candidates if person.id in member_ids]
     elif mode == "excel":
-        if upload is None:
-            raise HTTPException(status_code=422, detail="Selecciona el archivo Excel")
-        field, keys = _excel_assignment_keys(upload.filename or "", await upload.read())
+        field, keys = _excel_assignment_keys(upload.filename or "", upload_content)
         by_key: dict[str, list[Participant]] = {}
         for person in candidates:
             key = str(getattr(person, field) or "").strip().casefold()

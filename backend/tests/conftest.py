@@ -5,6 +5,7 @@ import pytest
 
 from app.core.config import settings
 from app.services.permission_cache_service import in_memory_permission_cache
+from app.services.query_cache_service import query_cache
 
 
 @pytest.fixture(autouse=True)
@@ -15,6 +16,14 @@ def _reset_permission_cache():
     in_memory_permission_cache.clear()
     yield
     in_memory_permission_cache.clear()
+
+
+@pytest.fixture(autouse=True)
+def _reset_query_cache():
+    """Evita que el cache de consultas filtre estado entre pruebas."""
+    query_cache.clear()
+    yield
+    query_cache.clear()
 
 
 @pytest.fixture(autouse=True, scope="session")

@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     permissions_cache_backend: str = "memory"
     permissions_cache_redis_prefix: str = "infomatt360:permissions"
     permissions_cache_ttl_seconds: int = 60
+    query_cache_backend: str = "memory"
+    query_cache_redis_prefix: str = "infomatt360:qcache"
+    query_cache_ttl_seconds: int = 60
     request_logging_enabled: bool = True
     request_id_header: str = "X-Request-ID"
     metrics_enabled: bool = True

@@ -8,6 +8,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.core.time import utc_now
+from app.services.query_cache_service import query_cache
 from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.reports import Report, ReportBoard, ReportLink
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
@@ -84,6 +85,11 @@ class ReportService:
         return link_to_read(row)
 
     def project_summary(self, db: Session, project_id: str) -> ReportProjectSummary:
+        cache_key = f"project_summary:{project_id}"
+        cached = query_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
         templates = db.query(BuilderTemplate).filter(BuilderTemplate.project_id == project_id).order_by(BuilderTemplate.name.asc()).all()
         status_rows = (
             db.query(RuntimeRecord.template_id, RuntimeRecord.status, func.count(RuntimeRecord.id))
@@ -119,7 +125,9 @@ class ReportService:
             for template in templates
         ]
         metrics.sort(key=lambda item: (-item.records_total, item.template_name.lower()))
-        return ReportProjectSummary(project_id=project_id, records_total=records_total, records_by_status=records_by_status, templates=metrics, generated_at=utc_now())
+        result = ReportProjectSummary(project_id=project_id, records_total=records_total, records_by_status=records_by_status, templates=metrics, generated_at=utc_now())
+        query_cache.set(cache_key, result)
+        return result
 
     # --- Constructor visual de tableros (docs/96 item #6, docs/111) ---
 

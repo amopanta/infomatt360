@@ -31,7 +31,7 @@ class ExcelImportJob(Base):
     group_name: Mapped[str | None] = mapped_column(String(160), nullable=True)
     # Solo se usa cuando entity_type="records": la plantilla cuyos campos
     # definen el mapeo dinamico de columnas (ver docs/104).
-    template_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    template_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     source_filename: Mapped[str] = mapped_column(String(250), nullable=False)
     status: Mapped[str] = mapped_column(String(30), default="uploaded", nullable=False)
     column_mapping_json: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -41,8 +41,8 @@ class ExcelImportJob(Base):
     imported_rows: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     failed_rows: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     error_report_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    created_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    approved_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    created_by: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    approved_by: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

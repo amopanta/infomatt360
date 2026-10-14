@@ -21,7 +21,7 @@ class ScheduledTask(Base):
     target_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     frequency: Mapped[str] = mapped_column(String(60), default="manual", nullable=False)
     config_json: Mapped[str | None] = mapped_column(Text, nullable=True)
-    status: Mapped[str] = mapped_column(String(40), default="active", nullable=False)
+    status: Mapped[str] = mapped_column(String(40), default="active", nullable=False, index=True)
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     next_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_result: Mapped[str | None] = mapped_column(Text, nullable=True)

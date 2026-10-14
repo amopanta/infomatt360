@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
@@ -82,7 +83,7 @@ async def import_xlsform(
         preview = preview_xlsform(db, project_id, upload.filename or "formulario.xlsx", content, replace_template_id)
         if preview.errors:
             raise HTTPException(status_code=422, detail={"errors": preview.errors})
-    return import_form(db, project_id, upload.filename or "formulario.xlsx", content, current_user.id, replace_template_id)
+    return await asyncio.to_thread(import_form, db, project_id, upload.filename or "formulario.xlsx", content, current_user.id, replace_template_id)
 
 
 @router.get("/export/{template_id}", summary="Exportar plantilla a XLSForm (.xlsx)")

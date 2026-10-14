@@ -22,7 +22,7 @@ class ParticipantCase(Base):
     assigned_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     properties_json: Mapped[str] = mapped_column(Text, default="{}", nullable=False)
-    created_by: Mapped[str] = mapped_column(String(36), nullable=False)
+    created_by: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
@@ -34,9 +34,9 @@ class CaseEvent(Base):
     case_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     event_type: Mapped[str] = mapped_column(String(30), nullable=False)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
-    from_user_id: Mapped[str] = mapped_column(String(36), nullable=False)
-    to_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    from_user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
+    to_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False, index=True)
 
 
 class UserTerritory(Base):
@@ -57,9 +57,9 @@ class SavedExport(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_uuid)
     project_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(180), nullable=False)
-    template_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    template_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     frequency: Mapped[str] = mapped_column(String(30), default="manual", nullable=False)
-    recipient_user_id: Mapped[str] = mapped_column(String(36), nullable=False)
+    recipient_user_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 

@@ -28,7 +28,7 @@ class BackupJob(Base):
     status: Mapped[str] = mapped_column(String(30), default="running", nullable=False)
     file_path: Mapped[str | None] = mapped_column(Text, nullable=True)
     size_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
-    triggered_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    triggered_by: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

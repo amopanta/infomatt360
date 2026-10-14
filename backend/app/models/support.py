@@ -32,6 +32,6 @@ class SupportTicket(Base):
     resolution_channel: Mapped[str] = mapped_column(String(20), default="human", nullable=False)
     matched_rule: Mapped[str | None] = mapped_column(String(60), nullable=True)
     auto_response_text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    resolved_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    resolved_by: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

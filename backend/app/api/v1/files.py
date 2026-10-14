@@ -1,3 +1,4 @@
+import asyncio
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
@@ -125,7 +126,7 @@ def download_file_asset(file_id: str, db: Session = Depends(get_db), current_use
 
 
 @router.post("/project/{project_id}/download-batch", summary="Descargar evidencias en lote (ZIP)")
-def download_file_assets_batch(project_id: str, payload: EvidenceBatchDownloadRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Response:
+async def download_file_assets_batch(project_id: str, payload: EvidenceBatchDownloadRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> Response:
     if not assignment_service.user_has_project_access(db, current_user.id, project_id):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
 
@@ -157,7 +158,7 @@ def download_file_assets_batch(project_id: str, payload: EvidenceBatchDownloadRe
             detail=f"El lote pesa {total_bytes // (1024 * 1024)} MB y excede el maximo permitido ({settings.evidence_batch_max_total_size_mb} MB); reduce la seleccion o el filtro.",
         )
 
-    zip_bytes = file_service.download_batch(db, project_id, asset_ids)
+    zip_bytes = await asyncio.to_thread(file_service.download_batch, db, project_id, asset_ids)
     return Response(
         content=zip_bytes,
         media_type="application/zip",

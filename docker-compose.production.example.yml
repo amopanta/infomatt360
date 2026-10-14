@@ -205,6 +205,56 @@ services:
       - uploads_data:/var/lib/infomatt360/uploads
     command: ["python", "-m", "app.cli.run_scheduled_tasks", "--limit", "50", "--loop", "--sleep-seconds", "60"]
 
+  # -------------------------------------------------------------------
+  # Mobile API (Express + SQLite) -- mobile-infomatt360.tecnomatt.com
+  # -------------------------------------------------------------------
+  # API liviana para la app movil de recoleccion en campo. Usa SQLite
+  # local (no Postgres) y se expone a traves de mobile-lb (nginx)
+  # en el puerto 18090 del host; el reverse proxy externo (Caddy,
+  # Traefik o nginx con SSL) mapea el dominio
+  # mobile-infomatt360.tecnomatt.com a este puerto.
+  mobile:
+    build:
+      context: ./mobile
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      JWT_SECRET: ${MOBILE_JWT_SECRET:?configure_MOBILE_JWT_SECRET}
+      JWT_REFRESH_SECRET: ${MOBILE_JWT_REFRESH_SECRET:-${MOBILE_JWT_SECRET:?configure_MOBILE_JWT_SECRET}_refresh}
+      JWT_EXPIRES_IN: "24h"
+      JWT_REFRESH_EXPIRES_IN: "7d"
+      DB_PATH: /app/data/infomatt360.db
+      UPLOAD_DIR: /app/uploads
+      MAX_FILE_SIZE: "10485760"
+      CORS_ORIGIN: https://mobile-infomatt360.tecnomatt.com
+    volumes:
+      - mobile_data:/app/data
+      - mobile_uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+  mobile-lb:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    depends_on:
+      mobile:
+        condition: service_healthy
+    volumes:
+      - ./deploy/nginx.mobile.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "127.0.0.1:18090:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   frontend:
     build:
       context: .
@@ -257,6 +307,8 @@ volumes:
   postgres_data:
   redis_data:
   uploads_data:
+  mobile_data:
+  mobile_uploads:
   prometheus_data:
   grafana_data:
 

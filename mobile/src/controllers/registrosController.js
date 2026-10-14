@@ -28,7 +28,7 @@ exports.list = (req, res) => {
     res.json({ data: registros, pagination: { page: Number(page), limit: Number(limit), total, pages: Math.ceil(total / limit) } });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al obtener registros' });
+    res.status(500).json({ error: req.t('error.fetchRecords') });
   }
 };
 
@@ -44,12 +44,12 @@ exports.getById = (req, res) => {
       WHERE r.id = ?
     `).get(req.params.id);
 
-    if (!registro) return res.status(404).json({ error: 'Registro no encontrado' });
+    if (!registro) return res.status(404).json({ error: req.t('reg.notFound') });
 
     const evidencias = db.prepare('SELECT * FROM evidencias WHERE registro_id = ?').all(req.params.id);
     res.json({ ...registro, respuestas: JSON.parse(registro.respuestas_json), campos: JSON.parse(registro.campos_json), evidencias });
   } catch (err) {
-    res.status(500).json({ error: 'Error al obtener registro' });
+    res.status(500).json({ error: req.t('error.fetchRecord') });
   }
 };
 
@@ -58,13 +58,13 @@ exports.create = (req, res) => {
     const { plantilla_id, participante_id, respuestas, latitud, longitud, precision_gps, tiene_huella, tiene_firma, device_id, offline_id, notas } = req.body;
 
     if (!plantilla_id || !participante_id || !respuestas) {
-      return res.status(400).json({ error: 'Campos requeridos: plantilla_id, participante_id, respuestas' });
+      return res.status(400).json({ error: req.t('reg.requiredFields') });
     }
 
     // Check for duplicate offline_id
     if (offline_id) {
       const existing = db.prepare('SELECT id FROM registros WHERE offline_id = ?').get(offline_id);
-      if (existing) return res.status(409).json({ error: 'Registro ya sincronizado', existing_id: existing.id });
+      if (existing) return res.status(409).json({ error: req.t('reg.alreadySynced'), existing_id: existing.id });
     }
 
     const id = uuid();
@@ -80,14 +80,14 @@ exports.create = (req, res) => {
     res.status(201).json(db.prepare('SELECT * FROM registros WHERE id = ?').get(id));
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: 'Error al crear registro' });
+    res.status(500).json({ error: req.t('error.createRecord') });
   }
 };
 
 exports.update = (req, res) => {
   try {
     const existing = db.prepare('SELECT * FROM registros WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Registro no encontrado' });
+    if (!existing) return res.status(404).json({ error: req.t('reg.notFound') });
 
     const { respuestas, estado, notas, tiene_huella, tiene_firma } = req.body;
 
@@ -104,20 +104,20 @@ exports.update = (req, res) => {
 
     res.json(db.prepare('SELECT * FROM registros WHERE id = ?').get(req.params.id));
   } catch (err) {
-    res.status(500).json({ error: 'Error al actualizar registro' });
+    res.status(500).json({ error: req.t('error.updateRecord') });
   }
 };
 
 exports.delete = (req, res) => {
   try {
     const existing = db.prepare('SELECT * FROM registros WHERE id = ?').get(req.params.id);
-    if (!existing) return res.status(404).json({ error: 'Registro no encontrado' });
-    if (existing.estado === 'sincronizado') return res.status(400).json({ error: 'No se puede eliminar un registro ya sincronizado' });
+    if (!existing) return res.status(404).json({ error: req.t('reg.notFound') });
+    if (existing.estado === 'sincronizado') return res.status(400).json({ error: req.t('reg.cannotDeleteSynced') });
 
     db.prepare('DELETE FROM registros WHERE id = ?').run(req.params.id);
-    res.json({ success: true, message: 'Registro eliminado' });
+    res.json({ success: true, message: req.t('reg.deleted') });
   } catch (err) {
-    res.status(500).json({ error: 'Error al eliminar registro' });
+    res.status(500).json({ error: req.t('error.deleteRecord') });
   }
 };
 
@@ -126,7 +126,7 @@ exports.syncBatch = (req, res) => {
   try {
     const { registros } = req.body;
     if (!Array.isArray(registros) || registros.length === 0) {
-      return res.status(400).json({ error: 'Se requiere un array de registros' });
+      return res.status(400).json({ error: req.t('reg.syncBatchRequired') });
     }
 
     const results = { synced: [], errors: [] };
@@ -159,6 +159,6 @@ exports.syncBatch = (req, res) => {
 
     res.json({ success: true, total: registros.length, synced: results.synced.length, errors: results.errors.length, details: results });
   } catch (err) {
-    res.status(500).json({ error: 'Error en sincronización batch' });
+    res.status(500).json({ error: req.t('error.syncBatch') });
   }
 };

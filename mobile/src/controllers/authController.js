@@ -23,7 +23,7 @@ exports.login = (req, res) => {
     const { email, password, organizacion } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ error: 'Email y contraseña son requeridos' });
+      return res.status(400).json({ error: req.t('auth.emailPasswordRequired') });
     }
 
     // Find user with org info
@@ -35,12 +35,12 @@ exports.login = (req, res) => {
     `).get(email.toLowerCase().trim());
 
     if (!user) {
-      return res.status(401).json({ error: 'Credenciales inválidas' });
+      return res.status(401).json({ error: req.t('auth.invalidCredentials') });
     }
 
     const validPassword = bcrypt.compareSync(password, user.password_hash);
     if (!validPassword) {
-      return res.status(401).json({ error: 'Credenciales inválidas' });
+      return res.status(401).json({ error: req.t('auth.invalidCredentials') });
     }
 
     // Get active project
@@ -83,7 +83,7 @@ exports.login = (req, res) => {
     });
   } catch (err) {
     console.error('Login error:', err);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    res.status(500).json({ error: req.t('error.internal') });
   }
 };
 
@@ -91,7 +91,7 @@ exports.refreshToken = (req, res) => {
   try {
     const { refreshToken } = req.body;
     if (!refreshToken) {
-      return res.status(400).json({ error: 'Refresh token requerido' });
+      return res.status(400).json({ error: req.t('auth.refreshRequired') });
     }
 
     const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
@@ -102,7 +102,7 @@ exports.refreshToken = (req, res) => {
     `).get(decoded.id);
 
     if (!user) {
-      return res.status(401).json({ error: 'Usuario no encontrado' });
+      return res.status(401).json({ error: req.t('auth.userNotFound') });
     }
 
     // Clean old refresh tokens
@@ -111,7 +111,7 @@ exports.refreshToken = (req, res) => {
     const tokens = generateTokens(user);
     res.json({ success: true, tokens });
   } catch (err) {
-    res.status(401).json({ error: 'Refresh token inválido o expirado' });
+    res.status(401).json({ error: req.t('auth.refreshInvalid') });
   }
 };
 
@@ -124,7 +124,7 @@ exports.me = (req, res) => {
       WHERE u.id = ?
     `).get(req.user.id);
 
-    if (!user) return res.status(404).json({ error: 'Usuario no encontrado' });
+    if (!user) return res.status(404).json({ error: req.t('auth.userNotFound') });
 
     const proyecto = db.prepare(`
       SELECT p.* FROM proyectos p
@@ -145,11 +145,11 @@ exports.me = (req, res) => {
       estadisticas: stats,
     });
   } catch (err) {
-    res.status(500).json({ error: 'Error interno' });
+    res.status(500).json({ error: req.t('error.internal') });
   }
 };
 
 exports.logout = (req, res) => {
   db.prepare(`DELETE FROM refresh_tokens WHERE usuario_id = ?`).run(req.user.id);
-  res.json({ success: true, message: 'Sesión cerrada' });
+  res.json({ success: true, message: req.t('auth.loggedOut') });
 };

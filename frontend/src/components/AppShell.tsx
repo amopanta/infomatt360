@@ -74,6 +74,7 @@ const MENU: MenuGroup[] = [
       { labelKey: 'nav.mail', href: '/admin/mail-profiles', icon: 'mail', permissions: ['messages.write'] },
       { labelKey: 'nav.whatsapp', href: '/admin/whatsapp', icon: 'msg', permissions: ['messages.read', 'records.review', 'records.approve'] },
       { labelKey: 'nav.backups', href: '/admin/backups', icon: 'backup', permissions: ['backups.manage'] },
+      { labelKey: 'nav.mirror', href: '/admin/mirror', icon: 'db', permissions: ['mirror.manage'] },
       { labelKey: 'nav.mySecurity', href: '/account/security', icon: 'lock' },
     ],
   },

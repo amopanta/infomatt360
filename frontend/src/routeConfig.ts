@@ -18,6 +18,7 @@ export type AppRouteKey =
   | 'brandingAdmin'
   | 'publicLinks'
   | 'xlsform'
+  | 'mirror'
   | 'adminUsers'
   | 'accountSecurity'
   | 'participants'
@@ -63,6 +64,7 @@ export function resolveAppRoute(pathname: string): AppRoute {
   if (pathname.startsWith('/admin/branding')) return { key: 'brandingAdmin', permissions: ['organizations.branding.manage', 'organizations.manage'] };
   if (pathname.startsWith('/admin/public-links')) return { key: 'publicLinks', permissions: ['builder.write'] };
   if (pathname.startsWith('/admin/xlsform')) return { key: 'xlsform', permissions: ['builder.write'] };
+  if (pathname.startsWith('/admin/mirror')) return { key: 'mirror', permissions: ['mirror.manage'] };
   if (pathname.startsWith('/admin/users')) return { key: 'adminUsers', permissions: ['identity.users.manage'] };
   if (pathname.startsWith('/account/security')) return { key: 'accountSecurity' };
   if (pathname.startsWith('/participants')) return { key: 'participants' };

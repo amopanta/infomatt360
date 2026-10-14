@@ -6,7 +6,7 @@ function authenticateToken(req, res, next) {
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
   if (!token) {
-    return res.status(401).json({ error: 'Token de acceso requerido' });
+    return res.status(401).json({ error: req.t ? req.t('auth.tokenInvalid') : 'Token required' });
   }
 
   try {
@@ -15,16 +15,16 @@ function authenticateToken(req, res, next) {
     next();
   } catch (err) {
     if (err.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expirado', code: 'TOKEN_EXPIRED' });
+      return res.status(401).json({ error: req.t ? req.t('auth.tokenInvalid') : 'Token expired', code: 'TOKEN_EXPIRED' });
     }
-    return res.status(403).json({ error: 'Token inválido' });
+    return res.status(403).json({ error: req.t ? req.t('auth.tokenInvalid') : 'Invalid token' });
   }
 }
 
 function requireRole(...roles) {
   return (req, res, next) => {
     if (!req.user || !roles.includes(req.user.rol)) {
-      return res.status(403).json({ error: 'No tiene permisos para esta acción' });
+      return res.status(403).json({ error: req.t ? req.t('auth.accessDenied') : 'Access denied' });
     }
     next();
   };

@@ -3,7 +3,7 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-SUPPORTED_MIRROR_ENGINES = ("postgres", "sqlite")
+SUPPORTED_MIRROR_ENGINES = ("postgres", "sqlite", "mysql", "mssql")
 
 
 class MirrorTargetConnect(BaseModel):
@@ -18,10 +18,10 @@ class MirrorTargetConnect(BaseModel):
 
     project_id: str
     name: str
-    engine: Literal["postgres", "sqlite"]
-    # Postgres
+    engine: Literal["postgres", "sqlite", "mysql", "mssql"]
+    # Postgres / MySQL / MSSQL
     host: str | None = None
-    port: int = 5432
+    port: int | None = None
     database: str | None = None
     username: str | None = None
     password: str | None = None
@@ -47,7 +47,7 @@ class MirrorTargetTestConnectionResult(BaseModel):
 class MirrorPlanCreate(BaseModel):
     target_id: str
     name: str
-    schedule_mode: Literal["full_mirror", "insert_only"] = "full_mirror"
+    schedule_mode: Literal["full_mirror", "insert_only", "incremental"] = "full_mirror"
     status: str = "active"
 
 

@@ -988,6 +988,35 @@ function formatValue(raw?: string, detailed = false, t?: (key: string, params?: 
       const label = t ? t('recordsView.deviceVerified') : 'Dispositivo verificado';
       return `${label}${value.verified_at ? ` · ${new Date(value.verified_at).toLocaleString()}` : ''}`;
     }
+    // GPS coordinates: { lat, lng, accuracy } or { latitude, longitude, ... }
+    if (value && typeof value === 'object' && !Array.isArray(value) && (('lat' in value && 'lng' in value) || ('latitude' in value && 'longitude' in value))) {
+      const lat = value.lat ?? value.latitude;
+      const lng = value.lng ?? value.longitude;
+      const acc = value.accuracy ?? value.precision_gps;
+      const gpsLabel = t ? t('recordsView.gpsCoordinates') : 'GPS';
+      return `${gpsLabel}: ${Number(lat).toFixed(6)}, ${Number(lng).toFixed(6)}${acc ? ` (±${acc}m)` : ''}`;
+    }
+    // File attachment: { file_asset_id, file_name, ... }
+    if (value && typeof value === 'object' && !Array.isArray(value) && 'file_asset_id' in value) {
+      const fileName = value.file_name || value.original_name || value.file_asset_id;
+      const fileLabel = t ? t('recordsView.fileAttachment') : 'Archivo';
+      return `${fileLabel}: ${fileName}`;
+    }
+    // Array of files
+    if (Array.isArray(value) && value.length > 0 && value[0] && typeof value[0] === 'object' && 'file_asset_id' in value[0]) {
+      const filesLabel = t ? t('recordsView.filesCount', { count: value.length }) : `${value.length} archivo(s)`;
+      if (!detailed) return filesLabel;
+      return `${filesLabel}: ${value.map((item: Record<string, unknown>) => item.file_name || item.original_name || item.file_asset_id).join(', ')}`;
+    }
+    // Multiselect / array of strings
+    if (Array.isArray(value) && value.every((item: unknown) => typeof item === 'string' || typeof item === 'number')) {
+      return value.join(', ') || emptyValue;
+    }
+    // Signature: { signature: "data:image/..." }
+    if (value && typeof value === 'object' && !Array.isArray(value) && 'signature' in value && typeof value.signature === 'string') {
+      const sigLabel = t ? t('recordsView.signaturePresent') : 'Firma capturada';
+      return sigLabel;
+    }
     const text = JSON.stringify(value);
     return detailed ? text : `${text.slice(0, 60)}${text.length > 60 ? '…' : ''}`;
   } catch {

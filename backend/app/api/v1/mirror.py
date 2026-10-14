@@ -1,3 +1,5 @@
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -49,9 +51,9 @@ def list_targets(project_id: str, db: Session = Depends(get_db), current_user: U
 
 
 @router.post("/targets/{target_id}/test-connection", response_model=MirrorTargetTestConnectionResult)
-def test_connection(target_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> MirrorTargetTestConnectionResult:
+async def test_connection(target_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> MirrorTargetTestConnectionResult:
     _require_target_access(db, current_user.id, target_id)
-    result = mirror_service.test_connection(db, target_id)
+    result = await asyncio.to_thread(mirror_service.test_connection, db, target_id)
     if not result.success:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=result.message)
     return result
@@ -70,12 +72,19 @@ def list_plans(target_id: str, db: Session = Depends(get_db), current_user: User
 
 
 @router.post("/plans/{plan_id}/run", response_model=MirrorRunRead)
-def run_plan(plan_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> MirrorRunRead:
+async def run_plan(plan_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> MirrorRunRead:
     _require_plan_access(db, current_user.id, plan_id)
-    return mirror_service.run_plan(db, plan_id, current_user.id)
+    return await asyncio.to_thread(mirror_service.run_plan, db, plan_id, current_user.id)
 
 
 @router.get("/plans/{plan_id}/runs", response_model=list[MirrorRunRead])
 def list_runs(plan_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[MirrorRunRead]:
     _require_plan_access(db, current_user.id, plan_id)
     return mirror_service.list_runs(db, plan_id)
+
+
+@router.get("/targets/{target_id}/bi-connection")
+def get_bi_connection_info(target_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Return connection parameters for BI tools (Metabase, Superset, Looker). Password is NOT included."""
+    _require_target_access(db, current_user.id, target_id)
+    return mirror_service.bi_connection_info(db, target_id)

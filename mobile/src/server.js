@@ -19,6 +19,10 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
+// ── i18n: localizable error messages via Accept-Language ──
+const { i18nMiddleware } = require('./i18n/messages');
+app.use(i18nMiddleware);
+
 // ── Static files (uploads) ──
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
@@ -89,7 +93,7 @@ app.use('/api/v1', require('./routes/api'));
 
 // ── 404 handler ──
 app.use('/api', (req, res) => {
-  res.status(404).json({ error: 'Endpoint no encontrado' });
+  res.status(404).json({ error: req.t ? req.t('error.internal') : 'Not found' });
 });
 
 // ── SPA fallback (Express 5 syntax) ──
@@ -100,7 +104,7 @@ app.get('/{*path}', (req, res) => {
 // ── Error handler ──
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err);
-  res.status(500).json({ error: 'Error interno del servidor' });
+  res.status(500).json({ error: req.t ? req.t('error.internal') : 'Internal server error' });
 });
 
 // ── Start ──

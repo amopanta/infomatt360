@@ -9,12 +9,42 @@ from urllib.parse import quote, urlencode
 
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.time import utc_now
 from app.models.identity import User
+from app.models.user_mfa import UserMfaProfile
 
 
 class MfaService:
+    # --- helpers to read/write from the new profile table, falling back to User legacy columns ---
+    def get_or_create_profile(self, db: Session, user: User) -> UserMfaProfile:
+        """Return the MFA profile for a user, creating it from legacy columns if missing."""
+        profile = db.query(UserMfaProfile).filter(UserMfaProfile.user_id == user.id).first()
+        if profile is not None:
+            return profile
+        profile = UserMfaProfile(
+            user_id=user.id,
+            secret_encrypted=user.mfa_secret_encrypted,
+            recovery_hashes=user.mfa_recovery_hashes,
+            last_counter=user.mfa_last_counter,
+            locked_device_fingerprint=user.locked_device_fingerprint,
+            device_lock_updated_at=user.device_lock_updated_at,
+        )
+        db.add(profile)
+        db.flush()
+        return profile
+
+    def _sync_to_legacy(self, user: User, profile: UserMfaProfile) -> None:
+        """Keep legacy User columns in sync during migration period."""
+        user.mfa_secret_encrypted = profile.secret_encrypted
+        user.mfa_recovery_hashes = profile.recovery_hashes
+        user.mfa_last_counter = profile.last_counter
+        user.locked_device_fingerprint = profile.locked_device_fingerprint
+        user.device_lock_updated_at = profile.device_lock_updated_at
+        profile.updated_at = utc_now()
+
     def _fernet(self) -> Fernet:
         key = base64.urlsafe_b64encode(hashlib.sha256(settings.secret_key.encode("utf-8")).digest())
         return Fernet(key)

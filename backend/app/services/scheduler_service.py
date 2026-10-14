@@ -23,6 +23,7 @@ from app.models.scheduler import ScheduledTask, TaskRun
 from app.schemas.scheduler import ScheduledTaskCreate, ScheduledTaskRead, TaskRunCreate, TaskRunRead
 from app.services import imap_service
 from app.services.backup_service import backup_service
+from app.services.mirror_service import mirror_service
 from app.services.saved_export_service import run_saved_export
 from app.services.message_service import message_service
 from app.services.whatsapp_service import whatsapp_service
@@ -173,6 +174,19 @@ class SchedulerService:
             try:
                 file = run_saved_export(db, export)
                 return "success", f"Exportación disponible: {file.id}"
+            except Exception as exc:
+                db.rollback()
+                return "failed", str(exc)
+        if task.task_type == "mirror":
+            from app.models.mirror import MirrorPlan
+            plan = db.query(MirrorPlan).filter(MirrorPlan.id == task.target_id).first()
+            if not plan:
+                return "failed", "El plan de espejo referenciado ya no existe"
+            try:
+                run = mirror_service.run_plan(db, plan.id, triggered_by=f"scheduler:{task.id}")
+                if run.status == "completed":
+                    return "success", f"Espejo completado: {run.records_synced} registros, {run.values_synced} valores"
+                return "failed", run.error or "El espejo fallo sin detalle de error"
             except Exception as exc:
                 db.rollback()
                 return "failed", str(exc)

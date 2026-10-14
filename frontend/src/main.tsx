@@ -18,6 +18,7 @@ import { OperationalMetricsApp } from './modules/admin/OperationalMetricsApp';
 import { PublicLinksApp } from './modules/admin/PublicLinksApp';
 import { StorageApp } from './modules/admin/StorageApp';
 import { XlsformApp } from './modules/admin/XlsformApp';
+import { MirrorApp } from './modules/admin/MirrorApp';
 import { WhatsAppApp } from './modules/admin/WhatsAppApp';
 import { AuditApp } from './modules/audit/AuditApp';
 import { AuthGate } from './modules/auth/AuthGate';
@@ -107,6 +108,7 @@ function renderRoute(route: AppRoute) {
       case 'aiAudit': return <AiAuditApp />;
       case 'governance': return <GovernanceApp />;
       case 'backups': return <BackupsApp />;
+      case 'mirror': return <MirrorApp />;
       case 'excelImport': return <ExcelImportApp />;
       case 'storage': return <StorageApp />;
       case 'mailProfiles': return <MailProfilesApp />;

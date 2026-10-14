@@ -59,6 +59,24 @@ def _build_url(engine: str, credentials: dict) -> str:
         port = credentials.get("port") or 5432
         password = credentials.get("password") or ""
         return f"postgresql+psycopg2://{quote(username)}:{quote(password)}@{host}:{port}/{database}"
+    if engine == "mysql":
+        host = credentials.get("host")
+        database = credentials.get("database")
+        username = credentials.get("username")
+        if not host or not database or not username:
+            raise ValueError("Faltan datos de conexion para MySQL (host, database, username)")
+        port = credentials.get("port") or 3306
+        password = credentials.get("password") or ""
+        return f"mysql+pymysql://{quote(username)}:{quote(password)}@{host}:{port}/{database}?charset=utf8mb4"
+    if engine == "mssql":
+        host = credentials.get("host")
+        database = credentials.get("database")
+        username = credentials.get("username")
+        if not host or not database or not username:
+            raise ValueError("Faltan datos de conexion para SQL Server (host, database, username)")
+        port = credentials.get("port") or 1433
+        password = credentials.get("password") or ""
+        return f"mssql+pymssql://{quote(username)}:{quote(password)}@{host}:{port}/{database}"
     if engine == "sqlite":
         file_path = credentials.get("file_path")
         if not file_path:
@@ -237,7 +255,44 @@ class MirrorService:
             )
 
             with engine.begin() as conn:
-                if plan.schedule_mode == "insert_only":
+                if plan.schedule_mode == "incremental":
+                    # Modo incremental: solo sincroniza registros creados o
+                    # actualizados desde la ultima corrida exitosa del plan.
+                    last_success = (
+                        db.query(MirrorRun)
+                        .filter(MirrorRun.plan_id == plan.id, MirrorRun.status == "completed")
+                        .order_by(MirrorRun.finished_at.desc())
+                        .first()
+                    )
+                    watermark = last_success.finished_at if last_success and last_success.finished_at else None
+
+                    if watermark:
+                        changed_records = [r for r in records if r.updated_at >= watermark]
+                    else:
+                        changed_records = list(records)
+
+                    changed_ids = {r.id for r in changed_records}
+                    changed_values = [v for v in values if v.record_id in changed_ids]
+
+                    # Upsert: borrar existentes y reinsertar (compatible con todos los motores)
+                    if changed_ids:
+                        existing_in_mirror = {
+                            row[0]
+                            for row in conn.execute(
+                                select(records_table.c.id).where(records_table.c.id.in_(list(changed_ids)))
+                            )
+                        }
+                        if existing_in_mirror:
+                            conn.execute(values_table.delete().where(values_table.c.record_id.in_(list(existing_in_mirror))))
+                            conn.execute(records_table.delete().where(records_table.c.id.in_(list(existing_in_mirror))))
+
+                        conn.execute(records_table.insert(), [_record_row(r) for r in changed_records])
+                        if changed_values:
+                            conn.execute(values_table.insert(), [_value_row(v) for v in changed_values])
+
+                    records_synced, values_synced = len(changed_records), len(changed_values)
+
+                elif plan.schedule_mode == "insert_only":
                     existing_record_ids = {
                         row[0] for row in conn.execute(select(records_table.c.id).where(records_table.c.project_id == target.project_id))
                     }
@@ -280,6 +335,63 @@ class MirrorService:
         db.commit()
         db.refresh(run)
         return run_to_read(run)
+
+
+    def bi_connection_info(self, db: Session, target_id: str) -> dict:
+        """Genera informacion de conexion para herramientas BI (Looker, Metabase, Superset).
+
+        Devuelve los parametros de conexion (host, port, database, user) sin
+        la password — el admin la conoce.  Incluye instrucciones por herramienta.
+        """
+        target = self.get_target(db, target_id)
+        if target is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Destino de espejo no encontrado")
+
+        credentials = json.loads(decrypt_text(target.conn_json))
+
+        if target.engine == "sqlite":
+            return {
+                "engine": "sqlite",
+                "file_path": credentials.get("file_path", ""),
+                "tables": ["im360_runtime_records", "im360_runtime_record_values"],
+                "tools": {
+                    "metabase": "SQLite no es compatible con Metabase en modo servidor. Use la opción de archivo local.",
+                    "superset": "Configurar como SQLite datasource con la ruta del archivo.",
+                    "looker": "SQLite no es compatible con Looker. Considere migrar a PostgreSQL o MySQL.",
+                },
+            }
+
+        connection = {
+            "engine": target.engine,
+            "host": credentials.get("host", ""),
+            "port": credentials.get("port") or (5432 if target.engine == "postgres" else 3306 if target.engine == "mysql" else 1433),
+            "database": credentials.get("database", ""),
+            "username": credentials.get("username", ""),
+            "tables": ["im360_runtime_records", "im360_runtime_record_values"],
+        }
+
+        dialect_map = {"postgres": "PostgreSQL", "mysql": "MySQL", "mssql": "SQL Server"}
+        dialect_name = dialect_map.get(target.engine, target.engine)
+
+        jdbc_drivers = {
+            "postgres": f"jdbc:postgresql://{connection['host']}:{connection['port']}/{connection['database']}",
+            "mysql": f"jdbc:mysql://{connection['host']}:{connection['port']}/{connection['database']}",
+            "mssql": f"jdbc:sqlserver://{connection['host']}:{connection['port']};databaseName={connection['database']}",
+        }
+        sqlalchemy_urls = {
+            "postgres": f"postgresql+psycopg2://{connection['username']}:<password>@{connection['host']}:{connection['port']}/{connection['database']}",
+            "mysql": f"mysql+pymysql://{connection['username']}:<password>@{connection['host']}:{connection['port']}/{connection['database']}",
+            "mssql": f"mssql+pymssql://{connection['username']}:<password>@{connection['host']}:{connection['port']}/{connection['database']}",
+        }
+
+        connection["tools"] = {
+            "metabase": f"Agregar base de datos → {dialect_name} → Host: {connection['host']}, Port: {connection['port']}, Database: {connection['database']}, User: {connection['username']}",
+            "superset": f"Agregar database → SQLAlchemy URI: {sqlalchemy_urls.get(target.engine, '')}",
+            "looker": f"Agregar conexión → {dialect_name} → Host: {connection['host']}, Port: {connection['port']}, Database: {connection['database']}, Username: {connection['username']}",
+            "jdbc": jdbc_drivers.get(target.engine, ""),
+        }
+
+        return connection
 
 
 mirror_service = MirrorService()

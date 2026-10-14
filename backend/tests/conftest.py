@@ -1,5 +1,9 @@
+import os
+from pathlib import Path
+
 import pytest
 
+from app.core.config import settings
 from app.services.permission_cache_service import in_memory_permission_cache
 
 
@@ -11,3 +15,14 @@ def _reset_permission_cache():
     in_memory_permission_cache.clear()
     yield
     in_memory_permission_cache.clear()
+
+
+@pytest.fixture(autouse=True, scope="session")
+def _ensure_upload_directory():
+    """Crea el directorio de uploads si no existe para que los health-checks
+    y el asistente de instalacion no fallen por infraestructura ausente en
+    entornos de CI/sandbox donde solo hay SQLite en memoria."""
+    upload_path = Path(settings.upload_directory)
+    upload_path.mkdir(parents=True, exist_ok=True)
+    yield
+    # No eliminamos: otros procesos pueden necesitarlo aun.

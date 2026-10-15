@@ -167,6 +167,7 @@ export function AppShell({ title, children }: Props) {
             );
           })}
         </nav>
+        <a className="app-manual-link" href="/manual-usuario.html" target="_blank" rel="noopener noreferrer"><Icon name="form" /><span>{t('nav.userManual')}</span></a>
         <LanguageSelector className="app-lang-selector" />
         <small>InfoMatt360</small>
       </aside>

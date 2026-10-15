@@ -470,6 +470,8 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .app-nav-submenu { padding-left: 13px; border-left: 1px solid rgba(255, 255, 255, .16); margin-left: 13px; }
 .app-nav-submenu a { font-size: 12px; }
 .app-sidebar small { margin-top: auto; padding: var(--space-3) var(--space-2) 0; color: #64748b; font-size: var(--font-size-xs); border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.app-manual-link { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-3); color: #e9f3ff; text-decoration: none; border: 1px solid rgba(255,255,255,.2); border-radius: var(--radius-sm); font-size: var(--font-size-sm); font-weight: 700; }
+.app-manual-link:hover, .app-manual-link:focus-visible { background: rgba(255,255,255,.1); }
 .app-main { min-width: 0; }
 .app-header { height: 56px; padding: 0 var(--space-6); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); background: var(--surface); border-bottom: 1px solid var(--border); }
 .app-header h1 { margin: 0; font-size: var(--font-size-xl); }

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manual de usuario · InfoMatt360</title>
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, sans-serif; color: #172944; background: #f3f7fb; line-height: 1.55; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    header { background: #102b49; color: white; padding: 32px max(24px, calc((100vw - 1040px)/2)); }
+    header h1 { margin: 0 0 6px; font-size: clamp(1.7rem, 4vw, 2.5rem); }
+    header p { margin: 0; color: #d9e7f5; }
+    main { max-width: 1040px; margin: 24px auto 64px; padding: 0 20px; }
+    nav, section { background: white; border: 1px solid #d6e2ee; border-radius: 12px; padding: 22px 26px; margin-bottom: 18px; }
+    nav ul { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 6px 18px; padding-left: 18px; }
+    h2 { color: #123b62; margin: 0 0 12px; font-size: 1.4rem; }
+    h3 { color: #236084; margin: 20px 0 8px; }
+    p, li { max-width: 80ch; }
+    li { margin-bottom: 7px; }
+    a { color: #075d8a; }
+    a:focus-visible, button:focus-visible { outline: 3px solid #e8a536; outline-offset: 3px; }
+    .notice { background: #e8f7f2; border-left: 4px solid #129178; padding: 12px 16px; border-radius: 5px; }
+    .warning { background: #fff4db; border-left: 4px solid #db9323; padding: 12px 16px; border-radius: 5px; }
+    .table-wrap { overflow-x: auto; }
+    table { border-collapse: collapse; width: 100%; min-width: 620px; }
+    th, td { padding: 10px 12px; border: 1px solid #d6e2ee; text-align: left; vertical-align: top; }
+    th { background: #eef5fb; }
+    code { background: #eef5fb; border-radius: 3px; padding: 1px 4px; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 0; }
+    .actions a, .actions button { display: inline-block; border: 1px solid #1b7391; border-radius: 7px; background: #fff; color: #075d8a; padding: 8px 12px; font: inherit; text-decoration: none; cursor: pointer; }
+    footer { max-width: 1040px; margin: 0 auto 40px; padding: 0 20px; color: #60718a; }
+    @media print { :root { background: white; } header { color: #172944; background: white; padding: 0; } header p { color: #444; } nav, .actions, footer { display: none; } main { max-width: none; margin: 0; padding: 0; } section { border: 0; border-radius: 0; padding: 10px 0; break-inside: avoid; } a { color: inherit; text-decoration: none; } }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Manual de usuario de InfoMatt360</h1>
+    <p>Guía de uso web y escritorio · Versión del 15 de octubre de 2026</p>
+    <div class="actions"><a href="/">Volver a InfoMatt360</a><button type="button" onclick="window.print()">Imprimir o guardar en PDF</button></div>
+  </header>
+  <main>
+    <nav aria-label="Contenido del manual">
+      <strong>Contenido</strong>
+      <ul>
+        <li><a href="#inicio">1. Ingreso y proyecto</a></li>
+        <li><a href="#gestor">2. Trabajo del gestor</a></li>
+        <li><a href="#telefono">3. Verificación del teléfono</a></li>
+        <li><a href="#revision">4. Revisión y notificaciones</a></li>
+        <li><a href="#admin">5. Preparación por el administrador</a></li>
+        <li><a href="#consulta">6. Consulta, exportación y sincronización</a></li>
+        <li><a href="#problemas">7. Problemas frecuentes</a></li>
+      </ul>
+    </nav>
+
+    <section id="inicio">
+      <h2>1. Ingreso y selección del proyecto</h2>
+      <ol>
+        <li>Abra <a href="/">InfoMatt360</a> e ingrese con el correo y la contraseña entregados por el administrador.</li>
+        <li>En la barra superior, seleccione el <strong>Proyecto</strong> donde trabajará. Las asignaciones, participantes y registros dependen del proyecto activo.</li>
+        <li>Abra <strong>Panel</strong> para consultar el resumen. El menú muestra únicamente las funciones permitidas a su cuenta.</li>
+      </ol>
+      <p class="notice">En el proyecto de pruebas «Octubre 2026 - Pruebas de escritorio» hay participantes ficticios y formularios para practicar. No use datos personales reales en esas pruebas.</p>
+    </section>
+
+    <section id="gestor">
+      <h2>2. Trabajo del gestor</h2>
+      <p>Abra <a href="/my-forms">Mis formularios</a>. Allí hay tres vistas que responden a tareas distintas:</p>
+      <div class="table-wrap"><table><thead><tr><th>Vista</th><th>Qué muestra</th><th>Qué hacer</th></tr></thead><tbody>
+        <tr><td><strong>Participantes asignados</strong></td><td>Personas asignadas a su usuario en formularios cerrados.</td><td>Busque por nombre, cédula o código; seleccione a la persona; abra la actividad y pulse <strong>Diligenciar</strong> o <strong>Ver respuestas</strong>.</td></tr>
+        <tr><td><strong>Formularios abiertos</strong></td><td>Formularios publicados en modo abierto.</td><td>Abra el formulario y siga el flujo de identificación. Si el formulario lo permite y tiene permiso, puede registrar un participante nuevo.</td></tr>
+        <tr><td><strong>Actividades por participante</strong></td><td>Una fila por participante y formulario cerrado, con documento, código, grupo, municipio y estado.</td><td>Busque una persona o actividad; use <strong>Diligenciar</strong> cuando esté pendiente o <strong>Ver respuesta</strong> si ya se aplicó.</td></tr>
+      </tbody></table></div>
+      <h3>Aplicar un formulario cerrado</h3>
+      <ol>
+        <li>Entre a <strong>Participantes asignados</strong> y seleccione al participante.</li>
+        <li>Compruebe el nombre, documento, código y actividad. Una actividad completada o cerrada muestra la respuesta; no crea un segundo registro.</li>
+        <li>Pulse <strong>Diligenciar</strong>. El número de documento identifica al participante y sus datos aparecen dentro del formulario.</li>
+        <li>Verifique el teléfono, responda las preguntas y pulse <strong>Guardar respuesta</strong>.</li>
+        <li>Vuelva a <strong>Mis formularios</strong> para comprobar que la actividad aparece aplicada o completada.</li>
+      </ol>
+      <p class="warning">Si aparece «Actividad no disponible para este responsable», compruebe el proyecto activo y pida al administrador que revise la asignación del participante y del formulario a su usuario.</p>
+    </section>
+
+    <section id="telefono">
+      <h2>3. Verificación del teléfono del participante</h2>
+      <p>En el formulario aparece la tabla de datos del participante y debajo la pregunta <strong>«¿El teléfono del participante está actualizado?»</strong>.</p>
+      <ul>
+        <li>Si se muestra un número correcto, marque <strong>«Sí, es correcto»</strong>. Debe aparecer una confirmación en pantalla. Continúe con las preguntas.</li>
+        <li>Si cambió, marque <strong>«No, registrar uno nuevo»</strong>, escriba el número actualizado y pulse <strong>Guardar teléfono</strong>. La ficha del participante se actualiza y el sistema confirma el guardado.</li>
+        <li>Si figura <strong>«No registrado»</strong>, agregue un número nuevo. La opción «Sí» permanece inactiva porque no hay un número para confirmar.</li>
+      </ul>
+      <p>El guardado de un teléfono nuevo necesita que el servidor confirme la asignación de la actividad. Si ve «Confirmando asignación…», espere unos segundos. Si el aviso persiste, actualice la página y verifique su conexión.</p>
+    </section>
+
+    <section id="revision">
+      <h2>4. Revisión, aprobación y notificaciones</h2>
+      <h3>Coordinador o revisor</h3>
+      <ol>
+        <li>Entre a <a href="/records">Registros</a>, abra el formulario y seleccione una respuesta.</li>
+        <li>Lea los datos y el historial de revisión. Elija la acción permitida por su perfil y por el flujo configurado.</li>
+        <li>Si decide <strong>Devolver</strong> o <strong>No aprobar</strong>, escriba el <strong>concepto</strong> que explique qué debe corregirse. Puede señalar un campo concreto.</li>
+        <li>Confirme la acción y verifique que el nuevo estado aparece en el registro.</li>
+      </ol>
+      <h3>Gestor que recibe una decisión</h3>
+      <ol>
+        <li>Abra <a href="/messages">Mensajes</a> y seleccione <strong>Notificaciones de revisión</strong>.</li>
+        <li>Lea el resultado: <strong>Aprobado</strong>, <strong>No aprobado</strong> o <strong>Devuelto para corrección</strong>. El aviso incluye el concepto del revisor cuando corresponda.</li>
+        <li>Si se devolvió una respuesta, entre al registro indicado y siga las opciones de corrección habilitadas por el flujo. Vuelva a enviarla para una nueva revisión.</li>
+      </ol>
+      <p class="warning">Una respuesta aprobada queda bloqueada. El gestor no puede editarla por su cuenta; un administrador autorizado debe devolverla para corrección. Los cambios y decisiones quedan en el historial.</p>
+    </section>
+
+    <section id="admin">
+      <h2>5. Preparación por el administrador</h2>
+      <ol>
+        <li>En <strong>Administración → Usuarios</strong>, cree o habilite usuarios y asígnelos al proyecto con el perfil apropiado.</li>
+        <li>En <strong>Participantes</strong>, cargue o registre la población. Use un nombre de grupo de importación para organizarla y compruebe documento, estado y municipio.</li>
+        <li>En <strong>Formularios</strong>, cree o importe la plantilla, configure preguntas y publique cuando esté lista.</li>
+        <li>En la configuración del formulario elija <strong>Abierto</strong> o <strong>Cerrado</strong>. Para cerrado, seleccione la fuente de participantes y la llave de identificación, normalmente documento o cédula.</li>
+        <li>En <strong>Asignaciones por responsable</strong>, seleccione el gestor y asigne participantes uno a uno, por grupo o desde Excel. Verifique el resumen antes de aplicar una asignación masiva.</li>
+        <li>Inicie sesión con una cuenta de gestor de prueba y confirme que las personas aparezcan en <strong>Mis formularios</strong>.</li>
+      </ol>
+      <p>El grupo de importación de participantes y el equipo de gestores son conceptos distintos: el primero organiza la población cargada; el segundo organiza usuarios y participantes para el trabajo de campo.</p>
+    </section>
+
+    <section id="consulta">
+      <h2>6. Consulta, exportación y sincronización</h2>
+      <ul>
+        <li><strong>Registros:</strong> busque por participante, campo, estado o usuario. Abra una fila para consultar la respuesta completa. Los permisos determinan si puede editar, revisar, anular o exportar.</li>
+        <li><strong>Exportar:</strong> use la opción CSV o los reportes disponibles para su perfil. Revise filtros y proyecto antes de descargar.</li>
+        <li><strong>Escritorio y web:</strong> ambas interfaces consultan el mismo proyecto del servidor. Compruebe que inicia sesión con la misma cuenta y selecciona el mismo proyecto.</li>
+        <li><strong>Sin conexión:</strong> la interfaz puede conservar borradores locales y enviar ciertas respuestas al recuperar conexión. Revise el indicador de sincronización antes de cerrar sesión o limpiar datos locales; algunas verificaciones de dispositivo requieren conexión.</li>
+      </ul>
+    </section>
+
+    <section id="problemas">
+      <h2>7. Problemas frecuentes</h2>
+      <div class="table-wrap"><table><thead><tr><th>Situación</th><th>Comprobación y acción</th></tr></thead><tbody>
+        <tr><td>No aparece un participante asignado</td><td>Verifique proyecto, usuario, publicación del formulario, estado activo del participante y asignación al responsable. Actualice <strong>Mis formularios</strong>.</td></tr>
+        <tr><td>No aparece un formulario abierto</td><td>Confirme que esté publicado y configurado como abierto. Use la vista <strong>Formularios abiertos</strong>.</td></tr>
+        <tr><td>La confirmación del teléfono no responde</td><td>Compruebe que exista un número registrado para marcar «Sí». Si no existe, registre uno nuevo. Espere a que termine «Confirmando asignación…».</td></tr>
+        <tr><td>No permite guardar una respuesta</td><td>Revise preguntas obligatorias, conexión, estado de la actividad y mensajes de validación. Una actividad ya aplicada o cerrada no admite un envío duplicado.</td></tr>
+        <tr><td>No llega la notificación</td><td>Revise <strong>Mensajes → Notificaciones de revisión</strong> y el proyecto activo. El envío por WhatsApp requiere que ese servicio esté configurado.</td></tr>
+        <tr><td>El cambio no aparece en escritorio</td><td>Compruebe cuenta y proyecto, conectividad y estado de sincronización; actualice la vista. Si persiste, facilite al administrador el formulario, documento y hora aproximada, sin compartir contraseñas.</td></tr>
+      </tbody></table></div>
+    </section>
+  </main>
+  <footer>InfoMatt360 · Manual de usuario y de uso operativo. No contiene credenciales ni datos reales de participantes.</footer>
+</body>
+</html>

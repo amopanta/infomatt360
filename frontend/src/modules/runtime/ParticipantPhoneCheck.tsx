@@ -34,7 +34,7 @@ export function ParticipantPhoneCheck({ person, templateId, assignmentReady, onU
   }
 
   return <div className="runtime-phone-check">
-    <fieldset disabled={!assignmentReady || saving}>
+    <fieldset disabled={saving}>
       <legend>{t('runtime.phoneQuestion')}</legend>
       <p>{t('runtime.registeredPhone')} <strong>{currentPhone || t('runtime.notRegistered')}</strong></p>
       <div className="runtime-phone-options">
@@ -46,10 +46,13 @@ export function ParticipantPhoneCheck({ person, templateId, assignmentReady, onU
       {answer === 'no' && <div className="runtime-phone-update">
         <label>{t('runtime.updatedPhoneLabel')}<input type="tel" autoComplete="tel" value={newPhone} maxLength={25}
           onChange={(event) => setNewPhone(event.target.value)} placeholder={t('runtime.phonePlaceholder')} /></label>
-        <button type="button" disabled={!/^\+?[0-9 ()-]{7,25}$/.test(newPhone.trim())} onClick={() => void savePhone()}>
+        <button type="button" disabled={!assignmentReady || !/^\+?[0-9 ()-]{7,25}$/.test(newPhone.trim())} onClick={() => void savePhone()}>
           {saving ? t('runtime.savingPhone') : t('runtime.savePhone')}
         </button>
       </div>}
+      {answer === 'yes' && <p role="status">{t('runtime.phoneConfirmed')}</p>}
+      {!currentPhone && <p>{t('runtime.phoneMissingHint')}</p>}
+      {!assignmentReady && <p role="status">{t('runtime.confirmingAssignment')}</p>}
     </fieldset>
     {message && <p role="status">{message}</p>}
   </div>;

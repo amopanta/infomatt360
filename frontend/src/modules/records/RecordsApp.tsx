@@ -88,7 +88,7 @@ function GenerateActaPanel({
     setPrinting(true);
     try {
       const result = await printActaFromRecord(selectedTemplateId, record.id, printerName || undefined, copies);
-      onMessage(result.success ? t('recordsView.actaSentToPrint') : t('recordsView.actaPrintFailedPrefix', { reason: result.failureReason }));
+      onMessage(result.success ? t('recordsView.actaSentToPrint') : t('recordsView.actaPrintFailedPrefix', { reason: result.failureReason ?? '' }));
     } catch (error) {
       onMessage(error instanceof Error ? error.message : t('recordsView.actaPrintFailed'));
     } finally {
@@ -251,6 +251,7 @@ function ReviewPanel({
   }, [record.id, record.status]);
 
   async function submit(action: { label: string; toStatus: string; action: string }) {
+    if (REJECTION_STATUSES.has(action.toStatus) && !notes.trim()) { onMessage(t('recordsView.rejectionConceptRequired')); return; }
     try {
       const fieldName = REJECTION_STATUSES.has(action.toStatus) ? rejectedFieldName : undefined;
       await applyReviewAction({ projectId, recordId: record.id, toStatus: action.toStatus, action: action.action, notes, rejectedFieldName: fieldName || undefined });
@@ -317,7 +318,7 @@ function ReviewPanel({
       <div className="review-actions">
         {record.status === 'approved' && permissions.has('identity.users.manage') && <button type="button" disabled={notes.trim().length < 5} onClick={() => void reopen()}>{t('recordsView.returnApprovedForCorrection')}</button>}
         {actions.length ? (
-          actions.map((item) => <button key={item.action} onClick={() => void submit(item)}>{item.label}</button>)
+          actions.map((item) => <button key={item.action} disabled={REJECTION_STATUSES.has(item.toStatus) && !notes.trim()} onClick={() => void submit(item)}>{item.label}</button>)
         ) : (
           <span>{t('recordsView.noActionsAvailable')}</span>
         )}

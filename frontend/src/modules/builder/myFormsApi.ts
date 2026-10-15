@@ -11,11 +11,23 @@ export type MyFormAssignment = {
   participant_name: string;
   document_id: string | null;
   external_code: string | null;
+  group_name?: string | null;
+  department?: string | null;
+  municipality?: string | null;
   assignment_status: string;
   record_id: string | null;
 };
 
 export type MyFormSummary = { assignment_count: number; form_count: number; pending: Array<Pick<MyFormAssignment, 'template_id' | 'template_name' | 'participant_id' | 'participant_name' | 'document_id'>> };
+
+export type OpenForm = { id: string; name: string; status: string; accepting_responses: boolean; participant_source?: { access_mode?: string } | null };
+
+export async function fetchOpenForms(projectId: string): Promise<OpenForm[]> {
+  const response = await fetch(`${API_BASE_URL}/builder/templates/${projectId}`, { headers: authorizationHeader() });
+  if (!response.ok) throw new Error('No fue posible consultar los formularios abiertos.');
+  const templates: OpenForm[] = await response.json();
+  return templates.filter((form) => form.status === 'published' && form.participant_source?.access_mode === 'open');
+}
 
 export async function fetchMyFormSummary(projectId: string): Promise<MyFormSummary> {
   const response = await fetch(`${API_BASE_URL}/form-assignments/mine/${projectId}/summary`, { headers: authorizationHeader() });

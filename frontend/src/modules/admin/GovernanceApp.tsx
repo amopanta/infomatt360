@@ -129,7 +129,7 @@ export function GovernanceApp() {
       const ticket = await createSupportTicket({ projectId, subject: ticketSubject.trim(), description: ticketDescription.trim() });
       setMessage(
         ticket.status === 'auto_resolved'
-          ? t('admin.governance.ticketAutoResolved', { response: ticket.auto_response_text })
+          ? t('admin.governance.ticketAutoResolved', { response: ticket.auto_response_text ?? '' })
           : t('admin.governance.ticketEscalated'),
       );
       setTicketSubject('');

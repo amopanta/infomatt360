@@ -167,7 +167,7 @@ export function MirrorApp() {
   }
 
   return (
-    <AppShell>
+    <AppShell title={t('admin.mirror.title')}>
       <h2>{t('admin.mirror.title')}</h2>
       {message && <p className="form-message" onClick={() => setMessage('')}>{message}</p>}
 

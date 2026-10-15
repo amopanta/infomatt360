@@ -332,7 +332,7 @@ def test_review_action_notifies_record_owner_when_reviewer_changes_status():
             owner_headers = auth(client, "owner-review@example.com", "Owner12345!")
             inbox = client.get("/api/v1/messages/internal/review-project/inbox", headers=owner_headers)
             assert inbox.status_code == 200
-            assert inbox.json()[0]["subject"] == "Registro returned"
+            assert inbox.json()[0]["subject"] == "Revisión de registro: Devuelto para corrección"
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

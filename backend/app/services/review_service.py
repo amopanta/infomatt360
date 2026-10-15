@@ -73,8 +73,8 @@ class ReviewService:
         from_status = record.status if record else None
         if from_status == "approved" and payload.to_status == "returned":
             raise ValueError("Usa la reapertura administrativa con motivo obligatorio")
-        if payload.to_status == "returned" and not (payload.notes or "").strip():
-            raise ValueError("El motivo de devolución es obligatorio")
+        if payload.to_status in {"returned", "rejected"} and not (payload.notes or "").strip():
+            raise ValueError("El concepto de no aprobación o devolución es obligatorio")
         template_id = self._record_template_id(record)
         snapshot_json = self._record_approval_snapshot(record)
         self._validate_transition(db, payload, from_status, template_id, snapshot_json)
@@ -253,13 +253,14 @@ class ReviewService:
         if not self._active_project_user(db, recipient_id, payload.project_id):
             return
 
-        subject = f"Registro {payload.to_status}"
-        body = (
-            f"El registro {payload.record_id} cambió de {from_status} a {payload.to_status} "
-            f"por la acción {payload.action}."
-        )
+        outcomes = {"approved": "Aprobado", "rejected": "No aprobado", "returned": "Devuelto para corrección"}
+        outcome = outcomes.get(payload.to_status, payload.to_status.replace("_", " ").capitalize())
+        subject = f"Revisión de registro: {outcome}"
+        body = f"Resultado: {outcome}. Registro: {payload.record_id}."
         if payload.notes:
-            body = f"{body}\n\nObservación: {payload.notes}"
+            body = f"{body}\n\nConcepto del revisor: {payload.notes.strip()}"
+        if payload.rejected_field_name:
+            body = f"{body}\nCampo señalado: {payload.rejected_field_name}"
 
         db.add(InternalMessage(
             project_id=payload.project_id,

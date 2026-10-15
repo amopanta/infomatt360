@@ -120,7 +120,7 @@ export function EnrollScanApp() {
         {status === 'success' && result ? (
           <div>
             <p role="status">{t('enroll.success')}</p>
-            <small>{t('enroll.project', { id: result.project_id })}</small>
+            <small>{t('enroll.project', { id: result.project_id ?? '' })}</small>
           </div>
         ) : null}
         {status === 'error' ? (

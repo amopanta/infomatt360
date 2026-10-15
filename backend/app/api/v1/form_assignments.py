@@ -62,6 +62,9 @@ class MyFormAssignmentRead(BaseModel):
     participant_name: str
     document_id: str | None = None
     external_code: str | None = None
+    group_name: str | None = None
+    department: str | None = None
+    municipality: str | None = None
     assignment_status: str
     record_id: str | None = None
 
@@ -140,11 +143,15 @@ def my_form_assignments(project_id: str, db: Session = Depends(get_db), user: Us
             record_by_pair.setdefault((template_id, participant_id), record_id)
     result: list[MyFormAssignmentRead] = []
     for assignment, template, participant in rows:
+        participant_data = participant_to_read(participant)
         result.append(MyFormAssignmentRead(
             template_id=template.id, template_name=template.name, template_status=template.status,
             access_mode=configured_source(template).access_mode,
             participant_id=participant.id, participant_name=participant.full_name,
             document_id=participant.document_id, external_code=participant.external_code,
+            group_name=participant_data.group_name,
+            department=participant_data.department,
+            municipality=participant_data.municipality,
             assignment_status=assignment.status,
             record_id=record_by_pair.get((template.id, participant.id)),
         ))
@@ -449,7 +456,7 @@ def update_assigned_participant_phone(template_id: str, participant_id: str, pay
     if not isinstance(metadata, dict):
         metadata = {}
     phone_keys = ("phone", "telefono", "teléfono", "celular", "mobile", "phone_number")
-    phone_key = next((key for key in phone_keys if key in metadata), "phone")
+    phone_key = next((key for key in metadata if key.strip().casefold() in phone_keys), "phone")
     previous = str(metadata.get(phone_key) or "")
     updated = payload.phone.strip()
     if previous != updated:

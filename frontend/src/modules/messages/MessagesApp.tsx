@@ -14,7 +14,7 @@ export function MessagesApp() {
   const [external, setExternal] = useState<ExternalMailMessage[]>([]);
   const [counts, setCounts] = useState<MessageCounts>({ unread: 0, inbox: 0, sent: 0 });
   const [users, setUsers] = useState<MessageUser[]>([]);
-  const [tab, setTab] = useState<'inbox' | 'sent' | 'external'>('inbox');
+  const [tab, setTab] = useState<'notifications' | 'inbox' | 'sent' | 'external'>('notifications');
   const [message, setMessage] = useState(t('messages.loadingMessages'));
   const [externalMessage, setExternalMessage] = useState('');
 
@@ -77,6 +77,7 @@ export function MessagesApp() {
             </div>
             <div className="messages-tabs">
               <button className={tab === 'inbox' ? 'active' : ''} onClick={() => setTab('inbox')}>{t('messages.receivedTab')}</button>
+              <button className={tab === 'notifications' ? 'active' : ''} onClick={() => setTab('notifications')}>{t('messages.reviewNotifications')}</button>
               <button className={tab === 'sent' ? 'active' : ''} onClick={() => setTab('sent')}>{t('messages.sentTab')}</button>
               <button className={tab === 'external' ? 'active' : ''} onClick={() => setTab('external')}>{t('messages.externalTab')}</button>
             </div>
@@ -89,7 +90,7 @@ export function MessagesApp() {
           ) : (
             <>
               {message ? <p role="status">{message}</p> : null}
-              <MessageList messages={tab === 'inbox' ? inbox : sent} mode={tab} onRead={markRead} />
+              <MessageList messages={tab === 'sent' ? sent : tab === 'notifications' ? inbox.filter((item) => item.subject.startsWith('Revisión de registro:') || item.subject.startsWith('Registro ')) : inbox} mode={tab === 'sent' ? 'sent' : 'inbox'} onRead={markRead} />
             </>
           )}
         </section>

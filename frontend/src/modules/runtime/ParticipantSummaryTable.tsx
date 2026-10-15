@@ -16,7 +16,8 @@ export function participantPhone(person: EligibleParticipant): string {
   try {
     const metadata = JSON.parse(person.metadata_json || '{}');
     if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return '';
-    return String(phoneKeys.map((key) => metadata[key]).find((value) => value !== null && value !== undefined && value !== '') || '');
+    const entry = Object.entries(metadata).find(([key, value]) => phoneKeys.includes(key.trim().toLocaleLowerCase()) && value !== null && value !== undefined && value !== '');
+    return String(entry?.[1] ?? '');
   } catch { return ''; }
 }
 
@@ -33,7 +34,7 @@ function metadataColumns(person: EligibleParticipant, t: (key: string) => string
   if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return [];
   const labels = metadataLabels(t);
   const ignored = new Set(['department', 'departamento', 'municipality', 'municipio', 'group_name', ...phoneKeys]);
-  return Object.entries(metadata).filter(([key]) => !ignored.has(key)).map(([key, value]) => ({
+  return Object.entries(metadata).filter(([key]) => !ignored.has(key.trim().toLocaleLowerCase())).map(([key, value]) => ({
     label: labels[key] || key.replace(/_/g, ' ').replace(/^./, (letter) => letter.toUpperCase()),
     value: displayValue(value),
   }));

@@ -29,6 +29,20 @@ export type ParticipantHistoryItem = {
 
 export type ParticipantActivity = { template_id: string; template_name: string; assignment_status: 'assigned' | 'in_progress' | 'completed' | 'closed'; responsible_user_id?: string | null; responsible_name?: string | null; record_id?: string | null; record_status?: string | null };
 
+export type ParticipantFormReportRow = {
+  participant_id: string;
+  participant_name: string;
+  document_id: string | null;
+  external_code: string | null;
+  group_name: string | null;
+  department: string | null;
+  municipality: string | null;
+  template_id: string;
+  template_name: string;
+  assignment_status: string;
+  applied_at: string | null;
+};
+
 function headers(): HeadersInit {
   return authorizationHeader();
 }
@@ -37,6 +51,29 @@ export async function fetchProjectParticipants(projectId: string): Promise<Parti
   const response = await fetch(`${API_BASE_URL}/participants/project/${projectId}`, { headers: headers() });
   if (!response.ok) throw new Error('No fue posible consultar los participantes del proyecto.');
   return response.json();
+}
+
+export async function fetchProjectFormReport(projectId: string): Promise<ParticipantFormReportRow[]> {
+  const response = await fetch(`${API_BASE_URL}/participants/project/${projectId}/form-report`, { headers: headers() });
+  if (!response.ok) throw new Error('No fue posible consultar los formularios asignados.');
+  return response.json();
+}
+
+export async function downloadProjectFormReport(projectId: string, query: string, group: string): Promise<void> {
+  const params = new URLSearchParams();
+  if (query.trim()) params.set('q', query.trim());
+  if (group) params.set('group', group);
+  const suffix = params.size ? `?${params.toString()}` : '';
+  const response = await fetch(`${API_BASE_URL}/participants/project/${projectId}/form-report.xlsx${suffix}`, { headers: headers() });
+  if (!response.ok) throw new Error('No fue posible exportar el reporte de participantes.');
+  const url = URL.createObjectURL(await response.blob());
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'formularios-por-participante.xlsx';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
 export async function fetchParticipant(participantId: string): Promise<Participant> {

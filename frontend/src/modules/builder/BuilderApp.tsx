@@ -4,8 +4,7 @@ import { PROJECT_KEY } from '../auth/session';
 import { BuilderCanvas } from './BuilderCanvas';
 import { BuilderPalette } from './BuilderPalette';
 import type { BuilderPaletteItem, BuilderPreviewField, BuilderPreviewSection } from './types';
-import { createColumn, createComponent, createPage, createRow, createSection, createTemplate, fetchTemplateDetail, previewAiQuestions, previewPdfQuestions, updateComponentProperties, updateSectionTitle, updateTemplateProperties } from './api';
-import type { PdfQuestionSuggestion } from './api';
+import { createColumn, createComponent, createPage, createRow, createSection, createTemplate, fetchTemplateDetail, updateComponentProperties, updateSectionTitle, updateTemplateProperties } from './api';
 import { createDefaultCharacterizationTemplate } from './createDefaultTemplate';
 import { navigateTo } from '../../routeConfig';
 import { fetchProjectTemplates } from '../records/api';
@@ -81,7 +80,6 @@ function fieldFromRuntime(component: RuntimeComponent): BuilderPreviewField {
     mediaType: config.visual?.type || 'none', mediaValue: config.visual?.value || '',
     mediaPosition: config.visual?.position || 'before', mediaSize: config.visual?.size || 'medium',
     childTemplateId: config.child_template_id || '', linkedTemplateId: config.linked_template_id || '', labelField: config.label_field || '',
-    participantField: config.participant_field || '',
   };
 }
 
@@ -96,9 +94,8 @@ function fieldConfig(field: BuilderPreviewField): string {
     relevant: field.relevantField ? { field: slugify(field.relevantField), operator: field.relevantOperator ?? 'equals', value: field.relevantValue ?? '' } : undefined,
     visual: field.mediaType && field.mediaType !== 'none' ? { type: field.mediaType, value: field.mediaValue ?? '', position: field.mediaPosition ?? 'before', size: field.mediaSize ?? 'medium' } : undefined,
     child_template_id: field.type === 'LINKED_SUBFORM' ? field.childTemplateId || undefined : undefined,
-    linked_template_id: ['PARENT_CHILD', 'LOOKUP', 'REFERENCE'].includes(field.type) ? field.linkedTemplateId || undefined : undefined,
-    label_field: ['PARENT_CHILD', 'LOOKUP', 'REFERENCE'].includes(field.type) ? field.labelField?.trim() || undefined : undefined,
-    participant_field: field.participantField || undefined,
+    linked_template_id: field.type === 'PARENT_CHILD' ? field.linkedTemplateId || undefined : undefined,
+    label_field: field.type === 'PARENT_CHILD' ? field.labelField?.trim() || undefined : undefined,
   });
 }
 
@@ -120,11 +117,6 @@ export function BuilderApp() {
   const [originalConfigs, setOriginalConfigs] = useState<Record<string, string | null>>({});
   const [submissionsCount, setSubmissionsCount] = useState(0);
   const [loaded, setLoaded] = useState(!editingTemplateId);
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
-  const [pdfQuestions, setPdfQuestions] = useState<PdfQuestionSuggestion[]>([]);
-  const [pdfBusy, setPdfBusy] = useState(false);
-  const [aiDescription, setAiDescription] = useState('');
-  const [aiBusy, setAiBusy] = useState(false);
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
 
   useEffect(() => {
@@ -184,46 +176,6 @@ export function BuilderApp() {
       return nextSections;
     });
     setMessage(t('builder.editor.questionAdded', { label: item.label }));
-  }
-
-  async function analyzePdf() {
-    if (!projectId || !pdfFile) return;
-    setPdfBusy(true);
-    setPdfQuestions([]);
-    try {
-      const suggestion = await previewPdfQuestions(projectId, pdfFile);
-      setPdfQuestions(suggestion.questions);
-      if (!editingTemplateId && templateName === t('builder.editor.newTemplateName')) setTemplateName(suggestion.title);
-      setMessage(t('builder.editor.pdfQuestionsFound', { count: suggestion.questions.length }));
-    } catch (error) { setMessage(error instanceof Error ? error.message : t('builder.editor.pdfError')); }
-    finally { setPdfBusy(false); }
-  }
-
-  async function analyzeWithAi() {
-    if (!projectId || aiDescription.trim().length < 20) return;
-    setAiBusy(true);
-    setPdfQuestions([]);
-    try {
-      const suggestion = await previewAiQuestions(projectId, aiDescription.trim());
-      setPdfQuestions(suggestion.questions);
-      setMessage(t('builder.editor.pdfQuestionsFound', { count: suggestion.questions.length }));
-    } catch (error) { setMessage(error instanceof Error ? error.message : t('builder.editor.aiError')); }
-    finally { setAiBusy(false); }
-  }
-
-  function addPdfQuestions() {
-    if (!pdfQuestions.length) return;
-    setSections((current) => {
-      const allFields = current.flatMap((section) => section.fields);
-      const fields = pdfQuestions.map((question): BuilderPreviewField => {
-        const field = { id: crypto.randomUUID(), type: question.type, name: uniqueName(slugify(question.label), allFields), label: question.label, required: false };
-        allFields.push(field);
-        return field;
-      });
-      return current.map((section) => section.id === activeSectionId ? { ...section, fields: [...section.fields, ...fields] } : section);
-    });
-    setMessage(t('builder.editor.pdfAdded'));
-    setPdfQuestions([]);
   }
 
   function addSection() {
@@ -411,18 +363,6 @@ export function BuilderApp() {
             </details>
             {!editingTemplateId && <button type="button" className="secondary" onClick={resetTemplate}>{t('builder.editor.newBlankTemplate')}</button>}
             {!editingTemplateId && <button onClick={createMvpTemplate}>{t('builder.editor.createCharacterization')}</button>}
-            <details className="builder-theme-panel"><summary>{t('builder.editor.importPdfQuestions')}</summary>
-              <p>{t('builder.editor.importPdfHint')}</p>
-              <input type="file" accept=".pdf,application/pdf" onChange={(event) => { setPdfFile(event.target.files?.[0] || null); setPdfQuestions([]); }} />
-              <button type="button" disabled={!pdfFile || pdfBusy || !projectId} onClick={() => void analyzePdf()}>{pdfBusy ? t('builder.editor.pdfAnalyzing') : t('builder.editor.analyzePdf')}</button>
-              {pdfQuestions.length > 0 && <><p>{t('builder.editor.pdfQuestionsFound', { count: pdfQuestions.length })}</p><ol>{pdfQuestions.map((question, index) => <li key={index}>{question.label} ({question.type})</li>)}</ol><button type="button" onClick={addPdfQuestions}>{t('builder.editor.addPdfQuestions')}</button></>}
-            </details>
-            <details className="builder-theme-panel"><summary>{t('builder.editor.aiQuestions')}</summary>
-              <p>{t('builder.editor.aiHint')}</p>
-              <textarea value={aiDescription} maxLength={4000} onChange={(event) => setAiDescription(event.target.value)} placeholder={t('builder.editor.aiPlaceholder')} />
-              <button type="button" disabled={aiBusy || !projectId || aiDescription.trim().length < 20} onClick={() => void analyzeWithAi()}>{aiBusy ? t('builder.editor.aiGenerating') : t('builder.editor.aiGenerate')}</button>
-              {pdfQuestions.length > 0 && <><p>{t('builder.editor.pdfQuestionsFound', { count: pdfQuestions.length })}</p><ol>{pdfQuestions.map((question, index) => <li key={index}>{question.label} ({question.type})</li>)}</ol><button type="button" onClick={addPdfQuestions}>{t('builder.editor.addPdfQuestions')}</button></>}
-            </details>
           </div>
 
           <div className="builder-structure-panel">

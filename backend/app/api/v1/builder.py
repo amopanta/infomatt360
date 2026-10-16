@@ -1,8 +1,6 @@
 import json
-import asyncio
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from pypdf.errors import PdfReadError
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -20,72 +18,8 @@ from app.schemas.participants import ParticipantRead
 from app.services.participant_service import _to_read as participant_to_read
 from app.services.assignment_service import assignment_service
 from app.services.builder_service import builder_service
-from app.services.pdf_form_suggestion_service import suggest_pdf_questions
-from app.services.ai_audit_service import ai_audit_service, _extract_json_object
 
 router = APIRouter()
-
-
-class AiQuestionRequest(BaseModel):
-    project_id: str
-    description: str
-
-
-@router.post("/assist/ai-questions")
-async def preview_ai_questions(
-    payload: AiQuestionRequest, db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
-) -> dict:
-    """Propone preguntas editables; nunca guarda ni publica una plantilla."""
-    require_project_permission(db, current_user.id, payload.project_id, BUILDER_WRITE)
-    description = payload.description.strip()
-    if not 20 <= len(description) <= 4000:
-        raise HTTPException(status_code=422, detail="Describe el formulario en 20 a 4000 caracteres")
-    if not ai_audit_service.is_configured():
-        raise HTTPException(status_code=503, detail="El proveedor de IA aún no está configurado en el servidor")
-    prompt = (
-        "Diseña hasta 20 preguntas para un formulario de captura. Responde SOLO un objeto JSON "
-        "con la clave questions, una lista de objetos con label y type. Tipos permitidos: "
-        "TEXT, NUMBER, DATE, EMAIL, PHONE, SELECT, BOOLEAN. No inventes datos personales. "
-        "Descripción: " + description
-    )
-    try:
-        raw = await asyncio.to_thread(ai_audit_service._call_llm, prompt)
-        parsed = _extract_json_object(raw)
-        allowed = {"TEXT", "NUMBER", "DATE", "EMAIL", "PHONE", "SELECT", "BOOLEAN"}
-        questions = [
-            {"label": item["label"].strip()[:180], "type": item["type"].upper()}
-            for item in parsed.get("questions", [])[:20]
-            if isinstance(item, dict) and isinstance(item.get("label"), str)
-            and isinstance(item.get("type"), str) and item["type"].upper() in allowed
-            and item["label"].strip()
-        ]
-        if not questions:
-            raise ValueError("El proveedor no devolvió preguntas válidas")
-        return {"questions": questions}
-    except (ValueError, KeyError, TypeError) as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail="El proveedor de IA no respondió. Intenta más tarde") from exc
-
-
-@router.post("/assist/pdf-questions")
-async def preview_pdf_questions(
-    project_id: str = Form(...), upload: UploadFile = File(...),
-    db: Session = Depends(get_db), current_user: User = Depends(get_current_user),
-) -> dict:
-    """Propone preguntas para revisión; no crea ni publica un formulario."""
-    require_project_permission(db, current_user.id, project_id, BUILDER_WRITE)
-    if not (upload.filename or "").lower().endswith(".pdf"):
-        raise HTTPException(status_code=422, detail="Selecciona un archivo PDF")
-    content = await upload.read(5_000_001)
-    if len(content) > 5_000_000:
-        raise HTTPException(status_code=413, detail="El PDF supera 5 MB")
-    if not content.startswith(b"%PDF-"):
-        raise HTTPException(status_code=422, detail="El archivo no es un PDF válido")
-    try:
-        return suggest_pdf_questions(content)
-    except (PdfReadError, ValueError) as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 class TemplateDeleteConfirmation(BaseModel):

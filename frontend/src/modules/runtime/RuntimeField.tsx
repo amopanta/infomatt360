@@ -143,7 +143,7 @@ export function RuntimeField(props: Props) {
     );
   }
 
-  if (type === 'PARENT_CHILD' || (['LOOKUP', 'REFERENCE'].includes(type) && config.linked_template_id)) {
+  if (type === 'PARENT_CHILD') {
     return (
       <RuntimeParentChildField
         fieldId={fieldId}

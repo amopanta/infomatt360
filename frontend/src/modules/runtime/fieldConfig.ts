@@ -43,6 +43,7 @@ export type RuntimeFieldConfig = {
   /** PARENT_CHILD (ver docs/97): plantilla y campo usados para el selector de enlace. */
   linked_template_id?: string;
   label_field?: string;
+  participant_field?: string;
 };
 
 export function parseFieldConfig(configJson?: string | null): RuntimeFieldConfig {

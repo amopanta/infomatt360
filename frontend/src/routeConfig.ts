@@ -22,7 +22,6 @@ export type AppRouteKey =
   | 'adminUsers'
   | 'accountSecurity'
   | 'participants'
-  | 'appliedActivities'
   | 'teams'
   | 'records'
   | 'reports'
@@ -68,7 +67,6 @@ export function resolveAppRoute(pathname: string): AppRoute {
   if (pathname.startsWith('/admin/mirror')) return { key: 'mirror', permissions: ['mirror.manage'] };
   if (pathname.startsWith('/admin/users')) return { key: 'adminUsers', permissions: ['identity.users.manage'] };
   if (pathname.startsWith('/account/security')) return { key: 'accountSecurity' };
-  if (pathname.startsWith('/activities')) return { key: 'appliedActivities' };
   if (pathname.startsWith('/participants')) return { key: 'participants' };
   if (pathname.startsWith('/teams')) return { key: 'teams', permissions: ['identity.users.manage'] };
   if (pathname.startsWith('/records')) return { key: 'records' };

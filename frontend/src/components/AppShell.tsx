@@ -32,7 +32,6 @@ const MENU: MenuGroup[] = [
       { labelKey: 'nav.forms', href: '/builder', icon: 'form', permissions: ['builder.write'], formsSubmenu: true },
       { labelKey: 'nav.actas', href: '/acta', icon: 'acta', permissions: ['builder.write'] },
       { labelKey: 'nav.participants', href: '/participants', icon: 'users' },
-      { labelKey: 'nav.appliedActivities', href: '/activities', icon: 'records' },
       { labelKey: 'nav.teams', href: '/teams', icon: 'users', permissions: ['identity.users.manage'] },
       { labelKey: 'nav.records', href: '/records', icon: 'records' },
       { labelKey: 'nav.evidence', href: '/evidence', icon: 'photo' },

@@ -1,17 +1,12 @@
 import json
-from datetime import datetime
-from io import BytesIO
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import StreamingResponse
-from openpyxl import Workbook
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
 from app.api.permissions import allowed_form_participant_ids, allowed_participant_ids, form_access_mode, get_project_permissions, participant_visible
 from app.api.permissions import require_any_project_permission
-from app.core.permissions import IDENTITY_USERS_MANAGE, PARTICIPANTS_CREATE, RECORDS_APPROVE, RECORDS_COORDINATE, RECORDS_LINK_PARTICIPANT, RECORDS_READ, RECORDS_REVIEW, RECORDS_WRITE
+from app.core.permissions import IDENTITY_USERS_MANAGE, PARTICIPANTS_CREATE, RECORDS_APPROVE, RECORDS_LINK_PARTICIPANT, RECORDS_REVIEW
 from app.db.session import get_db
 from app.models.identity import User
 from app.models.participants import Participant
@@ -21,98 +16,9 @@ from app.models.runtime_record import RuntimeRecord
 from app.schemas.participants import ParticipantCreate, ParticipantGroupStatusUpdate, ParticipantGroupUpdate, ParticipantHistoryItem, ParticipantPromoteRequest, ParticipantRead
 from app.services.assignment_service import assignment_service
 from app.services.participant_service import participant_service
-from app.services.participant_service import _to_read as participant_to_read
 from pydantic import BaseModel
 
 router = APIRouter()
-
-
-class ParticipantFormReportRow(BaseModel):
-    participant_id: str
-    participant_name: str
-    document_id: str | None = None
-    external_code: str | None = None
-    group_name: str | None = None
-    department: str | None = None
-    municipality: str | None = None
-    template_id: str
-    template_name: str
-    assignment_status: str
-    applied_at: datetime | None = None
-
-
-def _project_form_report(project_id: str, db: Session, user: User, q: str = "", group: str = "") -> list[ParticipantFormReportRow]:
-    if not assignment_service.user_has_project_access(db, user.id, project_id):
-        raise HTTPException(status_code=403, detail="Sin acceso al proyecto")
-    visible_ids = allowed_participant_ids(db, user.id, project_id)
-    _, permissions = get_project_permissions(db, user.id, project_id)
-    latest_application = (select(RuntimeRecord.created_at).where(
-        RuntimeRecord.project_id == project_id,
-        RuntimeRecord.template_id == ParticipantFormAssignment.template_id,
-        RuntimeRecord.participant_id == ParticipantFormAssignment.participant_id,
-        RuntimeRecord.status.notin_(["voided", "cancelled"]),
-    ).order_by(RuntimeRecord.created_at.desc(), RuntimeRecord.id.desc()).limit(1).correlate(ParticipantFormAssignment).scalar_subquery())
-    query = db.query(ParticipantFormAssignment, Participant, BuilderTemplate, latest_application).join(
-        Participant, Participant.id == ParticipantFormAssignment.participant_id,
-    ).join(BuilderTemplate, BuilderTemplate.id == ParticipantFormAssignment.template_id).filter(
-        ParticipantFormAssignment.project_id == project_id,
-        Participant.project_id == project_id,
-        BuilderTemplate.project_id == project_id,
-    )
-    if visible_ids is not None:
-        query = query.filter(Participant.id.in_(visible_ids))
-    supervisor = bool(permissions.intersection({IDENTITY_USERS_MANAGE, RECORDS_REVIEW, RECORDS_COORDINATE, RECORDS_APPROVE}))
-    if not supervisor and (RECORDS_WRITE in permissions or RECORDS_READ not in permissions):
-        query = query.filter(ParticipantFormAssignment.responsible_user_id == user.id)
-    rows = []
-    for assignment, participant, template, applied_at in query.order_by(Participant.full_name, BuilderTemplate.name).all():
-        data = participant_to_read(participant)
-        rows.append(ParticipantFormReportRow(
-            participant_id=participant.id, participant_name=participant.full_name,
-            document_id=participant.document_id, external_code=participant.external_code,
-            group_name=data.group_name,
-            department=data.department,
-            municipality=data.municipality,
-            template_id=template.id, template_name=template.name,
-            assignment_status=assignment.status, applied_at=applied_at,
-        ))
-    needle = q.strip().casefold()
-    if needle:
-        rows = [row for row in rows if any(needle in (value or "").casefold() for value in
-                (row.participant_name, row.document_id, row.external_code, row.department,
-                 row.municipality, row.template_name))]
-    if group:
-        rows = [row for row in rows if row.group_name == group]
-    return rows
-
-
-@router.get("/project/{project_id}/form-report", response_model=list[ParticipantFormReportRow])
-def project_form_report(project_id: str, q: str = "", group: str = "", db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[ParticipantFormReportRow]:
-    return _project_form_report(project_id, db, current_user, q, group)
-
-
-@router.get("/project/{project_id}/form-report.xlsx")
-def export_project_form_report(project_id: str, q: str = "", group: str = "", db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> StreamingResponse:
-    rows = _project_form_report(project_id, db, current_user, q, group)
-    workbook = Workbook(write_only=True)
-    sheet = workbook.create_sheet("Formularios asignados")
-    sheet.append(["Participante", "Documento", "Código externo", "Grupo", "Departamento", "Municipio",
-                  "Formulario asignado", "Estado", "Fecha de aplicación (UTC)"])
-
-    def safe_text(value: str | None) -> str:
-        text = value or ""
-        return "'" + text if text.startswith(("=", "+", "-", "@")) else text
-
-    for row in rows:
-        sheet.append([safe_text(row.participant_name), safe_text(row.document_id), safe_text(row.external_code),
-                      safe_text(row.group_name), safe_text(row.department), safe_text(row.municipality),
-                      safe_text(row.template_name), "Aplicado" if row.applied_at else row.assignment_status,
-                      row.applied_at.strftime("%Y-%m-%d %H:%M:%S") if row.applied_at else ""])
-    output = BytesIO()
-    workbook.save(output)
-    output.seek(0)
-    return StreamingResponse(output, media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                             headers={"Content-Disposition": 'attachment; filename="formularios-por-participante.xlsx"'})
 
 
 @router.delete("/project/{project_id}/groups/{group_name}", summary="Quitar un grupo sin borrar participantes")

@@ -68,6 +68,22 @@ def case_assignees(project_id: str, db: Session = Depends(get_db), user: User = 
     return [{"id": item.id, "full_name": item.full_name} for item in rows]
 
 
+@router.get("/project/{project_id}/schedule")
+def project_schedule(project_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Agenda interna de seguimientos fechados, respetando la visibilidad territorial."""
+    require_any_project_permission(db, user.id, project_id, {RECORDS_READ, RECORDS_WRITE, IDENTITY_USERS_MANAGE})
+    rows = db.query(ParticipantCase).filter(
+        ParticipantCase.project_id == project_id, ParticipantCase.due_at.isnot(None),
+        ParticipantCase.status != "closed",
+    ).order_by(ParticipantCase.due_at).limit(500).all()
+    result = []
+    for row in rows:
+        participant = db.get(Participant, row.participant_id)
+        if participant and participant_visible(db, user.id, participant):
+            result.append({**_read(row).model_dump(), "participant_name": participant.full_name})
+    return result
+
+
 @router.get("/participant/{participant_id}", response_model=list[CaseRead])
 def list_cases(participant_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     _participant(db, user, participant_id)

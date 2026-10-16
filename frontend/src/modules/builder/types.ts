@@ -38,6 +38,7 @@ export type BuilderPreviewField = {
   /** PARENT_CHILD (ver docs/97): plantilla y campo de esa plantilla que se usan para el selector de enlace. */
   linkedTemplateId?: string;
   labelField?: string;
+  participantField?: string;
 };
 
 export type BuilderPreviewSection = {

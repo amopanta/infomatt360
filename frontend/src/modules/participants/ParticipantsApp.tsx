@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react';
 import { AppShell } from '../../components/AppShell';
 import { useI18n } from '../../i18n';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
-import { assignParticipantGroup, assignTerritory, createParticipantCase, deleteParticipantGroup, fetchCaseAssignees, fetchCaseEvents, fetchParticipant, fetchParticipantActivities, fetchParticipantCases, fetchParticipantHistory, fetchProjectParticipants, fetchTerritories, removeTerritory, setParticipantGroupStatus, updateParticipantCase } from './api';
-import type { CaseAssignee, CaseEvent, Participant, ParticipantActivity, ParticipantCase, ParticipantHistoryItem, UserTerritory } from './api';
+import { assignParticipantGroup, assignTerritory, createParticipantCase, deleteParticipantGroup, fetchCaseAssignees, fetchCaseEvents, fetchParticipant, fetchParticipantActivities, fetchParticipantCases, fetchParticipantHistory, fetchProjectParticipants, fetchProjectSchedule, fetchTerritories, removeTerritory, setParticipantGroupStatus, updateParticipantCase } from './api';
+import type { CaseAssignee, CaseEvent, Participant, ParticipantActivity, ParticipantCase, ParticipantHistoryItem, ScheduledCase, UserTerritory } from './api';
 
 function participantIdFromPath(): string {
   const parts = window.location.pathname.split('/').filter(Boolean);
@@ -30,6 +30,8 @@ function ParticipantList() {
   const [territoryUser, setTerritoryUser] = useState('');
   const [department, setDepartment] = useState('');
   const [municipality, setMunicipality] = useState('');
+  const [schedule, setSchedule] = useState<ScheduledCase[]>([]);
+  const [scheduleOpen, setScheduleOpen] = useState(false);
 
   const statusLabels: Record<string, string> = {
     draft: t('participants.statusLabels.draft'), submitted: t('participants.statusLabels.submitted'), under_review: t('participants.statusLabels.under_review'),
@@ -53,6 +55,10 @@ function ParticipantList() {
       })
       .catch((error: Error) => setMessage(error.message));
   }, [projectId]);
+  useEffect(() => {
+    if (!scheduleOpen || !projectId) return;
+    void fetchProjectSchedule(projectId).then(setSchedule).catch((error: Error) => setMessage(error.message));
+  }, [projectId, scheduleOpen]);
   useEffect(() => {
     if (!hasAnyCurrentProjectPermission(['identity.users.manage'])) return;
     void Promise.all([fetchTerritories(projectId), fetchCaseAssignees(projectId)]).then(([items, users]) => { setTerritories(items); setAssignees(users); }).catch(() => {});
@@ -109,6 +115,7 @@ function ParticipantList() {
         </header>
         <div className="participants-group-toolbar"><label>{t('participants.groupLabel')}<select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}><option value="">{t('participants.allGroups')}</option>{groups.map((group) => <option key={group} value={group}>{group}</option>)}</select></label><a href="/admin/excel-import">{t('participants.importExcel')}</a><span>{t('participants.participantCount', { count: filtered.length })}</span>{groupFilter && hasAnyCurrentProjectPermission(['identity.users.manage']) && <><button type="button" onClick={() => void changeGroupStatus('active')}>{t('participants.activateGroup')}</button><button type="button" onClick={() => void changeGroupStatus('inactive')}>{t('participants.deactivateGroup')}</button><button type="button" className="participants-remove-group" onClick={() => void removeGroup()}>{t('participants.deleteGroup')}</button></>}</div>
         {hasAnyCurrentProjectPermission(['identity.users.manage']) && <details className="participant-summary-card"><summary>{t('participants.territorialAccess')}</summary><p>{t('participants.territorialAccessDesc')}</p><div className="participants-group-toolbar"><select aria-label={t('participants.userLabel')} value={territoryUser} onChange={(event) => setTerritoryUser(event.target.value)}><option value="">{t('participants.selectUser')}</option>{assignees.map((item) => <option key={item.id} value={item.id}>{item.full_name}</option>)}</select><input aria-label={t('participants.departmentLabel')} placeholder={t('participants.departmentPlaceholder')} value={department} onChange={(event) => setDepartment(event.target.value)} /><input aria-label={t('participants.municipalityLabel')} placeholder={t('participants.municipalityPlaceholder')} value={municipality} onChange={(event) => setMunicipality(event.target.value)} /><button type="button" onClick={() => { void assignTerritory(projectId, { user_id: territoryUser, department, municipality }).then(async () => { setTerritories(await fetchTerritories(projectId)); setDepartment(''); setMunicipality(''); setMessage(t('participants.territoryAssigned')); }).catch((error: Error) => setMessage(error.message)); }}>{t('participants.assignTerritory')}</button></div>{territories.map((item) => <p key={item.id}>{assignees.find((user) => user.id === item.user_id)?.full_name || item.user_id}: {item.department}{item.municipality ? ` / ${item.municipality}` : ''} <button type="button" onClick={() => { void removeTerritory(projectId, item.id).then(async () => setTerritories(await fetchTerritories(projectId))).catch((error: Error) => setMessage(error.message)); }}>{t('participants.removeTerritory')}</button></p>)}</details>}
+        <section className="participant-summary-card"><button type="button" onClick={() => setScheduleOpen((current) => !current)}>{t('participants.internalSchedule')}</button>{scheduleOpen && <><p>{t('participants.internalScheduleHint')}</p><div className="records-table-wrap"><table className="records-table"><thead><tr><th>{t('participants.caseDueLabel')}</th><th>{t('participants.name')}</th><th>{t('participants.caseNameLabel')}</th><th>{t('participants.detail')}</th></tr></thead><tbody>{schedule.map((item) => <tr key={item.id}><td>{item.due_at ? new Date(item.due_at).toLocaleString() : '—'}</td><td>{item.participant_name}</td><td>{item.title}</td><td><a href={`/participants/${item.participant_id}`}>{t('participants.viewHistory')}</a></td></tr>)}</tbody></table></div></>}</section>
         {message ? <p role="status">{message}</p> : null}
         <div className="records-table-wrap">
           <table className="records-table">

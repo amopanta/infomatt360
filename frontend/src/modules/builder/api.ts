@@ -13,6 +13,25 @@ function authHeaders(): HeadersInit {
   return jsonAuthHeaders();
 }
 
+export type PdfQuestionSuggestion = { label: string; type: string };
+
+export async function previewAiQuestions(projectId: string, description: string): Promise<{ questions: PdfQuestionSuggestion[] }> {
+  const response = await fetch(`${API_BASE_URL}/builder/assist/ai-questions`, {
+    method: 'POST', headers: authHeaders(), body: JSON.stringify({ project_id: projectId, description }),
+  });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible generar preguntas.');
+  return response.json();
+}
+
+export async function previewPdfQuestions(projectId: string, file: File): Promise<{ title: string; page_count: number; questions: PdfQuestionSuggestion[] }> {
+  const body = new FormData();
+  body.set('project_id', projectId);
+  body.set('upload', file);
+  const response = await fetch(`${API_BASE_URL}/builder/assist/pdf-questions`, { method: 'POST', headers: authorizationHeader(), body });
+  if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible analizar el PDF.');
+  return response.json();
+}
+
 export async function fetchTemplateDetail(templateId: string): Promise<TemplateSummary> {
   const response = await fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}`, { headers: authHeaders() });
   if (!response.ok) throw new Error('No fue posible consultar el formulario.');

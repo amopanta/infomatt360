@@ -7,7 +7,8 @@ import type { CaptureAssignment, EligibleParticipant } from './api';
 import { ParticipantSummaryTable } from './ParticipantSummaryTable';
 import { ParticipantPhoneCheck } from './ParticipantPhoneCheck';
 import { RuntimeRenderer, themeStyle } from './RuntimeRenderer';
-import { resolveFormValues, validateFormValues } from './formLogic';
+import { allComponents, isFieldVisible, resolveFormValues, validateFormValues } from './formLogic';
+import { prefillParticipantAnswers } from './participantPrefill';
 import { usePullData } from './pullData';
 import { useRuntimeDraft } from './useRuntimeDraft';
 import type { RuntimeFormValue, RuntimeTemplate } from './types';
@@ -17,6 +18,13 @@ function getTemplateIdFromPath(): string {
   const parts = window.location.pathname.split('/').filter(Boolean);
   const runtimeIndex = parts.indexOf('runtime');
   return runtimeIndex >= 0 && parts[runtimeIndex + 1] ? parts[runtimeIndex + 1] : '';
+}
+
+function reviewValue(value: RuntimeFormValue | undefined): string {
+  if (value === undefined || value === null || value === '') return '—';
+  if (Array.isArray(value)) return value.map((item) => reviewValue(item as RuntimeFormValue)).join(', ') || '—';
+  if (typeof value === 'object') return '✓';
+  return String(value);
 }
 
 export function RuntimeApp() {
@@ -36,6 +44,7 @@ export function RuntimeApp() {
   const [newDepartment, setNewDepartment] = useState('');
   const [creatingParticipant, setCreatingParticipant] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
 
   const templateId = getTemplateIdFromPath();
   const isPreview = new URLSearchParams(window.location.search).get('preview') === '1';
@@ -46,7 +55,7 @@ export function RuntimeApp() {
   const existingAssignment = matchingAssignments.length === 1 && (matchingAssignments[0].record_id || ['completed', 'closed'].includes(matchingAssignments[0].status)) ? matchingAssignments[0] : null;
   const selectedParticipant = !existingAssignment && matchingParticipants.length === 1 ? matchingParticipants[0] : null;
   const participantId = selectedParticipant?.id || '';
-  const { values, setValues, clearDraft } = useRuntimeDraft(`${templateId || 'sin-template'}${isPreview ? '-vista-previa' : ''}`);
+  const { values, setValues, clearDraft, ready: draftReady } = useRuntimeDraft(`${templateId || 'sin-template'}${isPreview ? '-vista-previa' : ''}`, participantId);
   const { pulls, error: pullError, ready: pullsReady } = usePullData(template, values);
 
   useEffect(() => {
@@ -72,6 +81,11 @@ export function RuntimeApp() {
   }, [pulls, template]);
 
   useEffect(() => {
+    if (!template || !selectedParticipant || !draftReady) return;
+    setValues((current) => prefillParticipantAnswers(template, selectedParticipant, current, pulls));
+  }, [template, participantId, draftReady]);
+
+  useEffect(() => {
     if (!templateId) {
       setStatus(t('runtime.invalidUrl'));
       return;
@@ -87,6 +101,7 @@ export function RuntimeApp() {
   }, [templateId]);
 
   function updateValue(fieldName: string, value: RuntimeFormValue) {
+    setReviewing(false);
     setValues((current) => template ? resolveFormValues(template, { ...current, [fieldName]: value }, pulls) : { ...current, [fieldName]: value });
   }
 
@@ -123,6 +138,7 @@ export function RuntimeApp() {
       const resolved = resolveFormValues(template, values, pulls);
       const invalid = validateFormValues(template, resolved);
       if (invalid) { setStatus(invalid); return; }
+      if (!reviewing) { setReviewing(true); setStatus(''); return; }
       let saved: { id: string };
       try {
         saved = await saveRuntimeRecord({ projectId, templateId: template.template_id, participantId, values: resolved });
@@ -146,6 +162,7 @@ export function RuntimeApp() {
       setAssignments((current) => current.map((assignment) => assignment.participant_id === participantId ? { ...assignment, status: 'completed', record_id: saved.id } : assignment));
       clearDraft();
       setParticipantKey('');
+      setReviewing(false);
       setStatus(t('runtime.savedSuccess'));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : t('runtime.saveFailed'));
@@ -172,7 +189,7 @@ export function RuntimeApp() {
             <p>{keyField === 'document_id' ? t('runtime.enterDocumentToStart') : t('runtime.enterCodeToStart')}</p>
             <label>{keyField === 'document_id' ? t('runtime.documentIdLabel') : t('runtime.participantCodeLabel')}
               <input type="text" autoComplete="off" value={participantKey} disabled={!participantsReady}
-                onChange={(event) => { setParticipantKey(event.target.value); setShowNewParticipant(false); setStatus(t('runtime.draftActive')); }} />
+                onChange={(event) => { setParticipantKey(event.target.value); setShowNewParticipant(false); setReviewing(false); setStatus(t('runtime.draftActive')); }} />
             </label>
             {!participantsReady && <small>{t('runtime.loadingParticipants')}</small>}
             {participantsReady && !participants.length && accessMode !== 'open' && <p role="alert">{t('runtime.noEnabledParticipants')}</p>}
@@ -198,7 +215,9 @@ export function RuntimeApp() {
               onUpdated={(updated) => setParticipants((current) => current.map((person) => person.id === updated.id ? updated : person))} />}
           </section>}
           footerContent={<div className="runtime-actions">
-            {!isPreview && selectedParticipant && assignmentReady && <button disabled={saving} onClick={save}>{saving ? t('runtime.saving') : t('runtime.saveResponse')}</button>}
+            {reviewing && selectedParticipant && <section className="runtime-review"><h2>{t('runtime.reviewBeforeSubmit')}</h2><p>{selectedParticipant.full_name} · {selectedParticipant.document_id || selectedParticipant.external_code}</p><dl>{allComponents(template).filter((component) => isFieldVisible(component, values) && component.type !== 'HIDDEN').map((component) => <div key={component.id}><dt>{component.label}</dt><dd>{reviewValue(values[component.name])}</dd></div>)}</dl></section>}
+            {!isPreview && selectedParticipant && assignmentReady && <button disabled={saving || !draftReady} onClick={save}>{saving ? t('runtime.saving') : reviewing ? t('runtime.confirmSubmit') : t('runtime.reviewResponse')}</button>}
+            {reviewing && <button type="button" disabled={saving} onClick={() => setReviewing(false)}>{t('runtime.backToEdit')}</button>}
             {status ? <p>{status}</p> : null}{pullError && <p role="alert">{pullError}</p>}
           </div>} />
       </div>

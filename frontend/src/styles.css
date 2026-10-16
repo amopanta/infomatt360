@@ -538,6 +538,12 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .runtime-shell h1 { margin-top: 0; color: var(--form-primary, var(--text)); }
 .runtime-shell .runtime-participant-picker { max-width: none; margin: 0 0 20px; padding: 10px 0 20px; border: 0; border-bottom: 1px solid var(--border-strong); border-radius: 0; background: transparent; }
 .runtime-shell .runtime-actions { max-width: none; margin: 22px 0 0; }
+.runtime-review { padding: 18px; margin-bottom: 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-lg); background: var(--surface-muted); }
+.runtime-review h2 { margin: 0 0 6px; }
+.runtime-review dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.runtime-review dl > div { padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow-wrap: anywhere; }
+.runtime-review dt { font-weight: 700; color: var(--text-muted); }
+.runtime-review dd { margin: 5px 0 0; }
 .runtime-page { margin-top: 12px; }
 .runtime-section { margin-top: 8px; padding: 14px; border: 1px solid color-mix(in srgb, var(--form-primary, var(--brand-primary)) 18%, #e3e8ef); border-left: 6px solid var(--form-primary, var(--brand-primary)); border-radius: var(--form-radius, 14px); background: linear-gradient(180deg, #ffffff, color-mix(in srgb, var(--form-background, #ffffff) 88%, var(--surface-muted))); }
 .runtime-section h3 { margin-top: 0; color: var(--form-primary, var(--brand-primary)); }

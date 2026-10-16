@@ -209,7 +209,7 @@ export function BuilderCanvas({
                     <p>{t('builder.canvas.linkedSubformHint')}</p>
                   </details>
                 ) : null}
-                {field.type === 'PARENT_CHILD' ? (
+                {['PARENT_CHILD', 'LOOKUP', 'REFERENCE'].includes(field.type) ? (
                   <details className="builder-parent-child-panel">
                     <summary>{t('builder.canvas.parentChildTitle')}</summary>
                     <div className="builder-field-row">
@@ -226,6 +226,18 @@ export function BuilderCanvas({
                       </label>
                     </div>
                     <p>{t('builder.canvas.parentChildHint')}</p>
+                  </details>
+                ) : null}
+                {['TEXT', 'PHONE', 'DOCUMENT_ID'].includes(field.type) ? (
+                  <details className="builder-parent-child-panel">
+                    <summary>{t('builder.canvas.participantPrefill')}</summary>
+                    <label>{t('builder.canvas.participantSourceField')}
+                      <select value={field.participantField ?? ''} onChange={(event) => onFieldChange(field.id, { participantField: event.target.value })}>
+                        <option value="">{t('builder.canvas.noPrefill')}</option>
+                        {['full_name', 'document_id', 'external_code', 'phone', 'department', 'municipality', 'group_name'].map((name) =>
+                          <option key={name} value={name}>{t(`builder.canvas.participantFields.${name}`)}</option>)}
+                      </select>
+                    </label>
                   </details>
                 ) : null}
                 <details className="builder-validation-panel">

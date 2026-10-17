@@ -24,6 +24,14 @@ Incluye:
 - health/readiness, scripts de demo, preflight, reporte y release;
 - referencia de despliegue productivo con PostgreSQL, Redis, backend, frontend y worker bulk.
 
+## Clientes y navegación
+
+- **Web / PWA** (`frontend/`): administración, constructor de formularios y captura desde navegador o celular, con cola offline.
+- **Escritorio** (`desktop/`, Electron): la misma web con impresión y cola offline local.
+- **App móvil oficial**: repositorio [`amopanta/infomatt360-mobile`](https://github.com/amopanta/infomatt360-mobile) (React Native / Expo), conectada a este backend.
+- El antiguo módulo `mobile/` (Express + SQLite propia + Capacitor) y sus instaladores `install.sh` / `deploy-mobile.sh` se retiraron: no compartían datos con la plataforma.
+
+El menú está organizado por tareas: **Inicio · Formularios · Datos · Revisión y reportes · Configuración · Avanzado**. Cada opción se muestra según los permisos del usuario. Detalle en `docs/140_REESTRUCTURACION_UX_Y_CLIENTE_MOVIL_UNICO.md`.
 ## Arranque rapido en Windows
 
 Desde la raiz del proyecto:

@@ -9,6 +9,10 @@ export type BuilderPaletteItem = {
   type: string;
   label: string;
   description: string;
+  /** Emoji que acompaña el tipo en la paleta y en la tarjeta de la pregunta */
+  icon?: string;
+  /** Tipo de uso frecuente: se muestra arriba en la paleta */
+  basic?: boolean;
 };
 
 export type BuilderPreviewField = {

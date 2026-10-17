@@ -6,7 +6,7 @@
   - MVP funcional reforzado con 138 documentos técnicos publicados.
   - **Backend** (FastAPI/Python): autenticación con refresh token + MFA TOTP, constructor de formularios + runtime de captura (55 tipos de campo), registros/evidencias/reportes XLSX, flujos de aprobación configurables, API keys con rate limit, sync bulk con worker separado, métricas operativas Prometheus, GIS real PostGIS, auditoría semántica con IA multi-proveedor, ERP headless, WhatsApp/WAHA, base espejo real (Postgres/SQLite), carga masiva Excel, conectores BI (Power BI/Tableau), bandeja IMAP, importador multiformato.
   - **Frontend** (React/TypeScript/Vite): panel admin completo con módulos de storage, flujos de aprobación, API keys, ERP, XLSForm, gobernanza, WhatsApp, mirror, backups, branding, auditoría IA, proveedores IA por API.
-  - **Mobile** (Capacitor): app móvil con sincronización offline, captura de huella, verificación en dispositivo móvil.
+  - **Mobile** (React Native / Expo, repo `amopanta/infomatt360-mobile`): app móvil oficial con sincronización offline, captura de huella y verificación en dispositivo. El módulo `mobile/` (Express + Capacitor) se retiró: no estaba conectado al backend principal (ver `docs/140`).
   - **Desktop** (Electron): impresión nativa de actas, bridge con el backend.
   - **Infraestructura:** Docker Compose productivo, PgBouncer, balanceo de carga, Prometheus/Grafana, scripts k6, deploy en VPS con DNS/SSL.
   - **14 hallazgos de auditoría contra documento maestro:** todos cerrados (con recortes de alcance acordados).
@@ -25,7 +25,7 @@
   - Repositorio móvil: `amopanta/infomatt360-mobile`
   - Backend: `backend/app/` (FastAPI, Alembic migrations)
   - Frontend: `frontend/src/` (React + TypeScript + Vite)
-  - Mobile: `mobile/src/` (Capacitor)
+  - Mobile: repositorio aparte `amopanta/infomatt360-mobile` (`src/`)
   - Desktop: `desktop/src/` (Electron)
   - Documentación: `docs/` (140 archivos, del 00 al 138 + arquitectura técnica)
   - Deploy: `deploy/`, `docker-compose.production.example.yml`

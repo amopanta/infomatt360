@@ -39,17 +39,28 @@ export async function fetchSession(token = currentAccessToken()): Promise<AuthSe
   return response.json();
 }
 
-export async function refreshAccessToken(): Promise<string> {
-  const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({}),
-  });
-  if (!response.ok) throw new Error('La sesión expiró.');
-  const tokens: TokenPair = await response.json();
-  setAccessToken(tokens.access_token);
-  return tokens.access_token;
+let refreshInFlight: Promise<string> | null = null;
+
+/** Renueva el access token. El refresh token rota en cada uso, así que dos
+ * renovaciones simultáneas (StrictMode, varias pantallas recibiendo 401 a la
+ * vez) harían que la segunda presente un token ya consumido y el servidor
+ * invalide la sesión; por eso las llamadas concurrentes comparten una sola. */
+export function refreshAccessToken(): Promise<string> {
+  if (!refreshInFlight) {
+    refreshInFlight = (async () => {
+      const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({}),
+      });
+      if (!response.ok) throw new Error('La sesión expiró.');
+      const tokens: TokenPair = await response.json();
+      setAccessToken(tokens.access_token);
+      return tokens.access_token;
+    })().finally(() => { refreshInFlight = null; });
+  }
+  return refreshInFlight;
 }
 
 export async function logout(token = currentAccessToken()): Promise<void> {

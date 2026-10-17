@@ -157,15 +157,6 @@ server {
         proxy_read_timeout 120s;
     }
 
-    # Backend móvil (Express) — API de campo
-    location /mobile-api/ {
-        rewrite ^/mobile-api/(.*) /api/v1/$1 break;
-        proxy_pass http://127.0.0.1:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
 
     # Frontend React (SPA)
     location / {
@@ -261,3 +252,5 @@ Si no se usa Let's Encrypt (ej. certificado comercial de DigiCert, Comodo):
 2. Enviar `server.csr` al proveedor y recibir el certificado `.crt`
 3. Concatenar certificado + cadena intermedia: `cat server.crt intermediate.crt > fullchain.crt`
 4. Configurar Nginx con `ssl_certificate fullchain.crt` y `ssl_certificate_key server.key`
+
+> Nota (2026-10-17): se retiró el bloque `/mobile-api/` que enviaba tráfico al backend móvil Express en `127.0.0.1:3000`. Ese módulo se eliminó del repositorio; la app móvil oficial (`amopanta/infomatt360-mobile`) usa directamente `/api/`. Ver `docs/140_REESTRUCTURACION_UX_Y_CLIENTE_MOVIL_UNICO.md`.

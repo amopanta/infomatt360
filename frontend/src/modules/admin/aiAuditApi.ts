@@ -18,12 +18,41 @@ export type AiCheck = {
   created_at: string;
 };
 
+export type AiProvider = {
+  id: string; project_id: string; name: string; provider: string; model: string;
+  base_url: string; status: 'active' | 'disabled'; has_key: boolean;
+};
+
+export type AiProviderInput = {
+  project_id: string; name: string; provider: string; model: string;
+  base_url: string; api_key: string; status: 'active' | 'disabled';
+};
+
 import { authorizationHeader } from '../auth/session';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
 
 function headers(): HeadersInit {
   return { ...authorizationHeader(), 'Content-Type': 'application/json' };
+}
+
+export async function fetchAiProviders(projectId: string): Promise<AiProvider[]> {
+  const response = await fetch(`${API_BASE_URL}/ai-audit/providers/${projectId}`, { headers: headers() });
+  return parseOrThrow(response, 'No fue posible cargar los proveedores de IA.');
+}
+
+export async function saveAiProvider(payload: AiProviderInput, id?: string): Promise<AiProvider> {
+  const response = await fetch(`${API_BASE_URL}/ai-audit/providers${id ? `/${id}` : ''}`, {
+    method: id ? 'PUT' : 'POST', headers: headers(), body: JSON.stringify(payload),
+  });
+  return parseOrThrow(response, 'No fue posible guardar la conexión de IA.');
+}
+
+export async function testAiProvider(projectId: string, id: string): Promise<{ connected: boolean }> {
+  const response = await fetch(`${API_BASE_URL}/ai-audit/providers/${id}/test?project_id=${encodeURIComponent(projectId)}`, {
+    method: 'POST', headers: headers(),
+  });
+  return parseOrThrow(response, 'No fue posible conectar con el proveedor.');
 }
 
 async function parseOrThrow<T>(response: Response, fallbackMessage: string): Promise<T> {

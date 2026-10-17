@@ -22,6 +22,7 @@ from app.services.assignment_service import assignment_service
 from app.services.builder_service import builder_service
 from app.services.pdf_form_suggestion_service import suggest_pdf_questions
 from app.services.ai_audit_service import ai_audit_service, _extract_json_object
+from app.services.ai_provider_service import connection_for, get_provider, list_providers
 
 router = APIRouter()
 
@@ -29,6 +30,7 @@ router = APIRouter()
 class AiQuestionRequest(BaseModel):
     project_id: str
     description: str
+    provider_id: str | None = None
 
 
 @router.post("/assist/ai-questions")
@@ -40,8 +42,16 @@ async def preview_ai_questions(
     description = payload.description.strip()
     if not 20 <= len(description) <= 4000:
         raise HTTPException(status_code=422, detail="Describe el formulario en 20 a 4000 caracteres")
-    if not ai_audit_service.is_configured():
-        raise HTTPException(status_code=503, detail="El proveedor de IA aún no está configurado en el servidor")
+    active_providers = [item for item in list_providers(db, payload.project_id) if item.status == "active"]
+    selected = get_provider(db, payload.project_id, payload.provider_id) if payload.provider_id else None
+    if payload.provider_id and (not selected or selected.status != "active"):
+        raise HTTPException(status_code=422, detail="Selecciona una conexión de IA activa del proyecto")
+    if not selected and len(active_providers) == 1:
+        selected = active_providers[0]
+    if not selected and len(active_providers) > 1:
+        raise HTTPException(status_code=422, detail="Selecciona el proveedor de IA")
+    if not selected and not ai_audit_service.is_configured():
+        raise HTTPException(status_code=503, detail="Configura una conexión de IA para este proyecto")
     prompt = (
         "Diseña hasta 20 preguntas para un formulario de captura. Responde SOLO un objeto JSON "
         "con la clave questions, una lista de objetos con label y type. Tipos permitidos: "
@@ -49,7 +59,8 @@ async def preview_ai_questions(
         "Descripción: " + description
     )
     try:
-        raw = await asyncio.to_thread(ai_audit_service._call_llm, prompt)
+        options = vars(connection_for(selected)) if selected else {}
+        raw = await asyncio.to_thread(ai_audit_service._call_llm, prompt, **options)
         parsed = _extract_json_object(raw)
         allowed = {"TEXT", "NUMBER", "DATE", "EMAIL", "PHONE", "SELECT", "BOOLEAN"}
         questions = [

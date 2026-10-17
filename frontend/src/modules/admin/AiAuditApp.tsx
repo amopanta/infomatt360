@@ -3,10 +3,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { AppShell } from '../../components/AppShell';
 import { useI18n } from '../../i18n';
 import { PROJECT_KEY } from '../auth/session';
-import { analyzeRecord, createAuditConfig, fetchAuditConfig, fetchChecks } from './aiAuditApi';
-import type { AiAuditConfig, AiCheck } from './aiAuditApi';
+import { analyzeRecord, createAuditConfig, fetchAiProviders, fetchAuditConfig, fetchChecks, saveAiProvider, testAiProvider } from './aiAuditApi';
+import type { AiAuditConfig, AiCheck, AiProvider } from './aiAuditApi';
 
-type Tab = 'alerts' | 'config';
+type Tab = 'alerts' | 'config' | 'providers';
 
 function statusClass(status: string) {
   if (status === 'none') return 'sent';
@@ -39,6 +39,15 @@ export function AiAuditApp() {
   const [lookupTemplateId, setLookupTemplateId] = useState('');
   const [lookupResult, setLookupResult] = useState<AiAuditConfig | null | undefined>(undefined);
   const [analyzeRecordId, setAnalyzeRecordId] = useState('');
+  const [providers, setProviders] = useState<AiProvider[]>([]);
+  const [editingProviderId, setEditingProviderId] = useState('');
+  const [providerName, setProviderName] = useState('');
+  const [providerKind, setProviderKind] = useState('gemini');
+  const [providerModel, setProviderModel] = useState('gemini-2.5-flash-lite');
+  const [providerBaseUrl, setProviderBaseUrl] = useState('');
+  const [providerKey, setProviderKey] = useState('');
+  const [providerStatus, setProviderStatus] = useState<'active' | 'disabled'>('active');
+  const [providerBusy, setProviderBusy] = useState(false);
 
   function statusLabel(status: string) {
     const labels: Record<string, string> = {
@@ -69,6 +78,38 @@ export function AiAuditApp() {
   }
 
   useEffect(() => { void loadChecks(); }, [projectId]);
+  useEffect(() => { if (projectId) void fetchAiProviders(projectId).then(setProviders).catch((error: Error) => setMessage(error.message)); }, [projectId]);
+
+  function editProvider(item: AiProvider) {
+    setEditingProviderId(item.id); setProviderName(item.name); setProviderKind(item.provider);
+    setProviderModel(item.model); setProviderBaseUrl(item.base_url);
+    setProviderKey(''); setProviderStatus(item.status); setTab('providers');
+  }
+
+  function resetProvider() {
+    setEditingProviderId(''); setProviderName(''); setProviderKind('gemini');
+    setProviderModel('gemini-2.5-flash-lite'); setProviderBaseUrl('');
+    setProviderKey(''); setProviderStatus('active');
+  }
+
+  async function submitProvider() {
+    setProviderBusy(true);
+    try {
+      await saveAiProvider({ project_id: projectId, name: providerName, provider: providerKind,
+        model: providerModel, base_url: providerBaseUrl, api_key: providerKey, status: providerStatus }, editingProviderId || undefined);
+      setProviders(await fetchAiProviders(projectId));
+      resetProvider(); setMessage(t('admin.aiAudit.providerSaved'));
+    } catch (error) { setMessage(error instanceof Error ? error.message : t('admin.aiAudit.providerError')); }
+    finally { setProviderBusy(false); }
+  }
+
+  async function toggleProvider(item: AiProvider) {
+    try {
+      await saveAiProvider({ project_id: projectId, name: item.name, provider: item.provider,
+        model: item.model, base_url: item.base_url, api_key: '', status: item.status === 'active' ? 'disabled' : 'active' }, item.id);
+      setProviders(await fetchAiProviders(projectId));
+    } catch (error) { setMessage(error instanceof Error ? error.message : t('admin.aiAudit.providerError')); }
+  }
 
   async function submitConfig() {
     try {
@@ -106,6 +147,7 @@ export function AiAuditApp() {
         <nav className="erp-tabs">
           <button className={tab === 'alerts' ? 'active' : undefined} onClick={() => setTab('alerts')}>{t('admin.aiAudit.tabAlerts')}</button>
           <button className={tab === 'config' ? 'active' : undefined} onClick={() => setTab('config')}>{t('admin.aiAudit.tabConfig')}</button>
+          <button className={tab === 'providers' ? 'active' : undefined} onClick={() => setTab('providers')}>{t('admin.aiAudit.tabProviders')}</button>
         </nav>
         {message ? <p role="status" className="erp-message">{message}</p> : null}
 
@@ -188,6 +230,22 @@ export function AiAuditApp() {
             </div>
           </section>
         ) : null}
+        {tab === 'providers' && <section className="audit-panel">
+          <h2>{t('admin.aiAudit.providerTitle')}</h2>
+          <p>{t('admin.aiAudit.providerHint')}</p>
+          <div className="ds-map-create">
+            <label>{t('admin.aiAudit.providerName')}<input value={providerName} maxLength={180} onChange={(event) => setProviderName(event.target.value)} /></label>
+            <label>{t('admin.aiAudit.providerType')}<select value={providerKind} onChange={(event) => { const kind = event.target.value; setProviderKind(kind); setProviderModel(kind === 'gemini' ? 'gemini-2.5-flash-lite' : ''); }}>
+              {['gemini', 'openai', 'anthropic', 'openrouter', 'deepseek', 'groq', 'custom'].map((kind) => <option key={kind} value={kind}>{kind === 'custom' ? t('admin.aiAudit.providerCustom') : kind}</option>)}
+            </select></label>
+            <label>{t('admin.aiAudit.providerModel')}<input value={providerModel} maxLength={120} onChange={(event) => setProviderModel(event.target.value)} placeholder="gemini-2.5-flash-lite" /></label>
+            {providerKind === 'custom' && <label>{t('admin.aiAudit.providerUrl')}<input type="url" value={providerBaseUrl} onChange={(event) => setProviderBaseUrl(event.target.value)} placeholder="https://api.example.com/v1" /></label>}
+            <label>{t('admin.aiAudit.providerKey')}<input type="password" autoComplete="new-password" value={providerKey} onChange={(event) => setProviderKey(event.target.value)} placeholder={editingProviderId ? t('admin.aiAudit.providerKeepKey') : ''} /></label>
+            <label>{t('admin.aiAudit.providerStatus')}<select value={providerStatus} onChange={(event) => setProviderStatus(event.target.value as 'active' | 'disabled')}><option value="active">{t('admin.aiAudit.providerActive')}</option><option value="disabled">{t('admin.aiAudit.providerDisabled')}</option></select></label>
+            <div><button type="button" disabled={providerBusy || !providerName.trim() || !providerModel.trim() || (!editingProviderId && !providerKey.trim())} onClick={() => void submitProvider()}>{t('app.save')}</button>{editingProviderId && <button type="button" onClick={resetProvider}>{t('app.cancel')}</button>}</div>
+          </div>
+          <div className="ds-map-list">{providers.map((item) => <article className="ds-map-card" key={item.id}><strong>{item.name}</strong><span>{item.provider} · {item.model} · {item.status === 'active' ? t('admin.aiAudit.providerActive') : t('admin.aiAudit.providerDisabled')}</span><small>{item.has_key ? t('admin.aiAudit.providerKeySaved') : t('admin.aiAudit.providerKeyMissing')}</small><div><button type="button" onClick={() => editProvider(item)}>{t('admin.aiAudit.providerEdit')}</button><button type="button" onClick={() => void toggleProvider(item)}>{item.status === 'active' ? t('admin.aiAudit.providerDisable') : t('admin.aiAudit.providerEnable')}</button><button type="button" disabled={item.status !== 'active'} onClick={() => void testAiProvider(projectId, item.id).then(() => setMessage(t('admin.aiAudit.providerConnected'))).catch((error: Error) => setMessage(error.message))}>{t('admin.aiAudit.providerTest')}</button></div></article>)}</div>
+        </section>}
       </main>
     </AppShell>
   );

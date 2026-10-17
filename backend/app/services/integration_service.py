@@ -110,7 +110,7 @@ class IntegrationService:
         return source_to_read(row)
 
     def list_sources(self, db: Session, project_id: str) -> list[IntegrationSourceRead]:
-        rows = db.query(IntegrationSource).filter(IntegrationSource.project_id == project_id).order_by(IntegrationSource.created_at.desc()).all()
+        rows = db.query(IntegrationSource).filter(IntegrationSource.project_id == project_id, IntegrationSource.source_type != "ai_provider").order_by(IntegrationSource.created_at.desc()).all()
         return [source_to_read(row) for row in rows]
 
     def get_source(self, db: Session, source_id: str) -> IntegrationSource | None:

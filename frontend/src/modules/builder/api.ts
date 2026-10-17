@@ -15,9 +15,9 @@ function authHeaders(): HeadersInit {
 
 export type PdfQuestionSuggestion = { label: string; type: string };
 
-export async function previewAiQuestions(projectId: string, description: string): Promise<{ questions: PdfQuestionSuggestion[] }> {
+export async function previewAiQuestions(projectId: string, description: string, providerId?: string): Promise<{ questions: PdfQuestionSuggestion[] }> {
   const response = await fetch(`${API_BASE_URL}/builder/assist/ai-questions`, {
-    method: 'POST', headers: authHeaders(), body: JSON.stringify({ project_id: projectId, description }),
+    method: 'POST', headers: authHeaders(), body: JSON.stringify({ project_id: projectId, description, provider_id: providerId || null }),
   });
   if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible generar preguntas.');
   return response.json();

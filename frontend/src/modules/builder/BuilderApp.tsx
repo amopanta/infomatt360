@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AppShell } from '../../components/AppShell';
-import { PROJECT_KEY } from '../auth/session';
+import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
 import { BuilderCanvas } from './BuilderCanvas';
 import { BuilderPalette } from './BuilderPalette';
 import type { BuilderPaletteItem, BuilderPreviewField, BuilderPreviewSection } from './types';
@@ -13,6 +13,8 @@ import type { TemplateSummary } from '../records/api';
 import { fetchRuntimeTemplate } from '../runtime/api';
 import type { RuntimeComponent } from '../runtime/types';
 import { useI18n } from '../../i18n';
+import { fetchAiProviders } from '../admin/aiAuditApi';
+import type { AiProvider } from '../admin/aiAuditApi';
 
 function slugify(value: string) {
   const normalized = value.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
@@ -125,11 +127,15 @@ export function BuilderApp() {
   const [pdfBusy, setPdfBusy] = useState(false);
   const [aiDescription, setAiDescription] = useState('');
   const [aiBusy, setAiBusy] = useState(false);
+  const [aiProviders, setAiProviders] = useState<AiProvider[]>([]);
+  const [selectedAiProvider, setSelectedAiProvider] = useState('');
+  const [suggestionSource, setSuggestionSource] = useState<'pdf' | 'ai' | ''>('');
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
 
   useEffect(() => {
     if (!projectId) return;
     fetchProjectTemplates(projectId).then(setProjectTemplates).catch(() => setProjectTemplates([]));
+    fetchAiProviders(projectId).then(setAiProviders).catch(() => setAiProviders([]));
   }, [projectId]);
 
   useEffect(() => {
@@ -193,6 +199,7 @@ export function BuilderApp() {
     try {
       const suggestion = await previewPdfQuestions(projectId, pdfFile);
       setPdfQuestions(suggestion.questions);
+      setSuggestionSource('pdf');
       if (!editingTemplateId && templateName === t('builder.editor.newTemplateName')) setTemplateName(suggestion.title);
       setMessage(t('builder.editor.pdfQuestionsFound', { count: suggestion.questions.length }));
     } catch (error) { setMessage(error instanceof Error ? error.message : t('builder.editor.pdfError')); }
@@ -204,8 +211,9 @@ export function BuilderApp() {
     setAiBusy(true);
     setPdfQuestions([]);
     try {
-      const suggestion = await previewAiQuestions(projectId, aiDescription.trim());
+      const suggestion = await previewAiQuestions(projectId, aiDescription.trim(), selectedAiProvider);
       setPdfQuestions(suggestion.questions);
+      setSuggestionSource('ai');
       setMessage(t('builder.editor.pdfQuestionsFound', { count: suggestion.questions.length }));
     } catch (error) { setMessage(error instanceof Error ? error.message : t('builder.editor.aiError')); }
     finally { setAiBusy(false); }
@@ -224,6 +232,7 @@ export function BuilderApp() {
     });
     setMessage(t('builder.editor.pdfAdded'));
     setPdfQuestions([]);
+    setSuggestionSource('');
   }
 
   function addSection() {
@@ -415,13 +424,15 @@ export function BuilderApp() {
               <p>{t('builder.editor.importPdfHint')}</p>
               <input type="file" accept=".pdf,application/pdf" onChange={(event) => { setPdfFile(event.target.files?.[0] || null); setPdfQuestions([]); }} />
               <button type="button" disabled={!pdfFile || pdfBusy || !projectId} onClick={() => void analyzePdf()}>{pdfBusy ? t('builder.editor.pdfAnalyzing') : t('builder.editor.analyzePdf')}</button>
-              {pdfQuestions.length > 0 && <><p>{t('builder.editor.pdfQuestionsFound', { count: pdfQuestions.length })}</p><ol>{pdfQuestions.map((question, index) => <li key={index}>{question.label} ({question.type})</li>)}</ol><button type="button" onClick={addPdfQuestions}>{t('builder.editor.addPdfQuestions')}</button></>}
+              {suggestionSource === 'pdf' && pdfQuestions.length > 0 && <><p>{t('builder.editor.pdfQuestionsFound', { count: pdfQuestions.length })}</p><ol>{pdfQuestions.map((question, index) => <li key={index}>{question.label} ({question.type})</li>)}</ol><button type="button" onClick={addPdfQuestions}>{t('builder.editor.addPdfQuestions')}</button></>}
             </details>
             <details className="builder-theme-panel"><summary>{t('builder.editor.aiQuestions')}</summary>
               <p>{t('builder.editor.aiHint')}</p>
+              {aiProviders.filter((provider) => provider.status === 'active').length > 0 && <label>{t('builder.editor.aiProvider')}<select value={selectedAiProvider} onChange={(event) => setSelectedAiProvider(event.target.value)}><option value="">{t('builder.editor.aiSelectProvider')}</option>{aiProviders.filter((provider) => provider.status === 'active').map((provider) => <option key={provider.id} value={provider.id}>{provider.name} · {provider.model}</option>)}</select></label>}
+              {hasAnyCurrentProjectPermission(['ai.audit.manage']) && <p><a href="/admin/ai-audit">{t('builder.editor.aiConfigure')}</a></p>}
               <textarea value={aiDescription} maxLength={4000} onChange={(event) => setAiDescription(event.target.value)} placeholder={t('builder.editor.aiPlaceholder')} />
               <button type="button" disabled={aiBusy || !projectId || aiDescription.trim().length < 20} onClick={() => void analyzeWithAi()}>{aiBusy ? t('builder.editor.aiGenerating') : t('builder.editor.aiGenerate')}</button>
-              {pdfQuestions.length > 0 && <><p>{t('builder.editor.pdfQuestionsFound', { count: pdfQuestions.length })}</p><ol>{pdfQuestions.map((question, index) => <li key={index}>{question.label} ({question.type})</li>)}</ol><button type="button" onClick={addPdfQuestions}>{t('builder.editor.addPdfQuestions')}</button></>}
+              {suggestionSource === 'ai' && pdfQuestions.length > 0 && <><p>{t('builder.editor.pdfQuestionsFound', { count: pdfQuestions.length })}</p><ol>{pdfQuestions.map((question, index) => <li key={index}>{question.label} ({question.type})</li>)}</ol><button type="button" onClick={addPdfQuestions}>{t('builder.editor.addPdfQuestions')}</button></>}
             </details>
           </div>
 

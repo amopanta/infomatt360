@@ -167,26 +167,31 @@ class AiAuditService:
 
     # --- Adaptadores de proveedor ---
 
-    def _call_llm(self, prompt: str) -> str:
-        if settings.ai_audit_provider == "anthropic":
-            return self._call_anthropic(prompt)
-        if settings.ai_audit_provider == "gemini":
-            return self._call_gemini(prompt)
-        if settings.ai_audit_provider == "openai_compatible":
-            return self._call_openai_compatible(prompt)
-        raise ValueError(f"Proveedor de IA no soportado: {settings.ai_audit_provider!r}")
+    def _call_llm(self, prompt: str, *, provider: str | None = None, api_key: str | None = None,
+                  model: str | None = None, base_url: str | None = None) -> str:
+        provider = provider or settings.ai_audit_provider
+        api_key = api_key or settings.ai_audit_api_key
+        model = model or settings.ai_audit_model
+        base_url = base_url or settings.ai_audit_base_url
+        if provider == "anthropic":
+            return self._call_anthropic(prompt, api_key=api_key, model=model)
+        if provider == "gemini":
+            return self._call_gemini(prompt, api_key=api_key, model=model, base_url=base_url)
+        if provider == "openai_compatible":
+            return self._call_openai_compatible(prompt, api_key=api_key, model=model, base_url=base_url)
+        raise ValueError(f"Proveedor de IA no soportado: {provider!r}")
 
-    def _call_anthropic(self, prompt: str) -> str:
+    def _call_anthropic(self, prompt: str, *, api_key: str, model: str) -> str:
         response = httpx.post(
             "https://api.anthropic.com/v1/messages",
             headers={
-                "x-api-key": settings.ai_audit_api_key,
+                "x-api-key": api_key,
                 "anthropic-version": "2023-06-01",
                 "Content-Type": "application/json",
             },
             json={
-                "model": settings.ai_audit_model or "claude-sonnet-5",
-                "max_tokens": 512,
+                "model": model or "claude-sonnet-5",
+                "max_tokens": 2048,
                 "messages": [{"role": "user", "content": prompt}],
             },
             timeout=AUDIT_TIMEOUT_SECONDS,
@@ -195,16 +200,16 @@ class AiAuditService:
         data = response.json()
         return data["content"][0]["text"]
 
-    def _call_openai_compatible(self, prompt: str) -> str:
+    def _call_openai_compatible(self, prompt: str, *, api_key: str, model: str, base_url: str) -> str:
         """Cubre OpenAI, DeepSeek, Zhipu/GLM y cualquier otro proveedor que
         implemente el esquema de "chat completions" de OpenAI -- solo
         cambia `AI_AUDIT_BASE_URL` y `AI_AUDIT_MODEL`."""
-        base_url = (settings.ai_audit_base_url or "https://api.openai.com/v1").rstrip("/")
+        base_url = (base_url or "https://api.openai.com/v1").rstrip("/")
         response = httpx.post(
             f"{base_url}/chat/completions",
-            headers={"Authorization": f"Bearer {settings.ai_audit_api_key}", "Content-Type": "application/json"},
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json={
-                "model": settings.ai_audit_model or "gpt-4o-mini",
+                "model": model or "gpt-4o-mini",
                 "messages": [{"role": "user", "content": prompt}],
                 "temperature": 0,
             },
@@ -214,11 +219,12 @@ class AiAuditService:
         data = response.json()
         return data["choices"][0]["message"]["content"]
 
-    def _call_gemini(self, prompt: str) -> str:
-        model = settings.ai_audit_model or "gemini-1.5-flash"
-        base_url = (settings.ai_audit_base_url or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
+    def _call_gemini(self, prompt: str, *, api_key: str, model: str, base_url: str) -> str:
+        model = model or "gemini-2.5-flash-lite"
+        base_url = (base_url or "https://generativelanguage.googleapis.com/v1beta").rstrip("/")
         response = httpx.post(
-            f"{base_url}/models/{model}:generateContent?key={settings.ai_audit_api_key}",
+            f"{base_url}/models/{model}:generateContent",
+            headers={"x-goog-api-key": api_key},
             json={"contents": [{"parts": [{"text": prompt}]}]},
             timeout=AUDIT_TIMEOUT_SECONDS,
         )

@@ -21,7 +21,7 @@ router = APIRouter()
 
 def _source_project_id(db: Session, source_id: str) -> str:
     source = integration_service.get_source(db, source_id)
-    if source is None:
+    if source is None or source.source_type == "ai_provider":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fuente de integracion no encontrada")
     return source.project_id
 
@@ -29,6 +29,8 @@ def _source_project_id(db: Session, source_id: str) -> str:
 @router.post("/sources", response_model=IntegrationSourceRead)
 def create_source(payload: IntegrationSourceCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> IntegrationSourceRead:
     require_project_permission(db, current_user.id, payload.project_id, INTEGRATIONS_DONOR_SYNC_MANAGE)
+    if payload.source_type == "ai_provider":
+        raise HTTPException(status_code=422, detail="Usa el módulo de proveedores de IA")
     return integration_service.create_source(db, payload)
 
 

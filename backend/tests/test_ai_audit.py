@@ -16,6 +16,7 @@ from app.models.assignment import UserProjectAssignment
 from app.models.builder import BuilderTemplate
 from app.models.identity import Project, Role, User
 from app.models.runtime_record import RuntimeRecord
+from app.models.integrations import IntegrationSource
 
 
 class FakeResponse:
@@ -84,6 +85,52 @@ def auth(client: TestClient, email: str, password: str) -> dict[str, str]:
     response = client.post("/api/v1/auth/login", json={"email": email, "password": password})
     assert response.status_code == 200
     return {"Authorization": f"Bearer {response.json()['access_token']}"}
+
+
+def test_project_ai_providers_use_encrypted_keys_and_builder_selection(monkeypatch):
+    engine, sessions = setup_client()
+    with sessions() as db:
+        role = db.get(Role, "aud-manager-role")
+        role.permissions += ",builder.write"
+        db.commit()
+    calls = []
+
+    def fake_llm(prompt, **options):
+        calls.append(options)
+        return '{"questions":[{"label":"¿Nombre de la familia?","type":"TEXT"}]}'
+
+    monkeypatch.setattr(ai_audit_service_module.ai_audit_service, "_call_llm", fake_llm)
+    try:
+        with TestClient(app) as client:
+            manager = auth(client, "aud-manager@example.com", "Manager12345!")
+            outsider = auth(client, "aud-outsider@example.com", "Outsider12345!")
+            payload = {"project_id": "aud-project", "name": "Google de prueba", "provider": "gemini",
+                       "model": "gemini-2.5-flash-lite", "api_key": "secret-test-key"}
+            assert client.post("/api/v1/ai-audit/providers", json=payload, headers=outsider).status_code == 403
+            created = client.post("/api/v1/ai-audit/providers", json=payload, headers=manager)
+            assert created.status_code == 200, created.text
+            provider_id = created.json()["id"]
+            assert created.json()["has_key"] is True
+            assert "secret-test-key" not in created.text
+            listed = client.get("/api/v1/ai-audit/providers/aud-project", headers=manager)
+            assert listed.status_code == 200 and listed.json()[0]["id"] == provider_id
+            with sessions() as db:
+                stored = db.get(IntegrationSource, provider_id)
+                assert stored.credentials_encrypted != "secret-test-key"
+                assert "secret-test-key" not in stored.credentials_encrypted
+            generated = client.post("/api/v1/builder/assist/ai-questions", headers=manager,
+                                    json={"project_id": "aud-project", "provider_id": provider_id,
+                                          "description": "Encuesta de caracterización de hogares de prueba"})
+            assert generated.status_code == 200, generated.text
+            assert generated.json()["questions"][0]["type"] == "TEXT"
+            assert calls[0]["api_key"] == "secret-test-key"
+            assert calls[0]["provider"] == "gemini"
+            bad = client.post("/api/v1/ai-audit/providers", headers=manager,
+                              json={**payload, "provider": "custom", "base_url": "https://127.0.0.1/v1"})
+            assert bad.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+        engine.dispose()
 
 
 def _create_config(sessions, mode: str) -> None:

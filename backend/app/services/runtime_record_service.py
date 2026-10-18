@@ -360,8 +360,12 @@ class RuntimeRecordService:
         permitir continuar cuando un item del lote tiene errores. Si
         continue_on_error es false, se detiene en el primer error.
         """
+        # La huella se calcula antes de guardar: save_record completa el lote
+        # (consecutivo, quién capturó, id de respuesta...) y una huella
+        # posterior nunca coincidiría con un reenvío idéntico del cliente, que
+        # recibiría 409 en vez de la respuesta original.
+        request_hash = self._bulk_request_hash(payload) if payload.idempotency_key else None
         if payload.idempotency_key:
-            request_hash = self._bulk_request_hash(payload)
             existing = db.query(BulkImportJob).filter(
                 BulkImportJob.project_id == payload.project_id,
                 BulkImportJob.template_id == payload.template_id,
@@ -397,7 +401,7 @@ class RuntimeRecordService:
                 project_id=payload.project_id,
                 template_id=payload.template_id,
                 idempotency_key=payload.idempotency_key,
-                request_hash=self._bulk_request_hash(payload),
+                request_hash=request_hash,
                 payload_json=payload.model_dump_json(),
                 response_json=response.model_dump_json(),
                 status="queued",
@@ -439,7 +443,7 @@ class RuntimeRecordService:
                 project_id=payload.project_id,
                 template_id=payload.template_id,
                 idempotency_key=payload.idempotency_key,
-                request_hash=self._bulk_request_hash(payload),
+                request_hash=request_hash,
                 payload_json=payload.model_dump_json(),
                 response_json=response.model_dump_json(),
                 status="completed",

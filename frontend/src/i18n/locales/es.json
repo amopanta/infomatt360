@@ -1,5 +1,9 @@
 {
   "ux": {
+    "branding": {
+      "companyName": "Nombre de la empresa",
+      "companyNameHint": "Es el nombre que ven los usuarios al entrar, en la web y en la app móvil."
+    },
     "runtime": {
       "addRow": "Agregar",
       "removeRow": "Quitar",

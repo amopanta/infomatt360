@@ -1,5 +1,9 @@
 {
   "ux": {
+    "branding": {
+      "companyName": "Company name",
+      "companyNameHint": "The name users see when signing in, on the web and the mobile app."
+    },
     "runtime": {
       "addRow": "Add",
       "removeRow": "Remove",

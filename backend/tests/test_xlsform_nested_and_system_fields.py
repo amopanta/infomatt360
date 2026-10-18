@@ -99,3 +99,42 @@ def test_system_fields_are_filled_by_server_and_captured_by_cannot_be_spoofed():
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
+
+
+def test_resending_same_bulk_batch_replays_even_when_server_fills_fields():
+    """Un reenvío idéntico (respuesta perdida en la red) debe devolver el
+    resultado original, aunque el servidor complete consecutivo y campos de
+    sistema al guardar; antes la huella se calculaba después y daba 409."""
+    engine, sessions = setup_client()
+    with sessions() as db:
+        db.get(Role, "xlsform-builder-role").permissions = "builder.write,records.write,records.read"
+        db.commit()
+    try:
+        with TestClient(app) as client:
+            headers = auth(client, "xlsform-builder@example.com", "Builder12345!")
+            content = _build_xlsform(
+                survey_rows=[["text", "nombre", "Nombre"], ["SERIAL_NUMBER", "consecutivo", "Consecutivo"], ["CAPTURED_BY", "capturador", "Quién"]],
+                choices_rows=[],
+            )
+            template_id = _import(client, headers, content)["template_id"]
+            with sessions() as db:
+                db.get(BuilderTemplate, template_id).status = "published"
+                db.commit()
+            batch = {
+                "project_id": "xlsform-project", "template_id": template_id, "idempotency_key": "k" * 64,
+                "records": [{"project_id": "xlsform-project", "template_id": template_id, "status": "submitted",
+                             "values": [{"field_name": "nombre", "field_value_json": json.dumps("Ana")}]}],
+            }
+            first = client.post("/api/v1/runtime/session/bulk-save", headers=headers, json=batch)
+            assert first.status_code == 200, first.text
+            again = client.post("/api/v1/runtime/session/bulk-save", headers=headers, json=batch)
+            assert again.status_code == 200, again.text
+            assert again.json()["replayed"] is True
+            assert again.json()["results"][0]["id"] == first.json()["results"][0]["id"]
+
+            batch["records"][0]["values"][0]["field_value_json"] = json.dumps("Otra")
+            changed = client.post("/api/v1/runtime/session/bulk-save", headers=headers, json=batch)
+            assert changed.status_code == 409  # misma clave con contenido distinto sí es conflicto
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)

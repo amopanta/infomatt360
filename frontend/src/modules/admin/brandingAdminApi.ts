@@ -16,6 +16,7 @@ export type OrganizationBranding = {
   accent_color?: string | null;
   background_color?: string | null;
   slogan?: string | null;
+  organization_name?: string | null;
 };
 
 export type AdminProject = {
@@ -54,6 +55,7 @@ export type BrandingSavePayload = {
   accent_color?: string | null;
   background_color?: string | null;
   slogan?: string | null;
+  organization_name?: string | null;
 };
 
 export async function saveOrganizationBranding(organizationId: string, payload: BrandingSavePayload): Promise<OrganizationBranding> {

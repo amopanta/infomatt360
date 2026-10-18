@@ -104,3 +104,26 @@ def test_public_branding_reflects_admin_configuration():
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
+
+
+def test_branding_can_rename_organization_shown_to_field_staff():
+    engine, _sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            admin_headers = auth(client, "org-admin@example.com", "Admin12345!")
+            organization_id = client.post("/api/v1/organizations/", headers=admin_headers, json={"name": "Fundacion X", "slug": "fundacion-x"}).json()["id"]
+
+            renamed = client.put(f"/api/v1/organizations/{organization_id}/branding", headers=admin_headers,
+                                 json={"organization_name": "  Fundación Territorio Vivo  ", "slogan": "Datos que transforman"})
+            assert renamed.status_code == 200, renamed.text
+            assert renamed.json()["organization_name"] == "Fundación Territorio Vivo"
+            assert client.get(f"/api/v1/organizations/{organization_id}/branding", headers=admin_headers).json()["organization_name"] == "Fundación Territorio Vivo"
+            assert client.get("/api/v1/public/branding", params={"slug": "fundacion-x"}).json()["organization_name"] == "Fundación Territorio Vivo"
+
+            # Guardar la marca sin nombre conserva el actual (la pantalla vieja no lo envía).
+            client.put(f"/api/v1/organizations/{organization_id}/branding", headers=admin_headers, json={"slogan": "Otro lema"})
+            assert client.get("/api/v1/public/branding", params={"slug": "fundacion-x"}).json()["organization_name"] == "Fundación Territorio Vivo"
+            assert client.put(f"/api/v1/organizations/{organization_id}/branding", headers=admin_headers, json={"organization_name": "X"}).status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)

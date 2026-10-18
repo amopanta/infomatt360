@@ -1,5 +1,21 @@
 {
   "ux": {
+    "runtime": {
+      "addRow": "Add",
+      "removeRow": "Remove",
+      "rowTitle": "{label} · {index}",
+      "noRows": "No rows yet. Press \"Add\".",
+      "maxRows": "Maximum {max} rows.",
+      "rowRequired": "Complete \"{field}\" in \"{group}\" (row {index}).",
+      "rowConstraint": "The value of \"{field}\" in \"{group}\" (row {index}) breaks the rule.",
+      "minRows": "Add at least {min} row(s) to \"{group}\".",
+      "automatic": "Filled in automatically on save",
+      "ratingLabel": "{value} of {max}",
+      "rankHint": "Use ↑ ↓ to order from most to least important.",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "matrixWithoutRows": "This matrix has no rows configured. Edit it in the builder."
+    },
     "nav": {
       "home": "Home",
       "fill": "Fill in forms",

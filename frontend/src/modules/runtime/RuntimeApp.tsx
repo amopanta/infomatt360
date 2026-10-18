@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
 import { createParticipantInForm, fetchCaptureParticipants, fetchRuntimeTemplate, saveRuntimeRecord, startFormAssignment, toRuntimeValueList } from './api';
@@ -7,7 +7,7 @@ import type { CaptureAssignment, EligibleParticipant } from './api';
 import { ParticipantSummaryTable } from './ParticipantSummaryTable';
 import { ParticipantPhoneCheck } from './ParticipantPhoneCheck';
 import { RuntimeRenderer, themeStyle } from './RuntimeRenderer';
-import { allComponents, isFieldVisible, resolveFormValues, validateFormValues } from './formLogic';
+import { allComponents, isFieldVisible, resolveFormValues, stampInterviewDuration, validateFormValues } from './formLogic';
 import { prefillParticipantAnswers } from './participantPrefill';
 import { usePullData } from './pullData';
 import { useRuntimeDraft } from './useRuntimeDraft';
@@ -45,6 +45,8 @@ export function RuntimeApp() {
   const [creatingParticipant, setCreatingParticipant] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reviewing, setReviewing] = useState(false);
+  // Inicio de la captura, para la duración de la entrevista (INTERVIEW_DURATION).
+  const startedAt = useRef(Date.now());
 
   const templateId = getTemplateIdFromPath();
   const isPreview = new URLSearchParams(window.location.search).get('preview') === '1';
@@ -135,7 +137,7 @@ export function RuntimeApp() {
       if (!selectedParticipant) { setStatus(t('runtime.enterUniqueKey')); return; }
       if (!assignmentReady) { setStatus(t('runtime.waitAssignment')); return; }
       if (pullError || !pullsReady) { setStatus(pullError || t('runtime.waitCsv')); return; }
-      const resolved = resolveFormValues(template, values, pulls);
+      const resolved = stampInterviewDuration(template, resolveFormValues(template, values, pulls), startedAt.current);
       const invalid = validateFormValues(template, resolved);
       if (invalid) { setStatus(invalid); return; }
       if (!reviewing) { setReviewing(true); setStatus(''); return; }
@@ -163,6 +165,7 @@ export function RuntimeApp() {
       clearDraft();
       setParticipantKey('');
       setReviewing(false);
+      startedAt.current = Date.now();
       setStatus(t('runtime.savedSuccess'));
     } catch (error) {
       setStatus(error instanceof Error ? error.message : t('runtime.saveFailed'));

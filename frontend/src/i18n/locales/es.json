@@ -1,5 +1,21 @@
 {
   "ux": {
+    "runtime": {
+      "addRow": "Agregar",
+      "removeRow": "Quitar",
+      "rowTitle": "{label} · {index}",
+      "noRows": "Aún no hay filas. Pulsa «Agregar».",
+      "maxRows": "Máximo {max} filas.",
+      "rowRequired": "Completa «{field}» en «{group}» (fila {index}).",
+      "rowConstraint": "El valor de «{field}» en «{group}» (fila {index}) no cumple la regla.",
+      "minRows": "Agrega al menos {min} fila(s) en «{group}».",
+      "automatic": "Se llena automáticamente al guardar",
+      "ratingLabel": "{value} de {max}",
+      "rankHint": "Usa ↑ ↓ para ordenar de más a menos importante.",
+      "moveUp": "Subir",
+      "moveDown": "Bajar",
+      "matrixWithoutRows": "Esta matriz no tiene filas configuradas. Edítala en el constructor."
+    },
     "nav": {
       "home": "Inicio",
       "fill": "Llenar formularios",

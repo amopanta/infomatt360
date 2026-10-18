@@ -22,6 +22,7 @@ from app.core.time import utc_now
 from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.audit import AuditLog
 from app.models.files import FileAsset
+from app.models.identity import User
 from app.models.device_verification import DeviceVerification
 from app.models.bulk_import import BulkImportJob
 from app.models.participants import Participant
@@ -132,7 +133,12 @@ class RuntimeRecordService:
             RuntimeRecord.content_hash == content_hash,
             RuntimeRecord.created_at >= duplicate_window_start,
         ).first() is not None
+        # Despues de la huella anti-duplicados: estos valores cambian en cada
+        # registro y harian que dos capturas identicas parezcan distintas.
+        record_id = str(uuid4())
+        self._fill_system_fields(db, payload.template_id, payload.values, user_id, record_id)
         record = RuntimeRecord(
+            id=record_id,
             project_id=payload.project_id,
             template_id=payload.template_id,
             version_id=payload.version_id,
@@ -265,6 +271,57 @@ class RuntimeRecordService:
                 existing.field_value_json = json.dumps(next_number)
             else:
                 values.append(RuntimeValueCreate(field_name=field.name, field_value_json=json.dumps(next_number)))
+
+    SYSTEM_FIELD_TYPES = ("CAPTURED_BY", "UUID", "RESPONSE_ID", "CHANGE_HISTORY")
+
+    def _fill_system_fields(self, db: Session, template_id: str, values: list[RuntimeValueCreate], user_id: str | None, record_id: str) -> None:
+        """Llena los campos que no debe escribir quien captura.
+
+        - CAPTURED_BY: nombre completo del usuario autenticado, tal como se
+          creo en Usuarios; se ignora lo que envie el cliente para que no se
+          pueda suplantar a otro capturador. Sin usuario (carga por API key)
+          se conserva el valor recibido.
+        - RESPONSE_ID: id del registro.
+        - UUID: se respeta si llega con valor; si no, se genera.
+        - CHANGE_HISTORY: primera entrada (creacion) con usuario y fecha.
+        """
+        fields = db.query(BuilderComponent).filter(
+            BuilderComponent.template_id == template_id,
+            BuilderComponent.component_type.in_(self.SYSTEM_FIELD_TYPES),
+        ).all()
+        if not fields:
+            return
+        user = db.get(User, user_id) if user_id else None
+        user_name = (user.full_name or user.email) if user else None
+        by_name = {item.field_name: item for item in values}
+
+        def put(name: str, value: object) -> None:
+            encoded = json.dumps(value, ensure_ascii=False)
+            if name in by_name:
+                by_name[name].field_value_json = encoded
+            else:
+                item = RuntimeValueCreate(field_name=name, field_value_json=encoded)
+                values.append(item)
+                by_name[name] = item
+
+        def current(name: str) -> object:
+            item = by_name.get(name)
+            if item is None:
+                return None
+            try:
+                return json.loads(item.field_value_json)
+            except (json.JSONDecodeError, TypeError):
+                return None
+
+        for field in fields:
+            if field.component_type == "CAPTURED_BY" and user_name:
+                put(field.name, user_name)
+            elif field.component_type == "RESPONSE_ID":
+                put(field.name, record_id)
+            elif field.component_type == "UUID" and current(field.name) in (None, ""):
+                put(field.name, str(uuid4()))
+            elif field.component_type == "CHANGE_HISTORY":
+                put(field.name, [{"accion": "creado", "usuario": user_name or "sistema", "fecha": utc_now().isoformat()}])
 
     def _next_serial_number(self, db: Session, template_id: str, field_name: str) -> int:
         rows = db.query(RuntimeRecordValue.field_value_json).join(

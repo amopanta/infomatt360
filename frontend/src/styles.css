@@ -1472,4 +1472,18 @@ svg.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor
 .builder-preview-submit { width: 100%; margin-top: 10px; padding: 13px; font: inherit; font-size: var(--font-size-xl); font-weight: 800; color: #ffffff; border: 0; border-radius: calc(var(--form-radius, 18px) / 2); background: linear-gradient(135deg, var(--form-primary, var(--brand-primary)), var(--form-accent, var(--brand-accent))); }
 @media (max-width: 640px) {
   .builder-preview-device.phone { border-width: 0; border-radius: var(--radius-lg); min-height: 0; }
-}
+}.runtime-repeat-item-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.runtime-repeat-remove { border: 1px solid var(--danger); border-radius: var(--radius-md); padding: 6px 12px; color: var(--danger); background: var(--surface); font-weight: 700; cursor: pointer; }
+.runtime-repeat .runtime-repeat { margin-top: 12px; background: var(--surface-muted); }
+.runtime-scale { display: flex; flex-wrap: wrap; gap: 6px; }
+.runtime-scale button { min-width: 42px; min-height: 42px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface); font: inherit; font-weight: 800; cursor: pointer; }
+.runtime-scale button.active { color: #ffffff; border-color: var(--form-primary, var(--brand-primary)); background: var(--form-primary, var(--brand-primary)); }
+.runtime-scale.stars button { font-size: 22px; color: var(--border-strong); }
+.runtime-scale.stars button.active { color: #f59e0b; background: var(--surface); border-color: #f59e0b; }
+.runtime-ranking { display: flex; flex-direction: column; gap: 6px; margin: 6px 0 0; padding-left: 22px; }
+.runtime-ranking li span { display: inline-block; min-width: 160px; font-weight: 700; }
+.runtime-ranking li button { margin-left: 6px; min-width: 34px; padding: 4px 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-md); background: var(--surface); cursor: pointer; }
+.runtime-matrix table { border-collapse: collapse; width: 100%; }
+.runtime-matrix th, .runtime-matrix td { padding: 6px; text-align: center; border-bottom: 1px solid var(--border); }
+.runtime-matrix tbody th { text-align: left; }
+.runtime-field-automatic small { color: var(--text-muted); font-style: italic; }

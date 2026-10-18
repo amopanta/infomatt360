@@ -24,6 +24,7 @@ export type AppRouteKey =
   | 'participants'
   | 'appliedActivities'
   | 'teams'
+  | 'fieldDevices'
   | 'records'
   | 'reports'
   | 'evidence'
@@ -70,6 +71,7 @@ export function resolveAppRoute(pathname: string): AppRoute {
   if (pathname.startsWith('/account/security')) return { key: 'accountSecurity' };
   if (pathname.startsWith('/activities')) return { key: 'appliedActivities' };
   if (pathname.startsWith('/participants')) return { key: 'participants' };
+  if (pathname.startsWith('/field-devices')) return { key: 'fieldDevices', permissions: ['records.review', 'records.coordinate', 'identity.users.manage'] };
   if (pathname.startsWith('/teams')) return { key: 'teams', permissions: ['identity.users.manage'] };
   if (pathname.startsWith('/records')) return { key: 'records' };
   if (pathname.startsWith('/reports')) return { key: 'reports' };

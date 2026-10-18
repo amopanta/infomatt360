@@ -40,6 +40,7 @@ const MapsApp = lazy(() => import('./modules/maps/MapsApp').then((module) => ({ 
 const MessagesApp = lazy(() => import('./modules/messages/MessagesApp').then((module) => ({ default: module.MessagesApp })));
 const ParticipantsApp = lazy(() => import('./modules/participants/ParticipantsApp').then((module) => ({ default: module.ParticipantsApp })));
 const AppliedActivitiesApp = lazy(() => import('./modules/participants/AppliedActivitiesApp').then((module) => ({ default: module.AppliedActivitiesApp })));
+const FieldDevicesApp = lazy(() => import('./modules/devices/FieldDevicesApp').then((module) => ({ default: module.FieldDevicesApp })));
 const TeamsApp = lazy(() => import('./modules/teams/TeamsApp').then((module) => ({ default: module.TeamsApp })));
 const RecordsApp = lazy(() => import('./modules/records/RecordsApp').then((module) => ({ default: module.RecordsApp })));
 const ReportsApp = lazy(() => import('./modules/reports/ReportsApp').then((module) => ({ default: module.ReportsApp })));
@@ -124,6 +125,7 @@ function renderRoute(route: AppRoute) {
       case 'participants': return <ParticipantsApp />;
       case 'appliedActivities': return <AppliedActivitiesApp />;
       case 'teams': return <TeamsApp />;
+      case 'fieldDevices': return <FieldDevicesApp />;
       case 'records': return <RecordsApp />;
       case 'reports': return window.location.pathname.startsWith('/reports/form/') ? <FormReportApp /> : window.location.pathname.startsWith('/reports/indicators') ? <IndicatorLibraryApp /> : window.location.pathname.startsWith('/reports/catalog') ? <ReportCatalogApp /> : <ReportsApp />;
       case 'evidence': return <EvidenceApp />;

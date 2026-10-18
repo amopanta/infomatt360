@@ -37,6 +37,7 @@ const ICONS: Record<string, string> = {
   gRev: '<circle cx="12" cy="12" r="9"/><path d="m8.5 12 2.5 2.5 4.5-5"/>',
   gData: '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>',
   gAdmin: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+  tablet: '<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M10.5 18.5h3"/><path d="M9 8.5a4 4 0 0 1 6 0M10.5 10.5a1.8 1.8 0 0 1 3 0"/>',
   chevron: '<path d="M6 9l6 6 6-6"/>',
 };
 

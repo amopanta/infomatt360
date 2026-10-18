@@ -60,6 +60,7 @@ const MENU: MenuGroup[] = [
     labelKey: 'ux.nav.review',
     icon: 'gRev',
     items: [
+      { labelKey: 'ux.nav.fieldDevices', href: '/field-devices', icon: 'tablet', permissions: ['records.review', 'records.coordinate', 'identity.users.manage'] },
       { labelKey: 'nav.approvalFlows', href: '/admin/approval-flows', icon: 'check', permissions: ['records.approve'] },
       { labelKey: 'nav.messages', href: '/messages', icon: 'msg' },
       { labelKey: 'nav.reports', href: '/reports', icon: 'report' },

@@ -1487,3 +1487,35 @@ svg.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor
 .runtime-matrix th, .runtime-matrix td { padding: 6px; text-align: center; border-bottom: 1px solid var(--border); }
 .runtime-matrix tbody th { text-align: left; }
 .runtime-field-automatic small { color: var(--text-muted); font-style: italic; }
+.devices-page { padding: 24px; max-width: 1500px; margin: 0 auto; }
+.devices-page h1 { margin-top: 0; }
+.devices-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 16px 0; }
+.devices-totals div { background: #fff; border: 1px solid #d8e1eb; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; }
+.devices-totals strong { font-size: 1.8rem; line-height: 1.1; }
+.devices-totals span { color: #586b82; }
+.devices-totals .is-warning { border-color: #f59e0b; background: #fffbeb; }
+.devices-totals .is-danger { border-color: #dc2626; background: #fef2f2; }
+.devices-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.devices-head .my-forms-views { margin: 0; }
+.devices-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; margin-top: 12px; }
+.device-card { border: 1px solid #d8e1eb; border-left: 6px solid #16a34a; border-radius: 10px; padding: 14px; background: #fff; }
+.device-card.level-warning { border-left-color: #f59e0b; }
+.device-card.level-danger { border-left-color: #dc2626; }
+.device-card header { display: flex; align-items: center; gap: 10px; }
+.device-card header > div { flex: 1; min-width: 0; }
+.device-card header small { display: block; color: #586b82; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.device-dot { width: 12px; height: 12px; border-radius: 50%; background: #16a34a; flex: none; }
+.level-warning .device-dot { background: #f59e0b; }
+.level-danger .device-dot { background: #dc2626; }
+.device-level { font-size: .78rem; font-weight: 700; padding: 3px 8px; border-radius: 999px; background: #dcfce7; color: #166534; white-space: nowrap; }
+.level-warning .device-level { background: #fef3c7; color: #92400e; }
+.level-danger .device-level { background: #fee2e2; color: #991b1b; }
+.device-card dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin: 12px 0 8px; }
+.device-card dt { font-size: .78rem; color: #586b82; }
+.device-card dd { margin: 0; font-weight: 700; }
+.device-alerts { margin: 6px 0; padding-left: 18px; color: #991b1b; }
+.device-errors { margin: 8px 0 0; padding-left: 20px; font-size: .9rem; max-height: 220px; overflow-y: auto; }
+.device-errors time { color: #586b82; margin-right: 6px; }
+.devices-note { color: #586b82; font-size: .9rem; }
+.devices-routes { display: grid; gap: 12px; }
+.devices-map { height: 440px; border-radius: 10px; border: 1px solid #d8e1eb; }

@@ -1,5 +1,44 @@
 {
   "ux": {
+    "devices": {
+      "title": "Field devices",
+      "description": "Status of each tablet or phone: what it has stored without sending, when it last synced and its errors. Refreshes every minute.",
+      "summary": "Summary",
+      "totalDevices": "devices reporting",
+      "needAttention": "need attention",
+      "unsentRecords": "unsent records",
+      "recordsWithErrors": "records with errors",
+      "listTitle": "Devices",
+      "filterAll": "All",
+      "filterAttention": "Only with alerts",
+      "empty": "No device has reported yet. They appear here when a field worker opens the mobile app online.",
+      "level": {
+        "ok": "Up to date",
+        "warning": "Pending",
+        "danger": "Needs attention"
+      },
+      "unsent": "Unsent",
+      "files": "{count} file(s)",
+      "errors": "With errors",
+      "lastSync": "Last sync",
+      "lastSeen": "Last report",
+      "showErrors": "Show errors ({count})",
+      "hideErrors": "Hide errors",
+      "viewRoute": "View route",
+      "routeTitle": "Field worker routes",
+      "day": "Day",
+      "routePrivacy": "The route is recorded only while the field worker has the app open, after a notice. Only supervisors and administrators can see it.",
+      "noRoutes": "No routes recorded that day.",
+      "noRouteForUser": "This field worker has no route recorded that day.",
+      "routeSummary": "{km} km · {points} points · {from} to {to}",
+      "start": "Start",
+      "end": "Last point",
+      "never": "Never",
+      "justNow": "Just now",
+      "minutesAgo": "{count} min ago",
+      "hoursAgo": "{count} h ago",
+      "daysAgo": "{count} days ago"
+    },
     "branding": {
       "companyName": "Company name",
       "companyNameHint": "The name users see when signing in, on the web and the mobile app."
@@ -35,7 +74,8 @@
       "backups": "Backups",
       "mirror": "Mirror database",
       "pullGroups": "Preloaded data",
-      "xlsform": "Import from Excel (XLSForm)"
+      "xlsform": "Import from Excel (XLSForm)",
+      "fieldDevices": "Field devices"
     },
     "home": {
       "greeting": "What would you like to do today?",

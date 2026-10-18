@@ -15,6 +15,7 @@ from app.api.v1.compiler import router as compiler_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.device_assignments import router as device_assignments_router
 from app.api.v1.device_verification import router as device_verification_router
+from app.api.v1.field_devices import router as field_devices_router
 from app.api.v1.emergency_access import router as emergency_access_router
 from app.api.v1.enrollment import router as enrollment_router
 from app.api.v1.erp import router as erp_router
@@ -66,6 +67,7 @@ api_v1_router.include_router(api_keys_router, prefix="/api-keys", tags=["api-key
 api_v1_router.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"])
 api_v1_router.include_router(device_assignments_router, prefix="/device-assignments", tags=["device-assignments"])
 api_v1_router.include_router(device_verification_router, prefix="/device-verification", tags=["device-verification"])
+api_v1_router.include_router(field_devices_router, prefix="/field-devices", tags=["field-devices"])
 api_v1_router.include_router(identity_router, prefix="/identity", tags=["identity"])
 api_v1_router.include_router(organizations_router, prefix="/organizations", tags=["organizations"])
 api_v1_router.include_router(backups_router, prefix="/backups", tags=["backups"])

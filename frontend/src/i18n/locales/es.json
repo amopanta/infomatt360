@@ -1,5 +1,44 @@
 {
   "ux": {
+    "devices": {
+      "title": "Equipos de campo",
+      "description": "Estado de cada tablet o celular: lo que tiene guardado sin enviar, cuándo sincronizó y sus errores. Se actualiza solo cada minuto.",
+      "summary": "Resumen",
+      "totalDevices": "equipos reportando",
+      "needAttention": "necesitan atención",
+      "unsentRecords": "registros sin enviar",
+      "recordsWithErrors": "registros con error",
+      "listTitle": "Equipos",
+      "filterAll": "Todos",
+      "filterAttention": "Solo con alertas",
+      "empty": "Aún ningún equipo ha reportado. Aparecen aquí cuando un gestor abre la app móvil con conexión.",
+      "level": {
+        "ok": "Al día",
+        "warning": "Pendiente",
+        "danger": "Requiere atención"
+      },
+      "unsent": "Sin enviar",
+      "files": "{count} archivo(s)",
+      "errors": "Con error",
+      "lastSync": "Última sincronización",
+      "lastSeen": "Último reporte",
+      "showErrors": "Ver errores ({count})",
+      "hideErrors": "Ocultar errores",
+      "viewRoute": "Ver recorrido",
+      "routeTitle": "Recorrido de los gestores",
+      "day": "Día",
+      "routePrivacy": "El recorrido se registra solo mientras el gestor tiene la app abierta, con aviso previo. Solo lo ven supervisión y administración.",
+      "noRoutes": "No hay recorridos registrados ese día.",
+      "noRouteForUser": "Este gestor no tiene recorrido registrado ese día.",
+      "routeSummary": "{km} km · {points} puntos · {from} a {to}",
+      "start": "Inicio",
+      "end": "Último punto",
+      "never": "Nunca",
+      "justNow": "Hace un momento",
+      "minutesAgo": "Hace {count} min",
+      "hoursAgo": "Hace {count} h",
+      "daysAgo": "Hace {count} días"
+    },
     "branding": {
       "companyName": "Nombre de la empresa",
       "companyNameHint": "Es el nombre que ven los usuarios al entrar, en la web y en la app móvil."
@@ -35,7 +74,8 @@
       "backups": "Copias de seguridad",
       "mirror": "Base espejo",
       "pullGroups": "Datos precargados",
-      "xlsform": "Importar desde Excel (XLSForm)"
+      "xlsform": "Importar desde Excel (XLSForm)",
+      "fieldDevices": "Equipos de campo"
     },
     "home": {
       "greeting": "¿Qué quieres hacer hoy?",

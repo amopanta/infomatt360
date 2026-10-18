@@ -21,6 +21,20 @@ from app.services.organization_service import organization_service
 router = APIRouter()
 
 
+def require_branding_access(db: Session, user_id: str, organization_id: str) -> None:
+    """La marca de una organización solo la edita quien tiene
+    organizations.branding.manage en esa organización (H11). Antes bastaba
+    tenerlo en cualquier proyecto: se podía cambiar el logo y el nombre de
+    otro cliente. organizations.manage es de plataforma (crea y lista todas
+    las organizaciones, docs/60) y sigue alcanzando a cualquiera."""
+    try:
+        require_any_permission(db, user_id, {ORGANIZATIONS_MANAGE})
+        return
+    except HTTPException:
+        pass
+    require_permission_in_organization(db, user_id, organization_id, ORGANIZATIONS_BRANDING_MANAGE)
+
+
 @router.post("/", response_model=OrganizationRead, summary="Crear organizacion")
 def create_organization(payload: OrganizationCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> OrganizationRead:
     require_any_permission(db, current_user.id, {ORGANIZATIONS_MANAGE})
@@ -35,7 +49,7 @@ def list_organizations(db: Session = Depends(get_db), current_user: User = Depen
 
 @router.put("/{organization_id}/branding", response_model=OrganizationBrandingRead, summary="Configurar marca blanca de la organizacion")
 def update_branding(organization_id: str, payload: OrganizationBrandingUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> OrganizationBrandingRead:
-    require_any_permission(db, current_user.id, {ORGANIZATIONS_BRANDING_MANAGE, ORGANIZATIONS_MANAGE})
+    require_branding_access(db, current_user.id, organization_id)
     return organization_service.upsert_branding(db, organization_id, payload)
 
 
@@ -48,14 +62,14 @@ async def upload_branding_logo(
     current_user: User = Depends(get_current_user),
 ) -> OrganizationBrandingRead:
     """Guarda el archivo y deja logo_url apuntando al endpoint publico que lo sirve (docs/122)."""
-    require_any_permission(db, current_user.id, {ORGANIZATIONS_BRANDING_MANAGE, ORGANIZATIONS_MANAGE})
+    require_branding_access(db, current_user.id, organization_id)
     content = await upload.read()
     return organization_service.save_logo(db, organization_id, content, upload.content_type, str(request.base_url))
 
 
 @router.get("/{organization_id}/branding", response_model=OrganizationBrandingRead | None, summary="Consultar marca blanca de la organizacion")
 def get_branding(organization_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> OrganizationBrandingRead | None:
-    require_any_permission(db, current_user.id, {ORGANIZATIONS_BRANDING_MANAGE, ORGANIZATIONS_MANAGE})
+    require_branding_access(db, current_user.id, organization_id)
     return organization_service.get_branding(db, organization_id)
 
 

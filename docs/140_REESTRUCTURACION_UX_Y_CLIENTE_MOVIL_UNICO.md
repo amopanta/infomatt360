@@ -348,3 +348,65 @@ el gestor de campo `gestor@infomatt360.demo`):
 que no funciona en Expo Go; se activará en la build propia (EAS). Mientras tanto,
 los datos están en el almacenamiento privado de la app y Android 10+ cifra el
 almacenamiento del equipo.
+
+## 10. H03 (paridad), H06 (sincronización) y H11 (accesos) (2026-10-18)
+
+### H03: la misma lógica en web y app
+
+- **Antes:** la app solo entendía condiciones simples ("campo igual a valor"),
+  además de mínimos y máximos. Descartaba los campos `calculate` y `hidden`,
+  suponiendo que los llenaba el servidor, pero los calcula el cliente: los
+  registros de la app llegaban sin esos valores.
+- **Ahora:** `src/forms/utils/xlsExpression.ts` es una copia exacta del evaluador
+  de la web. `formLogic.ts` aplica `relevant_expression`, `constraint_expression`,
+  `calculation` y los valores por defecto con el mismo algoritmo.
+  - En los grupos repetibles, cada regla ve los valores de su fila.
+  - Las reglas simples se comparan como texto, igual que en la web.
+  - Si se cambia el evaluador de la web, hay que copiarlo y correr
+    `test/xlsParity.test.ts`, que repite los casos de la web.
+- **Emulador, sin red:**
+  - el campo calculado no se muestra;
+  - la cédula solo aparece con edad >= 18;
+  - con edad 150 se avisa de la regla;
+  - el servidor recibió `edad_meses = 360`.
+
+### H06: lotes resistentes
+
+- **Servidor** (`test_runtime_bulk_resilience.py`):
+  - el mismo lote enviado tres veces deja una sola respuesta por registro;
+  - un registro inválido sale `failed` con su motivo y los demás se crean.
+- **App** (`test/syncResilience.test.ts`, con el ciclo `syncNow` real):
+  - si el servidor guarda pero la respuesta se pierde, el registro sigue
+    pendiente y el reenvío no duplica;
+  - un rechazo dentro del lote no bloquea a los demás registros.
+
+### H11: barridos de acceso
+
+Las pruebas recorren automáticamente **todas** las rutas GET (154) y cada una
+tiene un control positivo que demuestra que el barrido detecta datos.
+
+| Barrido | Resultado | Corrección |
+|---|---|---|
+| Entre proyectos (`test_cross_project_access_scan.py`): usuario con todos los permisos en A pide datos de B | Sin fugas. `/identity/projects` y `/organizations/` son globales por diseño con `organizations.manage`, que es de plataforma (docs/60) | — |
+| Marca de otra organización | **Hueco:** con `organizations.branding.manage` en cualquier proyecto se podía cambiar el logo y el nombre de otro cliente | Ahora exige ese permiso en esa organización (o el de plataforma). Prueba que falla sin la corrección |
+| Territorial (`test_territorial_access_scan.py`): coordinador de Soacha pide un participante de Bogotá y lo que cuelga de él | **Fuga:** `eligible-participants` no filtraba por territorio en formularios legacy | Filtro de territorio siempre que hay usuario |
+| Escritura entre proyectos (`test_cross_project_write_scan.py`): las 175 operaciones POST, PUT, PATCH y DELETE, con cuerpos válidos generados del esquema y datos de B; se compara una foto de las filas de B | **Hueco grave:** `POST /assignments/` aceptaba `identity.users.manage` de cualquier proyecto. Se podía asignar a cualquiera, incluso a uno mismo, en cualquier proyecto y con cualquier rol. `GET /assignments/` listaba asignaciones ajenas | Asignar y listar exigen el permiso en ese proyecto, salvo el de plataforma. Los permisos administrativos y de plataforma solo los entrega quien ya los tiene; los de captura los asigna el encargado de usuarios |
+| Escritura territorial (en `test_territorial_access_scan.py`): el coordinador de Soacha intenta modificar lo del participante de Bogotá | **Fugas:** `POST /files/` adjuntaba archivos a su registro. `POST /ai/checks` creaba revisiones sobre su registro, sin validar siquiera que el registro fuera del proyecto. `GET /ai/checks/{proyecto}` listaba revisiones de cualquier territorio | Las tres rutas validan el proyecto y el territorio. Hay pruebas que fallan sin la corrección |
+
+La copia de participantes en la app ya baja filtrada por el servidor (H02), así
+que no hay fuga sin conexión.
+
+### Decisiones pendientes
+
+1. **PR #48 (casos):** su migración `0080_case_relations_and_exports` y la nuestra
+   `0080_field_device_status` parten de la misma `0079`. Al integrar ambas hay
+   que encadenarlas: la segunda en entrar debe apuntar a la primera. H08 a H10
+   (casos sin conexión, relaciones padre-hijo y propiedades de casos) se apoyan
+   en ese PR.
+2. **Alcance de `organizations.manage`:** hoy es de plataforma (ve todas las
+   organizaciones). No debe darse a administradores de un cliente.
+3. **Registros sin participante y territorio:** hoy los ve cualquier usuario con
+   acceso al formulario. Falta definir si un coordinador territorial debe verlos.
+4. **Cobertura de los barridos:** recorren todas las rutas con datos sembrados de
+   cada tipo. Un modelo nuevo que se agregue debe sembrarse también en
+   `_seed`; si no, el barrido no puede encontrar fugas sobre él.

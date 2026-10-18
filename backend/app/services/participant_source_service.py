@@ -99,7 +99,9 @@ def eligible_participants(db: Session, template: BuilderTemplate, user_id: str |
         selected = [item for item in rows if item.id in selected_ids]
     if source.access_mode != "legacy" and enforce_assignments:
         selected = [item for item in selected if item.id in assigned_ids]
-    if source.access_mode != "legacy" and user_id:
+    # Territorio del usuario (H11): también en formularios legacy, que antes
+    # mostraban participantes de cualquier municipio.
+    if user_id:
         from app.api.permissions import allowed_form_participant_ids
         visible = allowed_form_participant_ids(db, user_id, template)
         if visible is not None:

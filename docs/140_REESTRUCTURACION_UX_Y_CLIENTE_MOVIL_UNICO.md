@@ -212,3 +212,81 @@ esa prueba dejó de dar puntos, por eso se usa GPS.
 **Pendiente**: recorrido con la app cerrada o en segundo plano. Requiere una build propia
 (EAS) con `expo-task-manager`, permiso de ubicación en segundo plano y
 notificación permanente; Expo Go no lo permite.
+
+## 8. Plan de captura híbrida: Fase 0, H04 y H02 (2026-10-18)
+
+Rama `feature/hybrid-offline-capture-20261017` en los dos repositorios
+(issue amopanta/infomatt360#50). Parte de `ux/reestructuracion-cliente-movil`
+(PR #49 y mobile#1), porque las dos fichas dependen de ese trabajo.
+
+### Fase 0: línea base
+
+- Servidor: 507 pruebas en verde antes de empezar.
+- App móvil: se agregó `npm test` (vitest). `test/setup.ts` cambia `expo-sqlite`
+  por `node:sqlite`, así que las pruebas ejecutan el SQL real de `src/db/database.ts`.
+  Antes la app no tenía pruebas automáticas.
+- La prueba de caracterización de la limpieza encontró un defecto grave:
+  `purgeOldSynced` fallaba con `FOREIGN KEY constraint failed` cuando un
+  registro sincronizado tenía evidencias. El error salía del ciclo de
+  sincronización y lo apagaba, a los 7 días de enviado el registro.
+
+### H04: evidencias sin conexión
+
+| Antes | Ahora |
+|---|---|
+| FILE, PDF, MULTIFILE, AUDIO y VIDEO abrían el escáner de documentos | Cada tipo tiene su control: elegir archivo, varios archivos, grabar audio, grabar o elegir video, escanear o elegir PDF |
+| Las fotos comprimidas quedaban en la caché, que Android puede vaciar | Toda evidencia se copia a `documentDirectory/evidence/` |
+| Toda evidencia se registraba como foto `image/jpeg` | Se registran desde los valores del formulario, con su tipo real (también en repetibles y huellas) |
+| Un reintento con la respuesta perdida duplicaba el archivo en el servidor | `POST /files/upload` acepta `client_ref`: un reenvío devuelve el mismo archivo (migración `0081_file_asset_client_ref`) |
+| No se verificaba la integridad | `client_md5`: el servidor rechaza archivos dañados (422) y la app solo da el archivo por subido si el tamaño coincide |
+| La limpieza podía borrar evidencias sin subir | Solo borra registro, evidencias y archivos juntos, y únicamente si todo fue confirmado por el servidor |
+
+MULTIFILE viaja como lista, igual que en la web, con el nombre original del
+archivo. El límite por archivo es de 25 MB, igual al del servidor.
+
+Prueba en emulador:
+- La red se cortó antes de abrir el formulario. En ese estado se adjuntaron
+  un PDF, un archivo de soporte, dos anexos, un audio de 2:45 y un video.
+- A mitad de la captura se cerró la app a la fuerza y el borrador se conservó.
+- Al reconectar llegaron el registro y 6 archivos sin duplicados, con tamaños
+  idénticos.
+- La cámara del emulador se cierra sola al grabar video. Es una falla del
+  emulador: el video se probó con "Elegir video". Grabar video con la cámara
+  queda pendiente para un teléfono real.
+
+### H02: participantes y asignaciones sin conexión
+
+- **Paquete del proyecto:** participantes autorizados por el servidor, que ya
+  filtra por permisos y territorio, y `GET /form-assignments/mine`. Se reemplaza
+  en una sola transacción, así que quien ya no está asignado sale del teléfono.
+  Antes la app guardaba solo los primeros 1000 participantes.
+- **Reglas sin red:** son las mismas de `require_capture_assignment`
+  (`src/participants/assignmentRules.ts`). Un formulario abierto o cerrado exige
+  una asignación activa. Se bloquean las actividades enviadas, las cerradas y
+  las ya capturadas en el teléfono. El runtime publica ahora `access_mode`
+  para que la app conozca el modo de cada formulario.
+- **Vigencia:** la pantalla muestra "Disponible sin conexión · actualizado hoy"
+  y avisa cuando el paquete tiene más de 7 días.
+
+Prueba en emulador, sin red:
+- La búsqueda por documento funcionó.
+- La participante asignada pudo aplicar el formulario.
+- La que tenía la actividad ya enviada quedó bloqueada.
+- Para la persona sin asignación, el formulario no aparece.
+
+Al reconectar, el servidor aceptó el registro y marcó la asignación como completada.
+
+### Pendiente del plan
+
+- **H01:**
+  - versión real de cada plantilla (hoy siempre "v1");
+  - retirar del teléfono los formularios despublicados sin perder borradores;
+  - avisar cuando un borrador quede incompatible con una versión nueva.
+- **H03:** pruebas de paridad web/móvil sobre cálculos y relevancia complejos.
+  Las de serialización ya existen en `test/backendValues.test.ts`.
+- **H05:** prueba de almacenamiento lleno y de corte de energía durante la escritura.
+- **H06:** prueba de reenvío triple de lotes y de fallos parciales en el emulador.
+  En el servidor ya hay pruebas de reenvío idéntico.
+- **H07:** separar los datos locales por usuario en dispositivos compartidos,
+  cifrarlos y permitir el borrado remoto.
+- **H08 a H19:** fases 2 a 4 del plan.

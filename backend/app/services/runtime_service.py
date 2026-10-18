@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.api.permissions import form_access_mode
 from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.builder_layout import BuilderColumn, BuilderPage, BuilderRow, BuilderSection
 from app.schemas.runtime import RuntimeColumn, RuntimeComponent, RuntimePage, RuntimeRow, RuntimeSection, RuntimeTemplate
@@ -81,7 +82,7 @@ class RuntimeService:
                 )
             )
 
-        return RuntimeTemplate(template_id=template.id, name=template.name, description=template.description, status=template.status, theme_json=template.theme_json, pages=runtime_pages)
+        return RuntimeTemplate(template_id=template.id, name=template.name, description=template.description, status=template.status, theme_json=template.theme_json, access_mode=form_access_mode(template), pages=runtime_pages)
 
 
 runtime_service = RuntimeService()

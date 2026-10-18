@@ -43,4 +43,7 @@ class RuntimeTemplate(BaseModel):
     description: str | None = None
     status: str
     theme_json: str | None = None
+    # legacy | open | closed (ver form_access_mode). La app de campo lo usa
+    # para aplicar sin conexión las mismas reglas de asignación que el servidor.
+    access_mode: str = "legacy"
     pages: list[RuntimePage] = []

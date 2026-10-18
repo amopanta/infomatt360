@@ -91,3 +91,26 @@ def test_saved_record_links_uploaded_asset(upload_client):
     assert saved.status_code == 200, saved.text
     files = client.get(f'/api/v1/files/project/upload-project?record_id={saved.json()["id"]}')
     assert [item["id"] for item in files.json()] == [uploaded["id"]]
+
+
+def test_field_device_reupload_returns_same_asset_and_verifies_integrity(upload_client):
+    """H04/H06: la app reintenta una subida cuya respuesta se perdió."""
+    client, tmp_path = upload_client
+    content = b"\x00\x01video-de-campo" * 100
+    form = {"project_id": "upload-project", "asset_type": "VIDEO", "client_ref": "ev-local-1",
+            "client_md5": hashlib.md5(content).hexdigest()}
+    first = client.post("/api/v1/files/upload", data=form, files={"upload": ("visita.mp4", content, "video/mp4")})
+    assert first.status_code == 201, first.text
+    again = client.post("/api/v1/files/upload", data=form, files={"upload": ("visita.mp4", content, "video/mp4")})
+    assert again.status_code == 201 and again.json()["id"] == first.json()["id"]
+    assert len(list(tmp_path.rglob("*.mp4"))) == 1
+
+    damaged = client.post("/api/v1/files/upload", data={**form, "client_ref": "ev-local-2"},
+                          files={"upload": ("visita.mp4", content[:-10], "video/mp4")})
+    assert damaged.status_code == 422 and "dañado" in damaged.json()["detail"]
+    assert len(list(tmp_path.rglob("*.mp4"))) == 1
+
+    # Sin client_ref (web) se mantiene el comportamiento anterior
+    plain = client.post("/api/v1/files/upload", data={"project_id": "upload-project", "asset_type": "VIDEO"},
+                        files={"upload": ("visita.mp4", content, "video/mp4")})
+    assert plain.status_code == 201 and plain.json()["id"] != first.json()["id"]

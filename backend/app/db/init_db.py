@@ -35,6 +35,11 @@ def _ensure_local_compat_columns() -> None:
         if "approval_flow_version" not in review_columns:
             statements.append("ALTER TABLE review_actions ADD COLUMN approval_flow_version INTEGER")
 
+    if "file_assets" in table_names:
+        file_columns = {column["name"] for column in inspector.get_columns("file_assets")}
+        if "client_ref" not in file_columns:
+            statements.append("ALTER TABLE file_assets ADD COLUMN client_ref VARCHAR(80)")
+
     if "runtime_records" in table_names:
         runtime_columns = {column["name"] for column in inspector.get_columns("runtime_records")}
         if "approval_flow_id" not in runtime_columns:

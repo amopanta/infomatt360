@@ -238,3 +238,16 @@ def test_assigned_responsible_can_correct_phone_before_submission_with_audit():
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
+
+
+def test_runtime_template_exposes_access_mode_for_offline_rules():
+    """H02: la app de campo aplica sin red las mismas reglas de asignación."""
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            admin = auth(client, "assign-admin@example.com", "Admin12345!")
+            assert client.get("/api/v1/runtime/template/closed-form", headers=admin).json()["access_mode"] == "closed"
+            assert client.get("/api/v1/runtime/template/open-form", headers=admin).json()["access_mode"] == "open"
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)

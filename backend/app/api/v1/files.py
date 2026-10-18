@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
@@ -15,7 +16,7 @@ from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord
 from app.schemas.files import EvidenceBatchDownloadRequest, FileAssetCreate, FileAssetRead
 from app.services.assignment_service import assignment_service
-from app.services.file_service import file_service
+from app.services.file_service import file_service, to_read
 
 router = APIRouter()
 UPLOAD_ASSET_TYPES = {"FILE", "PDF", "MULTIFILE", "IMAGE", "FINGERPRINT", "AUDIO", "VIDEO", "SIGNATURE"}
@@ -55,6 +56,8 @@ async def upload_file_asset(
     asset_type: str = Form(...),
     participant_id: str | None = Form(None),
     record_id: str | None = Form(None),
+    client_ref: str | None = Form(None, max_length=80),
+    client_md5: str | None = Form(None, max_length=32),
     upload: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -64,8 +67,33 @@ async def upload_file_asset(
     if asset_type.upper() not in UPLOAD_ASSET_TYPES:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="Tipo de evidencia no soportado")
     validate_asset_relations(db, project_id, participant_id, record_id)
+
+    # Reenvío desde la app de campo: devolver la evidencia ya recibida.
+    if client_ref:
+        existing = (
+            db.query(FileAsset)
+            .filter(FileAsset.project_id == project_id, FileAsset.created_by == current_user.id, FileAsset.client_ref == client_ref)
+            .first()
+        )
+        if existing is not None:
+            await upload.close()
+            if record_id and not existing.record_id:
+                existing.record_id = record_id
+                db.commit()
+                db.refresh(existing)
+            return to_read(existing)
+
+    # Integridad: el archivo recibido debe ser el mismo que guardó el teléfono.
+    if client_md5:
+        digest = hashlib.md5(usedforsecurity=False)
+        while chunk := await upload.read(1024 * 1024):
+            digest.update(chunk)
+        await upload.seek(0)
+        if digest.hexdigest() != client_md5.lower():
+            await upload.close()
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="El archivo llegó incompleto o dañado; se reintentará")
     try:
-        return await file_service.upload(
+        asset = await file_service.upload(
             db,
             project_id=project_id,
             asset_type=asset_type,
@@ -76,6 +104,11 @@ async def upload_file_asset(
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)) from exc
+    if client_ref:
+        row = db.get(FileAsset, asset.id)
+        row.client_ref = client_ref
+        db.commit()
+    return asset
 
 
 @router.get("/project/{project_id}", response_model=list[FileAssetRead])

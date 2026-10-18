@@ -116,7 +116,7 @@ un formulario", "Ver respuestas", "Revisar y aprobar") filtrados por permiso.
 
 - Backend: 496 pruebas aprobadas (incluye `tests/test_builder_component_edit.py`, 2 nuevas).
 - Frontend: TypeScript sin errores, 111 pruebas aprobadas (incluye `fieldCatalog.test.ts`), build Vite/PWA correcto.
-- App Expo: `tsc --noEmit` sin errores. **No se probó en un dispositivo** ni se ejecutó `expo lint`.
+- App Expo: `tsc --noEmit` sin errores y recorrido completo en emulador Android (ver sección 5). Falta teléfono físico.
 - Recorrido manual local (demo SQLite, `admin@infomatt360.demo`): crear
   formulario desde el asistente, vista previa con pregunta condicional,
   guardar, editar, eliminar una pregunta, reordenar, recargar y confirmar que
@@ -124,8 +124,54 @@ un formulario", "Ver respuestas", "Revisar y aprobar") filtrados por permiso.
 
 ## Pendiente
 
-- Probar la app Expo en Android con el backend real (descarga, captura sin
-  conexión, sincronización y evidencias).
 - Retirar el servicio Express del VPS (ver "Pendiente operativo").
 - Evaluar subir la escala tipográfica base (`--font-size-base: 12px`) para
   mejorar la lectura de personas sin experiencia.
+
+## 5. Pruebas de la app móvil en emulador Android (2026-10-17)
+
+Recorrido real en un emulador Pixel 6 / Android 14 con Expo Go, contra el
+backend local con datos demo. Se capturó sin conexión, se reconectó y se
+verificó en el servidor cada valor y cada archivo.
+
+### Errores encontrados y corregidos
+
+| Error | Efecto en campo | Corrección |
+|---|---|---|
+| `uuid` v14 usa `crypto.getRandomValues`, inexistente en React Native | **La app se cerraba al abrir cualquier formulario** | `randomUUID` de `expo-crypto` (ya se usaba en el proyecto); se retira `uuid` |
+| El backend nunca devolvía el refresh token a la app | Sesión perdida al cerrar la app y al vencer el token (sin señal, el encuestador quedaba fuera) | Modo nativo: con `X-Client-Platform: native` y **sin** `Origin` el refresh va en el cuerpo; la web sigue con cookie httponly. Un navegador no puede usar este modo porque siempre envía `Origin` |
+| La "compresión" de fotos truncaba los bytes del JPEG | Fotos > 2 MB llegaban **corruptas** | Recodificación real con `expo-image-manipulator` (lado mayor 1920 px, calidad 0.7 → 0.4); si falla se conserva la original |
+| Fotos adjuntas se subían antes de existir el registro | Evidencias sueltas, **sin vínculo** al registro | Orden: fotos de campo → registro → adjuntos con `record_id` del servidor (`queued_records.server_record_id`) |
+| Fotos de campo viajaban como `{uri: "file://…"}` | El servidor guardaba una ruta del teléfono | Se envían como `{file_asset_id, name, mime_type, size_bytes}`, igual que la web |
+| Firma en base64 dentro del registro | Registros pesados y formato distinto al de la web | Se guarda como PNG y se sube como `SIGNATURE` |
+| Sí/No llegaba como texto `"true"` | Reportes y filtros lo trataban distinto a la web | Se envía como booleano según el tipo del backend |
+| Fecha con `toISOString()` (UTC) | En Colombia, de noche se guardaba el día siguiente y se mostraba el anterior | Fecha local `YYYY-MM-DD`; verificado a las 20:36 hora de Bogotá |
+| Aviso "No hay formularios descargados" sin conexión | Mensaje falso aunque hubiera formularios guardados | Se consulta la caché local, no el estado aún vacío |
+| `X-Project-Id` enviado en cada petición | El backend no lo usa; bloqueaba la versión web por CORS | Se deja de enviar |
+| `DateTimePicker.onChange` obsoleto | Aviso en desarrollo | `onValueChange` / `onDismiss` |
+
+Backend: `backend/app/api/v1/auth.py` (`_is_native_client`,
+`_deliver_refresh_token`) y `backend/tests/test_auth_native_client.py`
+(4 pruebas: login nativo, rotación, navegador con `Origin` rechazado, web sin cambios).
+
+### Resultado verificado en el servidor
+
+Registro capturado sin conexión y sincronizado al reconectar: texto, Sí/No
+(booleano), opción, número, fecha, GPS `{lat, lng, accuracy}`, foto de
+campo y firma como archivos (`IMAGE` / `SIGNATURE`), y foto adjunta con
+`record_id`. Reenviar el mismo lote no duplica (idempotencia). La sesión se
+mantiene al cerrar y abrir la app (solo pide PIN).
+
+### Cómo repetir la prueba en este equipo
+
+- SDK en `D:\Android\Sdk`, JDK portátil en `D:\Android\jdk`, AVD `InfoMatt360`
+  en `D:\Android\avd`; aceleración con *Android Emulator Hypervisor Driver*.
+- Emulador: `emulator -avd InfoMatt360` (variables `ANDROID_HOME`,
+  `ANDROID_AVD_HOME`). La app apunta a `http://10.0.2.2:8000/api/v1`, que es el
+  `localhost` del equipo visto desde el emulador.
+- App: `npx expo start --android` en el repositorio móvil (instala Expo Go).
+
+### Pendiente
+
+- Probar en un teléfono físico con la cámara real (fotos > 2 MB) y huella.
+- Generar un APK de desarrollo/producción con EAS cuando se publique.

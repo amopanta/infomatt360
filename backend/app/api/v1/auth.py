@@ -61,6 +61,25 @@ def _set_refresh_cookie(response: Response, refresh_token: str | None) -> None:
     )
 
 
+def _is_native_client(request: Request) -> bool:
+    """App nativa (Android/iOS): guarda el refresh token en el almacén seguro
+    del dispositivo porque no maneja la cookie httponly de la web.
+
+    Se exige además que la petición no traiga Origin: los navegadores lo
+    envían siempre en un POST, así que ningún JavaScript de una página puede
+    usar este modo para leer el refresh token.
+    """
+    return request.headers.get("x-client-platform", "").lower() == "native" and not request.headers.get("origin")
+
+
+def _deliver_refresh_token(request: Request, response: Response, token_response: TokenResponse | LoginResponse) -> None:
+    """Web: refresh token solo en cookie httponly. Nativo: en el cuerpo."""
+    if _is_native_client(request):
+        return
+    _set_refresh_cookie(response, token_response.refresh_token)
+    token_response.refresh_token = None
+
+
 def _clear_refresh_cookie(response: Response) -> None:
     response.delete_cookie(
         key=settings.refresh_cookie_name,
@@ -87,8 +106,7 @@ def login(payload: LoginRequest, request: Request, response: Response, db: Sessi
                 raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail="Demasiados intentos. Intenta nuevamente mas tarde") from exc
         raise
     auth_throttle_service.clear(db, "login-email-ip", email_key)
-    _set_refresh_cookie(response, login_response.refresh_token)
-    login_response.refresh_token = None
+    _deliver_refresh_token(request, response, login_response)
     return login_response
 
 
@@ -110,8 +128,7 @@ def verify_mfa(payload: MfaVerifyRequest, request: Request, response: Response, 
         if user is None:
             raise JWTError("usuario invalido")
         token_response = auth_service.complete_mfa_login(db, user, payload.code, payload.device_fingerprint)
-        _set_refresh_cookie(response, token_response.refresh_token)
-        token_response.refresh_token = None
+        _deliver_refresh_token(request, response, token_response)
         return token_response
     except (JWTError, HTTPException) as exc:
         allowed = auth_throttle_service.record_attempt(db, "mfa-ip", ip_address, maximum=10, window_minutes=15, block_minutes=15)
@@ -157,8 +174,7 @@ def refresh_token(payload: RefreshRequest, request: Request, response: Response,
             _validate_cookie_refresh_origin(request)
         refresh_payload = RefreshRequest(refresh_token=payload.refresh_token or cookie_refresh_token)
         token_response = auth_service.refresh(db, refresh_payload)
-        _set_refresh_cookie(response, token_response.refresh_token)
-        token_response.refresh_token = None
+        _deliver_refresh_token(request, response, token_response)
         return token_response
     except HTTPException as exc:
         if exc.status_code == status.HTTP_401_UNAUTHORIZED:

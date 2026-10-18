@@ -175,3 +175,40 @@ mantiene al cerrar y abrir la app (solo pide PIN).
 
 - Probar en un teléfono físico con la cámara real (fotos > 2 MB) y huella.
 - Generar un APK de desarrollo/producción con EAS cuando se publique.
+
+## 6. Exportación a Excel, marca e idempotencia (2026-10-18)
+
+- **Exportar a Excel** en la app móvil (además de CSV y JSON). Las columnas usan
+  la etiqueta de cada pregunta; en los grupos repetibles se ven así: "Integrantes 1 · Nombre".
+  El archivo se comparte como archivo; antes se pegaba como texto.
+- **Marca de la organización**: en Configuración → Marca se edita también el
+  nombre de la empresa. La app muestra logo, nombre y lema en el ingreso
+  y en el PIN (`GET /public/branding`) y los guarda para verlos sin conexión.
+- **Reenvío idéntico sin 409**: `bulk-save` calcula la huella de idempotencia
+  antes de guardar. Un reenvío por respuesta perdida devuelve el mismo registro.
+
+## 7. Monitoreo de equipos y recorrido del gestor (2026-10-18)
+
+Objetivo: que el supervisor vea desde la web qué tablets tienen información
+sin enviar, si sincronizan y qué errores tienen, y el recorrido de cada
+gestor sin que este diligencie nada (similar a CommCare).
+
+| Pieza | Detalle |
+|---|---|
+| App → servidor | `POST /api/v1/field-devices/heartbeat` cada 5 min, al volver a primer plano y tras sincronizar. Envía conteos por estado (pendiente, error, conflicto, borrador), archivos sin subir, el registro pendiente más antiguo, la última sincronización correcta, los últimos 20 errores, el equipo y la versión, y los puntos del recorrido. |
+| Recorrido | Solo con la app abierta y después de un aviso único al gestor. Un punto GPS (precisión alta) cada 2 min o 30 m. Se guarda en SQLite (`route_points`) y se envía con el siguiente latido; solo se borran puntos ya recibidos. El servidor descarta duplicados (equipo + usuario + hora). |
+| Tablero web | Revisión y reportes → **Equipos de campo** (`/field-devices`). Tarjetas por equipo: al día, pendiente o requiere atención; alertas, errores recientes y mapa del recorrido por día con distancia (se omiten saltos con precisión > 100 m). Se actualiza cada minuto. |
+| Permisos | Tablero y recorrido: `records.review`, `records.coordinate` o `identity.users.manage` en el proyecto. El gestor solo envía su propio estado y no consulta el de otros. |
+| Datos | Tablas `field_device_status` (una fila por equipo y usuario) y `field_route_points`; migración `0080_field_device_status`. |
+
+Alertas: registros con error o en conflicto, pendientes por más de 24 h, y
+equipo sin reportar por más de 24 h (más grave si tiene pendientes).
+
+**Fuera de línea** (probado en emulador): con la red cortada, la app siguió
+guardando puntos (20:17 y 20:19). Llegaron solos al servidor 20 s después de
+reconectar. La precisión "equilibrada" de Android depende de la red y en
+esa prueba dejó de dar puntos, por eso se usa GPS.
+
+**Pendiente**: recorrido con la app cerrada o en segundo plano. Requiere una build propia
+(EAS) con `expo-task-manager`, permiso de ubicación en segundo plano y
+notificación permanente; Expo Go no lo permite.

@@ -20,7 +20,8 @@ from app.db.session import get_db
 from app.models.builder import BuilderTemplate
 from app.models.identity import User
 from app.schemas.api_key import ApiKeyAuthContext
-from app.schemas.runtime import RuntimeTemplate
+from app.schemas.runtime import OfflineManifestItem, RuntimeTemplate
+from app.services.template_availability import availability
 from app.schemas.runtime_record import RuntimeBulkJobDetail, RuntimeBulkJobRead, RuntimeBulkJobSummary, RuntimeBulkSaveRequest, RuntimeBulkSaveResponse, RuntimeRecordCreate, RuntimeRecordFieldCorrection, RuntimeRecordPage, RuntimeRecordRead
 from app.services.runtime_record_service import runtime_record_service
 from app.services.runtime_service import runtime_service
@@ -48,6 +49,24 @@ def get_template_runtime(template_id: str, db: Session = Depends(get_db), curren
     """
     require_template_access(db, current_user.id, template_id)
     return runtime_service.build_template_runtime(db, template_id)
+
+
+@router.get("/offline-manifest/{project_id}", response_model=list[OfflineManifestItem])
+def offline_manifest(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[OfflineManifestItem]:
+    """Formularios que el usuario puede capturar en el proyecto, con la huella
+    de su versión (H01). La app compara las huellas y descarga solo lo que
+    cambió; lo que ya no aparece aquí deja de ofrecerse para capturas nuevas."""
+    if not assignment_service.user_has_project_access(db, current_user.id, project_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    templates = db.query(BuilderTemplate).filter(BuilderTemplate.project_id == project_id, BuilderTemplate.status == "published").all()
+    items: list[OfflineManifestItem] = []
+    for template in sorted(templates, key=lambda t: t.name.lower()):
+        if availability(template) != "accepting":
+            continue
+        runtime = runtime_service.build_template_runtime(db, template.id)
+        items.append(OfflineManifestItem(template_id=template.id, name=template.name, version_hash=runtime.version_hash,
+                                         access_mode=runtime.access_mode, updated_at=template.updated_at or template.created_at))
+    return items
 
 
 @router.post("/save", response_model=RuntimeRecordRead)

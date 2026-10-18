@@ -47,6 +47,11 @@ class FieldDeviceStatus(Base):
     last_longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     last_location_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
+    # Borrado remoto (H07): lo pide un administrador; el equipo lo recibe en
+    # su siguiente latido, borra los datos del usuario y lo confirma.
+    wipe_requested_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    wipe_requested_by: Mapped[str | None] = mapped_column(String(36), nullable=True)
+    wipe_completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 
 

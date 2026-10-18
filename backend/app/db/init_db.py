@@ -35,6 +35,12 @@ def _ensure_local_compat_columns() -> None:
         if "approval_flow_version" not in review_columns:
             statements.append("ALTER TABLE review_actions ADD COLUMN approval_flow_version INTEGER")
 
+    if "field_device_status" in table_names:
+        device_columns = {column["name"] for column in inspector.get_columns("field_device_status")}
+        for column, ddl in (("wipe_requested_at", "DATETIME"), ("wipe_requested_by", "VARCHAR(36)"), ("wipe_completed_at", "DATETIME")):
+            if column not in device_columns:
+                statements.append(f"ALTER TABLE field_device_status ADD COLUMN {column} {ddl}")
+
     if "file_assets" in table_names:
         file_columns = {column["name"] for column in inspector.get_columns("file_assets")}
         if "client_ref" not in file_columns:

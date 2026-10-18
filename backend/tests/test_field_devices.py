@@ -8,6 +8,7 @@ from app.api.v1.field_devices import haversine_km
 from app.core.time import utc_now
 from app.db.base import Base
 from app.main import app
+from app.models.audit import AuditLog
 from app.models.device_status import FieldDeviceStatus, FieldRoutePoint
 from test_form_assignments_reopening import auth, setup_client
 
@@ -108,6 +109,38 @@ def test_stale_device_with_pending_data_is_flagged_and_project_access_is_checked
             too_long = client.get(f"/api/v1/field-devices/project/{PROJECT}/routes", headers=admin, params={
                 "date_from": _iso(utc_now() - timedelta(days=40)), "date_to": _iso(utc_now())})
             assert too_long.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_remote_wipe_is_admin_only_reaches_device_and_is_confirmed():
+    """H07: tablet perdida o reasignada."""
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            admin = auth(client, "assign-admin@example.com", "Admin12345!")
+            gestor = auth(client, "assign-owner@example.com", "Owner12345!")
+            beat = {"device_id": "tablet-0003", "project_id": PROJECT, "pending_count": 2}
+            assert client.post("/api/v1/field-devices/heartbeat", headers=gestor, json=beat).json()["wipe_requested"] is False
+            order = {"device_id": "tablet-0003", "user_id": "assign-owner"}
+            # El propio gestor (sin gestión de usuarios) no puede pedirlo
+            assert client.post(f"/api/v1/field-devices/project/{PROJECT}/wipe", headers=gestor, json=order).status_code == 403
+            requested = client.post(f"/api/v1/field-devices/project/{PROJECT}/wipe", headers=admin, json=order)
+            assert requested.status_code == 200, requested.text
+            assert requested.json()["wipe_requested_at"] and requested.json()["wipe_completed_at"] is None
+            assert client.post(f"/api/v1/field-devices/project/{PROJECT}/wipe", headers=admin,
+                               json={**order, "device_id": "no-existe"}).status_code == 404
+
+            assert client.post("/api/v1/field-devices/heartbeat", headers=gestor, json=beat).json()["wipe_requested"] is True
+            assert client.post("/api/v1/field-devices/wipe-ack", headers=gestor, json={"device_id": "tablet-0003"}).json() == {"wiped": True}
+            device = client.get(f"/api/v1/field-devices/project/{PROJECT}/status", headers=admin).json()[0]
+            assert device["wipe_completed_at"] and device["pending_count"] == 0
+            # Ya confirmado: el siguiente latido no vuelve a pedir el borrado
+            assert client.post("/api/v1/field-devices/heartbeat", headers=gestor, json={**beat, "pending_count": 0}).json()["wipe_requested"] is False
+            with sessions() as db:
+                actions = [row.action for row in db.query(AuditLog).filter(AuditLog.module == "field_devices").all()]
+            assert actions == ["remote_wipe_requested", "remote_wipe_completed"]
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

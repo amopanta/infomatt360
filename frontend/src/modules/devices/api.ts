@@ -26,12 +26,14 @@ export type FieldDeviceStatus = {
   last_location_at: string | null;
   level: DeviceLevel;
   alerts: string[];
+  wipe_requested_at: string | null;
+  wipe_completed_at: string | null;
 };
 export type RoutePoint = { latitude: number; longitude: number; accuracy_m: number | null; recorded_at: string };
 export type RouteSummary = { user_id: string; user_name: string; point_count: number; distance_km: number; first_at: string | null; last_at: string | null; points: RoutePoint[] };
 
-async function request<T>(path: string): Promise<T> {
-  const response = await fetch(`${API}/field-devices${path}`, { headers: authorizationHeader() });
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetch(`${API}/field-devices${path}`, { ...init, headers: { ...authorizationHeader(), ...(init?.body ? { 'Content-Type': 'application/json' } : {}) } });
   if (!response.ok) throw new Error((await response.json().catch(() => null))?.detail || 'No fue posible consultar los equipos.');
   return response.json();
 }
@@ -43,6 +45,10 @@ export function serverDate(value: string | null): Date | null {
 }
 
 export const fetchDeviceStatus = (projectId: string) => request<FieldDeviceStatus[]>(`/project/${projectId}/status`);
+
+/** Borrado remoto (H07): el equipo envía lo pendiente que pueda y borra los datos de ese usuario. */
+export const requestRemoteWipe = (projectId: string, deviceId: string, userId: string) =>
+  request<FieldDeviceStatus>(`/project/${projectId}/wipe`, { method: 'POST', body: JSON.stringify({ device_id: deviceId, user_id: userId }) });
 
 /** Recorridos de un día local (todo el equipo, o los puntos de un gestor). */
 export function fetchRoutes(projectId: string, day: string, userId?: string) {

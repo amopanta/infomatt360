@@ -37,7 +37,12 @@
       "justNow": "Hace un momento",
       "minutesAgo": "Hace {count} min",
       "hoursAgo": "Hace {count} h",
-      "daysAgo": "Hace {count} días"
+      "daysAgo": "Hace {count} días",
+      "wipe": "Borrar datos del equipo",
+      "wipeConfirm": "¿Borrar los datos de {user} en el equipo {device}? Se usa cuando una tablet se pierde o se reasigna. El equipo intentará enviar lo pendiente antes de borrar; lo que no pueda enviar se perderá.",
+      "wipeRequested": "Borrado solicitado. Se hará cuando el equipo se conecte.",
+      "wipePending": "Borrado solicitado {when}; se hará cuando el equipo se conecte.",
+      "wipeDone": "Datos borrados del equipo el {when}."
     },
     "branding": {
       "companyName": "Nombre de la empresa",

@@ -4,8 +4,8 @@ import 'leaflet/dist/leaflet.css';
 
 import { AppShell } from '../../components/AppShell';
 import { useI18n } from '../../i18n';
-import { PROJECT_KEY } from '../auth/session';
-import { fetchDeviceStatus, fetchRoutes, serverDate, type FieldDeviceStatus, type RouteSummary } from './api';
+import { hasAnyCurrentProjectPermission, PROJECT_KEY } from '../auth/session';
+import { fetchDeviceStatus, fetchRoutes, requestRemoteWipe, serverDate, type FieldDeviceStatus, type RouteSummary } from './api';
 
 const REFRESH_MS = 60_000;
 
@@ -47,6 +47,18 @@ export function FieldDevicesApp() {
   const [routeUser, setRouteUser] = useState('');
   const [route, setRoute] = useState<RouteSummary | null>(null);
   const [message, setMessage] = useState('');
+  const canWipe = hasAnyCurrentProjectPermission(['identity.users.manage']);
+
+  async function wipe(device: FieldDeviceStatus) {
+    if (!window.confirm(t('ux.devices.wipeConfirm', { user: device.user_name, device: device.device_name || device.device_id.slice(0, 8) }))) return;
+    try {
+      const updated = await requestRemoteWipe(projectId, device.device_id, device.user_id);
+      setDevices((rows) => rows.map((row) => (row.device_id === updated.device_id && row.user_id === updated.user_id ? updated : row)));
+      setMessage(t('ux.devices.wipeRequested'));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : String(error));
+    }
+  }
 
   useEffect(() => {
     if (!projectId) return;
@@ -119,9 +131,13 @@ export function FieldDevicesApp() {
               <div><dt>{t('ux.devices.lastSeen')}</dt><dd>{ago(device.last_seen_at)}</dd></div>
             </dl>
             {device.alerts.length > 0 && <ul className="device-alerts">{device.alerts.map((alert) => <li key={alert}>{alert}</li>)}</ul>}
+            {device.wipe_requested_at && <p className="devices-note">{device.wipe_completed_at
+              ? t('ux.devices.wipeDone', { when: serverDate(device.wipe_completed_at)?.toLocaleString() ?? '' })
+              : t('ux.devices.wipePending', { when: ago(device.wipe_requested_at) })}</p>}
             <div className="teams-inline">
               {device.recent_errors.length > 0 && <button type="button" onClick={() => setExpanded(expanded === key ? '' : key)}>{expanded === key ? t('ux.devices.hideErrors') : t('ux.devices.showErrors', { count: device.recent_errors.length })}</button>}
               <button type="button" onClick={() => showRoute(device.user_id)}>{t('ux.devices.viewRoute')}</button>
+              {canWipe && !(device.wipe_requested_at && !device.wipe_completed_at) && <button type="button" className="danger" onClick={() => void wipe(device)}>{t('ux.devices.wipe')}</button>}
             </div>
             {expanded === key && <ol className="device-errors">{device.recent_errors.map((error, index) => <li key={index}><time>{error.at ? serverDate(error.at)?.toLocaleString() : ''}</time> {error.message}</li>)}</ol>}
           </article>;

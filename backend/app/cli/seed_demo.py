@@ -26,6 +26,9 @@ DEMO_TEMPLATE_ID = "demo-template-characterization"
 DEMO_VERSION_ID = "demo-template-version-1"
 DEMO_PASSWORD = "Demo12345!"
 DEMO_EMAIL = "admin@infomatt360.demo"
+# Segundo usuario, de campo: pruebas de tableta compartida (docs/140 §9)
+DEMO_FIELD_USER_ID = "demo-field-user"
+DEMO_FIELD_EMAIL = "gestor@infomatt360.demo"
 
 
 def seed(db: Session) -> dict[str, str]:
@@ -60,6 +63,12 @@ def seed(db: Session) -> dict[str, str]:
         mfa_enabled=False,
     )
     upsert(db, UserProjectAssignment, "demo-admin-assignment", user_id=user.id, project_id=project.id, role_id=role.id, status="active")
+    field_role = upsert(db, Role, "demo-field-role", name="Gestor de campo demo", description="Captura en campo.",
+                        permissions="projects.read,records.read,records.write,participants.create")
+    field_user = upsert(db, User, DEMO_FIELD_USER_ID, full_name="Gestora de Campo Demo", document_id="DEMO-GESTOR",
+                        email=DEMO_FIELD_EMAIL, password_hash=hash_password(DEMO_PASSWORD), status="active",
+                        must_change_password=False, mfa_enabled=False)
+    upsert(db, UserProjectAssignment, "demo-field-assignment", user_id=field_user.id, project_id=project.id, role_id=field_role.id, status="active")
     template = upsert(
         db,
         BuilderTemplate,

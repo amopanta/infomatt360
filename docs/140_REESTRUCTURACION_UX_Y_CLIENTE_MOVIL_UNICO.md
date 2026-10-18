@@ -290,3 +290,61 @@ Al reconectar, el servidor aceptó el registro y marcó la asignación como comp
 - **H07:** separar los datos locales por usuario en dispositivos compartidos,
   cifrarlos y permitir el borrado remoto.
 - **H08 a H19:** fases 2 a 4 del plan.
+
+## 9. H01 (formularios versionados), H05 (borradores) y H07 (seguridad local) (2026-10-18)
+
+### H01: precarga versionada
+
+- **Versión de cada formulario:** `GET /runtime/template/{id}` incluye
+  `version_hash`, un SHA-256 de lo que se dibuja (preguntas, opciones, reglas
+  y modo de acceso). Cambia con cualquier edición y es estable entre llamadas.
+- **Manifiesto:** `GET /runtime/offline-manifest/{project_id}` lista los
+  formularios publicados que aceptan respuestas, con su huella.
+- **Actualización en la app:** baja solo lo nuevo o cambiado y lo aplica en una
+  transacción. Si una descarga falla, quedan completas las versiones anteriores.
+- **Formularios retirados** (pausados o despublicados): no se ofrecen para
+  capturas nuevas, pero se conservan mientras tengan borradores o pendientes.
+  Si se vuelven a publicar, reaparecen.
+- **Versión del borrador:** cada registro y borrador guarda `template_version`.
+  Al abrir un borrador de otra versión, la app avisa y conserva las respuestas.
+- **Lista de formularios:** muestra "✓ Sin conexión · Versión del …" y el resultado
+  de la actualización, por ejemplo "1 actualizado, 1 retirado".
+
+### H05: defectos corregidos en los borradores
+
+- El autoguardado usaba un intervalo de 30 s que se reiniciaba con cada tecla, y
+  al salir guardaba los valores vacíos del primer instante. Ahora guarda 1,5 s
+  después de cada cambio, al pasar a segundo plano y al salir.
+- El borrador no guardaba el participante, así que un formulario cerrado quedaba
+  sin participante. Ya lo guarda.
+- El borrador se borra solo después de guardar el registro definitivo.
+
+Prueba en emulador:
+- Se cerró la app a la fuerza 3 s después de escribir y el borrador se conservó.
+- Se editó una pregunta y se pausó un formulario en el servidor. La app bajó 1
+  formulario y retiró 1.
+- Sin red, la captura nueva mostró la pregunta nueva y el borrador avisó y
+  conservó sus respuestas.
+
+### H07: seguridad de los datos locales
+
+| Riesgo antes | Ahora |
+|---|---|
+| Una sola base: en una tableta compartida el segundo usuario veía los borradores y participantes del primero | Una base por usuario. El id sale del token (`sub`), así que funciona sin red. La base anterior queda para el primer usuario que entra tras actualizar |
+| La sincronización enviaba los pendientes del primero con la sesión del segundo, a nombre de este | Cada usuario solo ve y envía lo suyo. Al entrar se avisa cuántos registros sin enviar hay de otra persona, sin mostrarlos |
+| La sesión guardada no vencía | Pasados 15 días sin validar en línea, se pide iniciar sesión de nuevo. Los datos se conservan |
+| No había borrado remoto | Desde **Equipos de campo → Borrar datos del equipo**, solo con `identity.users.manage` (auditado). El equipo lo recibe en su siguiente reporte, intenta enviar lo pendiente, confirma (`POST /field-devices/wipe-ack`) y borra la base y las evidencias de ese usuario (migración `0082_field_device_remote_wipe`) |
+| No se podía salir dejando el equipo limpio | Al cerrar sesión, "Salir y borrar mis datos", que solo aparece si no hay nada pendiente |
+
+Prueba en emulador, con dos usuarios en la misma tableta (el seed tiene ahora
+el gestor de campo `gestor@infomatt360.demo`):
+1. El administrador dejó un registro sin red y cerró sesión.
+2. La gestora entró, vio el aviso y no vio el registro. El servidor no lo recibió.
+3. Se pidió el borrado de los datos de la gestora y el equipo lo ejecutó y lo
+   confirmó en 10 s.
+4. El administrador volvió a entrar y su registro se envió a su nombre.
+
+**Pendiente:** cifrar la base. Hace falta SQLCipher (`useSQLCipher` de expo-sqlite),
+que no funciona en Expo Go; se activará en la build propia (EAS). Mientras tanto,
+los datos están en el almacenamiento privado de la app y Android 10+ cifra el
+almacenamiento del equipo.

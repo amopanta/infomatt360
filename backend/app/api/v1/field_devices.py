@@ -23,6 +23,7 @@ from app.api.permissions import require_any_project_permission
 from app.core.permissions import IDENTITY_USERS_MANAGE, RECORDS_COORDINATE, RECORDS_REVIEW
 from app.core.time import to_naive_utc, utc_now
 from app.db.session import get_db
+from app.models.audit import AuditLog
 from app.models.device_status import FieldDeviceStatus, FieldRoutePoint
 from app.models.identity import User
 from app.services.assignment_service import assignment_service
@@ -69,6 +70,8 @@ class HeartbeatIn(BaseModel):
 
 class HeartbeatOut(BaseModel):
     received_points: int
+    # El administrador pidió borrar los datos de este usuario en el equipo
+    wipe_requested: bool = False
     heartbeat_interval_seconds: int = HEARTBEAT_INTERVAL_SECONDS
     route_interval_seconds: int = ROUTE_INTERVAL_SECONDS
 
@@ -96,6 +99,8 @@ class DeviceStatusOut(BaseModel):
     last_location_at: datetime | None
     level: str
     alerts: list[str]
+    wipe_requested_at: datetime | None = None
+    wipe_completed_at: datetime | None = None
 
 
 class RoutePointOut(BaseModel):
@@ -224,7 +229,7 @@ def heartbeat(payload: HeartbeatIn, db: Session = Depends(get_db), user: User = 
         # Dos latidos simultáneos del mismo equipo: el otro ya guardó.
         db.rollback()
         raise HTTPException(status_code=409, detail="Latido duplicado, reintente")
-    return HeartbeatOut(received_points=received)
+    return HeartbeatOut(received_points=received, wipe_requested=row.wipe_requested_at is not None and row.wipe_completed_at is None)
 
 
 @router.get("/project/{project_id}/status", response_model=list[DeviceStatusOut])
@@ -253,6 +258,7 @@ def project_device_status(project_id: str, db: Session = Depends(get_db), user: 
             last_error=row.last_error, recent_errors=recent if isinstance(recent, list) else [],
             last_latitude=row.last_latitude, last_longitude=row.last_longitude, last_location_at=row.last_location_at,
             level=level, alerts=alerts,
+            wipe_requested_at=row.wipe_requested_at, wipe_completed_at=row.wipe_completed_at,
         ))
     order = {"danger": 0, "warning": 1, "ok": 2}
     result.sort(key=lambda item: (order[item.level], -item.pending_count, item.user_name.lower()))
@@ -298,3 +304,52 @@ def project_routes(
     ]
     summaries.sort(key=lambda s: s.user_name.lower())
     return summaries
+
+
+class WipeRequest(BaseModel):
+    device_id: str = Field(min_length=4, max_length=120)
+    user_id: str = Field(min_length=1, max_length=36)
+
+
+class WipeAck(BaseModel):
+    device_id: str = Field(min_length=4, max_length=120)
+
+
+@router.post("/project/{project_id}/wipe", response_model=DeviceStatusOut)
+def request_remote_wipe(project_id: str, payload: WipeRequest, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    """Pide borrar los datos de un usuario en un equipo (tablet perdida o
+    reasignada). Solo administración del proyecto. El equipo intenta enviar
+    lo pendiente antes de borrar."""
+    require_any_project_permission(db, user.id, project_id, {IDENTITY_USERS_MANAGE})
+    row = (
+        db.query(FieldDeviceStatus)
+        .filter(FieldDeviceStatus.project_id == project_id, FieldDeviceStatus.device_id == payload.device_id,
+                FieldDeviceStatus.user_id == payload.user_id)
+        .first()
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="Equipo no encontrado en el proyecto")
+    row.wipe_requested_at = utc_now()
+    row.wipe_requested_by = user.id
+    row.wipe_completed_at = None
+    db.add(AuditLog(project_id=project_id, user_id=user.id, module="field_devices", action="remote_wipe_requested",
+                    entity_type="field_device", entity_id=row.device_id[:80],
+                    after_json=json.dumps({"device_id": row.device_id, "user_id": row.user_id})))
+    db.commit()
+    return next(item for item in project_device_status(project_id, db, user) if item.device_id == row.device_id and item.user_id == row.user_id)
+
+
+@router.post("/wipe-ack")
+def acknowledge_remote_wipe(payload: WipeAck, db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> dict[str, bool]:
+    """El equipo confirma que borró los datos del usuario."""
+    row = db.query(FieldDeviceStatus).filter(FieldDeviceStatus.device_id == payload.device_id, FieldDeviceStatus.user_id == user.id).first()
+    if row is None or row.wipe_requested_at is None:
+        raise HTTPException(status_code=404, detail="No hay borrado pendiente para este equipo")
+    row.wipe_completed_at = utc_now()
+    row.pending_count = row.error_count = row.conflict_count = row.draft_count = row.pending_evidence_count = 0
+    row.oldest_pending_at = None
+    db.add(AuditLog(project_id=row.project_id, user_id=user.id, module="field_devices", action="remote_wipe_completed",
+                    entity_type="field_device", entity_id=row.device_id[:80]))
+    db.commit()
+    return {"wiped": True}
+

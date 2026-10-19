@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+import asyncio
+
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_user
@@ -214,3 +216,29 @@ def record_correction_package(record_id: str, db: Session = Depends(get_db), cur
     values = db.query(RuntimeRecordValue).filter(RuntimeRecordValue.record_id == record_id).all()
     files = db.query(FileAsset).filter(FileAsset.record_id == record_id).all()
     return correction_package(db, record, values, files)
+
+
+# -- Devolución masiva desde Excel (docs/141 §5) --
+
+@router.get("/bulk-returns/template.csv")
+def bulk_return_template(current_user: User = Depends(get_current_user)) -> Response:
+    from app.services.bulk_return_service import template_csv
+    return Response(content=template_csv().encode("utf-8"), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="plantilla_devoluciones.csv"'})
+
+
+@router.post("/bulk-returns/{project_id}")
+async def bulk_returns(project_id: str, preview_only: bool = Form(True), upload: UploadFile = File(...),
+                       db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """Valida (vista previa) o aplica devoluciones y reasignaciones por lote."""
+    from app.services.bulk_return_service import BulkReturnError, process, read_rows
+    if not assignment_service.user_has_project_access(db, current_user.id, project_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    require_any_project_permission(db, current_user.id, project_id, REVIEWER_PERMISSIONS)
+    content = await upload.read()
+    try:
+        rows = read_rows(upload.filename or "", content)
+    except BulkReturnError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
+    return await asyncio.to_thread(process, db, project_id, current_user.id, rows, preview_only=preview_only,
+                                   apply_action=review_service.apply_action)

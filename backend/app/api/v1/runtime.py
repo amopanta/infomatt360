@@ -7,6 +7,7 @@ Notas: Este modulo cierra el flujo MVP Builder -> Runtime -> Guardar -> Consulta
 """
 
 import asyncio
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
@@ -436,6 +437,30 @@ async def export_runtime_records(
     )
 
 
+@router.get("/template/{template_id}/records/clean-export.csv")
+async def export_clean_answers(
+    template_id: str,
+    status_filter: str = Query(default="approved", alias="status", max_length=30),
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """Respuestas limpias para informes (docs/141 §8): una fila por registro,
+    sin observaciones, devoluciones ni auditoría. Por defecto solo registros
+    aprobados; status=todos los incluye todos (los demás filtros, explícitos)."""
+    template = require_template_access(db, current_user.id, template_id)
+    require_any_project_permission(db, current_user.id, template.project_id, {"records.read", "reports.export", "records.review", "records.approve"})
+    status_value = None if status_filter in {"todos", "all"} else status_filter
+    content = await asyncio.to_thread(
+        runtime_record_service.export_template_csv, db, template_id, status=status_value,
+        allowed_participant_ids=allowed_form_participant_ids(db, current_user.id, template, review=True),
+        date_from=date_from, date_to=date_to,
+    )
+    return Response(content=content.encode("utf-8"), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="respuestas_limpias.csv"'})
+
+
 @router.get("/template/{template_id}/records/observations.csv")
 async def export_runtime_observations(
     template_id: str,
@@ -463,23 +488,29 @@ async def export_runtime_observations(
         else:
             query = query.filter(RuntimeRecord.participant_id.in_(allowed))
     actions = query.order_by(ReviewAction.created_at, ReviewAction.id).all()
+    # Observaciones estructuradas (docs/141 §6): pregunta, ruta REPEAT y estado
+    from app.models.review import ReviewObservation
+    obs_query = db.query(ReviewObservation).join(RuntimeRecord, ReviewObservation.record_id == RuntimeRecord.id).filter(RuntimeRecord.template_id == template_id)
+    if allowed is not None:
+        obs_query = obs_query.filter(RuntimeRecord.participant_id.in_(allowed)) if allowed else obs_query.filter(False)
+    observations = obs_query.order_by(ReviewObservation.created_at, ReviewObservation.id).all()
+    action_with_observations = {o.review_action_id for o in observations if o.review_action_id}
     output = StringIO()
     writer = csv.writer(output, lineterminator="\n")
     writer.writerow([
-        "review_action_id", "record_id", "field_name", "observation",
-        "reviewer_id", "action", "from_status", "to_status", "created_at",
+        "origen", "observation_id", "review_action_id", "record_id", "field_name", "repeat_path", "observation",
+        "requested_action", "status", "reviewer_id", "action", "from_status", "to_status", "created_at", "updated_at",
     ])
+    cell = lambda value: runtime_record_service._safe_csv_cell(str(value or ""))
+    for o in observations:
+        writer.writerow([cell(v) for v in ("observacion", o.id, o.review_action_id, o.record_id, o.field_name, o.repeat_path, o.reason,
+                                            o.requested_action, o.status, o.created_by, "", "", "", o.created_at, o.updated_at)])
     for action in actions:
-        if not action.notes and not action.rejected_field_name:
+        # Una devolución con observaciones ya aparece arriba, por pregunta
+        if (not action.notes and not action.rejected_field_name) or action.id in action_with_observations:
             continue
-        writer.writerow([
-            runtime_record_service._safe_csv_cell(str(value or ""))
-            for value in (
-                action.id, action.record_id, action.rejected_field_name,
-                action.notes, action.user_id, action.action,
-                action.from_status, action.to_status, action.created_at,
-            )
-        ])
+        writer.writerow([cell(v) for v in ("accion_revision", "", action.id, action.record_id, action.rejected_field_name, "", action.notes,
+                                            "", "", action.user_id, action.action, action.from_status, action.to_status, action.created_at, "")])
     return Response(
         content=output.getvalue().encode("utf-8-sig"),
         media_type="text/csv; charset=utf-8",

@@ -18,7 +18,7 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.time import utc_now
+from app.core.time import to_naive_utc, utc_now
 from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.audit import AuditLog
 from app.models.files import FileAsset
@@ -1023,10 +1023,16 @@ class RuntimeRecordService:
         rows = query.order_by(direction, RuntimeRecord.id.asc()).offset(offset).limit(limit).all()
         return RuntimeRecordPage(items=[record_to_read(db, row) for row in rows], total=total, limit=limit, offset=offset)
 
-    def export_template_csv(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, allowed_participant_ids: list[str] | None = None) -> str:
+    def export_template_csv(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, allowed_participant_ids: list[str] | None = None,
+                            date_from: datetime | None = None, date_to: datetime | None = None) -> str:
         query = self._filtered_records_query(db, template_id, search, status)
         if allowed_participant_ids is not None:
             query = query.filter(RuntimeRecord.participant_id.in_(allowed_participant_ids))
+        # Periodo (docs/141 §8): por fecha de captura
+        if date_from is not None:
+            query = query.filter(RuntimeRecord.created_at >= to_naive_utc(date_from))
+        if date_to is not None:
+            query = query.filter(RuntimeRecord.created_at < to_naive_utc(date_to))
         records = query.order_by(RuntimeRecord.created_at.desc()).all()
         record_ids = [record.id for record in records]
         values = db.query(RuntimeRecordValue).filter(RuntimeRecordValue.record_id.in_(record_ids)).all() if record_ids else []

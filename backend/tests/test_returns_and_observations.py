@@ -124,3 +124,98 @@ def test_return_rejects_assignee_without_capture_permission_and_retries_do_not_d
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
+
+
+def test_clean_export_defaults_to_approved_and_filters_period_quality_export_is_separate():
+    engine, sessions = setup_client()
+    _legacy_form(sessions)
+    try:
+        with TestClient(app) as client:
+            coord = auth(client, "assign-admin@example.com", "Admin12345!")
+            juan = auth(client, "assign-owner@example.com", "Owner12345!")
+            ids = [client.post("/api/v1/runtime/save", headers=juan, json={
+                "project_id": PROJECT, "template_id": "visita-3",
+                "values": [{"field_name": "nombre", "field_value_json": json.dumps(f"Hogar {i}")}]}).json()["id"] for i in range(3)]
+            for record_id in ids[:2]:
+                client.post("/api/v1/review/actions", headers=coord, json={"project_id": PROJECT, "record_id": record_id, "to_status": "approved", "action": "approve"})
+            client.post(f"/api/v1/review/records/{ids[2]}/return", headers=coord, json={
+                "notes": "Revisar", "observations": [{"field_name": "nombre", "reason": "Nombre incompleto"}, {"field_name": "nombre", "reason": "Falta apellido"}]})
+
+            clean = client.get("/api/v1/runtime/template/visita-3/records/clean-export.csv", headers=coord).content.decode("utf-8-sig")
+            assert ids[0] in clean and ids[1] in clean and ids[2] not in clean  # solo aprobados
+            assert "Nombre incompleto" not in clean
+            everything = client.get("/api/v1/runtime/template/visita-3/records/clean-export.csv", headers=coord, params={"status": "todos"}).content.decode("utf-8-sig")
+            assert all(i in everything for i in ids) and everything.count(ids[2]) == 1  # dos observaciones, una sola fila
+            future = client.get("/api/v1/runtime/template/visita-3/records/clean-export.csv", headers=coord,
+                                params={"status": "todos", "date_from": "2099-01-01T00:00:00Z"}).content.decode("utf-8-sig")
+            assert not any(i in future for i in ids)
+
+            quality = client.get("/api/v1/runtime/template/visita-3/records/observations.csv", headers=coord).content.decode("utf-8-sig")
+            lines = [line for line in quality.splitlines() if ids[2] in line]
+            assert len(lines) == 2 and all(line.startswith("observacion,") for line in lines)
+            assert "Nombre incompleto" in quality and "Hogar 0" not in quality  # sin respuestas
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_bulk_return_1000_rows_with_partial_errors_retries_without_duplicates():
+    """docs/141 §11: devolución masiva de 1.000 filas con errores parciales."""
+    import csv
+    import io
+    from app.models.runtime_record import RuntimeRecord as RR
+    engine, sessions = setup_client()
+    _legacy_form(sessions)
+    with sessions() as db:
+        for i in range(500):
+            db.add(RR(id=f"bulk-{i}", project_id=PROJECT, template_id="visita-3", status="submitted", submitted_by="assign-owner"))
+        db.add(RR(id="bulk-aprobado", project_id=PROJECT, template_id="visita-3", status="approved", submitted_by="assign-owner"))
+        db.commit()
+    try:
+        with TestClient(app) as client:
+            coord = auth(client, "assign-admin@example.com", "Admin12345!")
+            juan = auth(client, "assign-owner@example.com", "Owner12345!")
+            buf = io.StringIO()
+            w = csv.writer(buf)
+            w.writerow(["id_registro", "accion", "usuario_destino", "observacion", "campo", "motivo"])
+            for i in range(490):  # 490 registros x 2 observaciones = 980 filas válidas
+                action, dest = ("reasignar", "assign-other@example.com") if i % 2 else ("devolver_original", "")
+                w.writerow([f"bulk-{i}", action, dest, "Revisar", "fecha_visita", "Fecha inválida"])
+                w.writerow([f"bulk-{i}", action, dest, "Revisar", "integrantes[0].firma", "Falta firma"])
+            w.writerow(["no-existe", "devolver_original", "", "x", "c", "motivo"])           # error: registro
+            w.writerow(["bulk-490", "borrar", "", "x", "c", "motivo"])                        # error: acción
+            w.writerow(["bulk-491", "reasignar", "nadie@example.com", "x", "c", "motivo"])    # error: destinatario
+            w.writerow(["bulk-aprobado", "devolver_original", "", "x", "c", "motivo"])        # error: estado
+            w.writerow(["bulk-0", "devolver_original", "", "Revisar", "fecha_visita", "Fecha inválida"])  # duplicada
+            for i in range(492, 497):
+                w.writerow([f"bulk-{i}", "devolver_original", "", "", "c", ""])                # error: sin motivo
+            w.writerow(["bulk-497", "reasignar", "assign-other@example.com", "x", "a", "m1"])
+            w.writerow(["bulk-497", "devolver_original", "", "x", "b", "m2"])                 # error: acción distinta
+            for i in range(8):
+                w.writerow([f"bulk-49{8 + i % 2}", "devolver_original", "", "Revisar", f"campo_{i}", f"motivo {i}"])
+            content = buf.getvalue().encode("utf-8")
+            assert content.count(b"\n") - 1 == 1000
+            upload = lambda preview: client.post(f"/api/v1/review/bulk-returns/{PROJECT}", headers=coord,
+                                                 data={"preview_only": str(preview).lower()}, files={"upload": ("devoluciones.csv", content, "text/csv")})
+            assert client.post(f"/api/v1/review/bulk-returns/{PROJECT}", headers=juan, data={"preview_only": "true"},
+                               files={"upload": ("d.csv", content, "text/csv")}).status_code == 403
+            preview = upload(True).json()
+            assert preview["filas"] == 1000 and preview["errores"] == 10 and preview["duplicadas"] == 1
+            assert preview["registros_a_devolver"] == 493  # 490 + bulk-497 + bulk-498 + bulk-499
+            with sessions() as db:
+                assert db.query(RR).filter(RR.status == "returned").count() == 0  # la vista previa no cambia nada
+            applied = upload(False).json()
+            assert applied["aplicadas"] == 493 and applied["errores"] == 10
+            assert "bulk-aprobado" in applied["errores_csv"] and "no-existe" in applied["errores_csv"]
+            with sessions() as db:
+                assert db.query(RR).filter(RR.status == "returned").count() == 493
+                assert db.query(ReviewObservation).count() == 980 + 1 + 8
+                assert db.get(RR, "bulk-1").correction_user_id == "assign-other" and db.get(RR, "bulk-1").submitted_by == "assign-owner"
+                assert db.get(RR, "bulk-0").correction_user_id is None
+            again = upload(False).json()  # reintento con el mismo archivo
+            assert again["aplicadas"] == 0 and again["ya_aplicadas"] == 980 + 1 + 8
+            with sessions() as db:
+                assert db.query(ReviewObservation).count() == 980 + 1 + 8
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)

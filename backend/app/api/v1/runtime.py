@@ -432,3 +432,54 @@ async def export_runtime_records(
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{safe_name}.csv"'},
     )
+
+
+@router.get("/template/{template_id}/records/observations.csv")
+async def export_runtime_observations(
+    template_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """Exporta acciones de revisión por separado de las respuestas.
+
+    Usa los mismos límites de acceso por plantilla y participante que la
+    exportación de respuestas; no expone registros ajenos al usuario.
+    """
+    import csv
+    from io import StringIO
+    from app.models.review import ReviewAction
+    from app.models.runtime_record import RuntimeRecord
+
+    template = require_template_access(db, current_user.id, template_id)
+    allowed = allowed_form_participant_ids(db, current_user.id, template, review=True)
+    query = db.query(ReviewAction).join(
+        RuntimeRecord, ReviewAction.record_id == RuntimeRecord.id
+    ).filter(RuntimeRecord.template_id == template_id)
+    if allowed is not None:
+        if not allowed:
+            query = query.filter(False)
+        else:
+            query = query.filter(RuntimeRecord.participant_id.in_(allowed))
+    actions = query.order_by(ReviewAction.created_at, ReviewAction.id).all()
+    output = StringIO()
+    writer = csv.writer(output, lineterminator="\\n")
+    writer.writerow([
+        "review_action_id", "record_id", "field_name", "observation",
+        "reviewer_id", "action", "from_status", "to_status", "created_at",
+    ])
+    for action in actions:
+        if not action.notes and not action.rejected_field_name:
+            continue
+        writer.writerow([
+            runtime_record_service._safe_csv_cell(str(value or ""))
+            for value in (
+                action.id, action.record_id, action.rejected_field_name,
+                action.notes, action.user_id, action.action,
+                action.from_status, action.to_status, action.created_at,
+            )
+        ])
+    return Response(
+        content=output.getvalue().encode("utf-8-sig"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="observaciones.csv"'},
+    )

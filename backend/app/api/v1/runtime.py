@@ -350,12 +350,11 @@ def list_runtime_record_children(record_id: str, field_name: str, db: Session = 
 
 @router.patch("/record/{record_id}/correction", response_model=RuntimeRecordRead)
 def correct_runtime_record_field(record_id: str, payload: RuntimeRecordFieldCorrection, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> RuntimeRecordRead:
-    """Corrige el valor de un campo de un registro devuelto (enlace magico).
+    """Corrige el valor de un campo de un borrador o de un registro devuelto.
 
-    Requiere el mismo permiso que capturar registros (`records.write`): es
-    la accion que hoy falta para que un gestor realmente pueda arreglar el
-    campo senalado por un revisor, en vez de solo poder marcar
-    "corregido" sin cambiar ningun valor.
+    Exige `records.write`, territorio y acceso al formulario; ademas, un
+    devuelto solo lo edita su destinatario (docs/141 §4,
+    `correction_service.ensure_can_edit`).
     """
     record = runtime_record_service.get_record(db, record_id)
     if record is None:

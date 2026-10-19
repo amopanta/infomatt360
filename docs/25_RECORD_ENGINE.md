@@ -36,6 +36,9 @@ GET /api/v1/runtime/record/{record_id}
 GET /api/v1/runtime/template/{template_id}/records
 GET /api/v1/runtime/template/{template_id}/records/search?search=&status=&limit=25&offset=0
 GET /api/v1/runtime/template/{template_id}/records/export.csv?search=&status=
+GET /api/v1/runtime/template/{template_id}/records/clean-export.csv?status=approved&date_from=&date_to=
+GET /api/v1/runtime/template/{template_id}/records/observations.csv
+PATCH /api/v1/runtime/record/{record_id}/correction
 ```
 
 ## Flujo
@@ -49,15 +52,22 @@ Runtime JSON
   -> GET /runtime/record/{id}
 ```
 
-## Estados iniciales
+## Estados
+
+Actualizado 2026-10-18. Los iniciales eran `draft`, `submitted`, `approved`,
+`rejected` y `archived`; hoy las transiciones por defecto
+(`DEFAULT_ACTIONS` en `backend/app/services/approval_flow_service.py`, o el
+flujo configurado del proyecto, docs/51) usan:
 
 ```text
-draft
-submitted
-approved
-rejected
-archived
+draft -> submitted -> under_review -> tech_approved / coordinator_approved -> approved
+                   \-> returned -> corrected -> (revision de nuevo)
+rejected, archived, cancelled, voided (docs/100), synced
 ```
+
+Solo se editan `draft` y, por su destinatario, `returned`/`corrected`
+(docs/141 §4, `correction_service.ensure_can_edit`). Enviado, en revisión y
+aprobado son de solo lectura.
 
 ## Soporte para valores complejos
 
@@ -94,6 +104,11 @@ offset: desplazamiento actual
 
 La exportacion CSV acepta los mismos filtros `search` y `status`, genera UTF-8
 compatible con Excel y protege columnas/celdas contra formulas inyectadas.
+
+Para informes hay dos salidas separadas (docs/141 §8):
+`clean-export.csv` (una fila por registro, sin observaciones, **solo
+aprobados por defecto**; `status=todos` los incluye todos) y
+`observations.csv` (las observaciones de revision).
 
 ## Pendientes
 

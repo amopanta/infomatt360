@@ -132,7 +132,7 @@ class RuntimeValueRead(RuntimeValueCreate):
 
 
 class RuntimeRecordFieldCorrection(BaseModel):
-    """Corrige el valor de un campo de un registro devuelto (`status="returned"`).
+    """Corrige el valor de un campo de un borrador o de un registro devuelto (docs/141 §4).
 
     `expected_lock_version` es el bloqueo optimista: debe ser el
     `lock_version` que el cliente vio la ultima vez que leyo el registro.

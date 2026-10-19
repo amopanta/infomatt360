@@ -908,9 +908,9 @@ class RuntimeRecordService:
 
         Es el unico camino de escritura sobre un `RuntimeRecordValue` ya
         existente en todo el sistema -- `save_record` siempre crea filas
-        nuevas. Solo se permite mientras el registro esta en `returned`
-        (la revision humana ya marco que necesita correccion); un registro
-        aprobado, rechazado o archivado es inmutable.
+        nuevas. Solo se permite en borrador, o en devuelto/corregido por su
+        destinatario (`ensure_can_edit`); enviado, aprobado, rechazado o
+        archivado son inmutables.
 
         El bloqueo optimista (`RuntimeRecord.lock_version`) evita que dos
         gestores corrigiendo el mismo registro al mismo tiempo se

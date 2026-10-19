@@ -462,7 +462,7 @@ async def export_runtime_observations(
             query = query.filter(RuntimeRecord.participant_id.in_(allowed))
     actions = query.order_by(ReviewAction.created_at, ReviewAction.id).all()
     output = StringIO()
-    writer = csv.writer(output, lineterminator="\\n")
+    writer = csv.writer(output, lineterminator="\n")
     writer.writerow([
         "review_action_id", "record_id", "field_name", "observation",
         "reviewer_id", "action", "from_status", "to_status", "created_at",

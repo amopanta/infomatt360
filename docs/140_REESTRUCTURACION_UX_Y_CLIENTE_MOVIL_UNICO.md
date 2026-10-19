@@ -344,10 +344,15 @@ el gestor de campo `gestor@infomatt360.demo`):
    confirmó en 10 s.
 4. El administrador volvió a entrar y su registro se envió a su nombre.
 
-**Pendiente:** cifrar la base. Hace falta SQLCipher (`useSQLCipher` de expo-sqlite),
-que no funciona en Expo Go; se activará en la build propia (EAS). Mientras tanto,
-los datos están en el almacenamiento privado de la app y Android 10+ cifra el
-almacenamiento del equipo.
+**Cifrado de la base: decidido no cifrar** (2026-10-18). Razones y medidas:
+- Los datos están en el almacenamiento privado de la app, y Android 10+ cifra
+  el almacenamiento del equipo.
+- Se desactivaron las copias de seguridad de Android (`android.allowBackup:
+  false`), que podían copiar la base a la cuenta de Google o por cable. Aplica
+  en la build propia (EAS).
+- Siguen el PIN, la vigencia de 15 días, el borrado remoto y la base por usuario.
+- Se recomienda exigir bloqueo de pantalla en las tabletas, por tratarse de
+  datos personales (Ley 1581).
 
 ## 10. H03 (paridad), H06 (sincronización) y H11 (accesos) (2026-10-18)
 

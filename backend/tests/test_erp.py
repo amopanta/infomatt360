@@ -109,8 +109,9 @@ def test_reopening_reverses_erp_and_reapproval_settles_corrected_quantity_once()
             manager = auth(client, "erp-manager@example.com", "Manager12345!")
             action = {"project_id": "erp-project", "record_id": "erp-record-reopen", "to_status": "approved", "action": "approve"}
             assert client.post("/api/v1/review/actions", headers=approver, json=action).status_code == 200
+            # Excepción administrativa: quien reabre se designa para corregir (docs/141)
             reopened = client.post("/api/v1/review/records/erp-record-reopen/reopen", headers=manager,
-                json={"reason": "Cantidad entregada incorrecta"})
+                json={"reason": "Cantidad entregada incorrecta", "assignee_user_id": "erp-manager"})
             assert reopened.status_code == 200, reopened.text
             with sessions() as db:
                 assert db.get(ErpInventoryItem, "erp-item-kit").quantity_on_hand == 10

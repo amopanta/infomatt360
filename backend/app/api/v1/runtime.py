@@ -364,6 +364,8 @@ def correct_runtime_record_field(record_id: str, payload: RuntimeRecordFieldCorr
     require_form_participant_access(db, current_user.id, record.template_id, record.participant_id)
     try:
         return runtime_record_service.correct_field(db, record_id, payload, current_user.id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except ValueError as exc:
         detail = str(exc)
         lowered = detail.lower()

@@ -72,6 +72,10 @@ class RuntimeRecord(Base):
     # campo (ver runtime_record_service.correct_field). No tiene relacion
     # con `version_id` (la version de la PLANTILLA usada al capturar).
     lock_version: Mapped[int] = mapped_column(Integer, default=1, nullable=False)
+    # Devolución (docs/141): quién debe corregir. Vacío = el autor original
+    # (submitted_by), que nunca cambia aunque la corrección se reasigne.
+    correction_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    returned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False, index=True)
 

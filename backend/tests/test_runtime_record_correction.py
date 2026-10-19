@@ -135,7 +135,8 @@ def test_correction_rejects_stale_lock_version_conflict():
         Base.metadata.drop_all(bind=engine)
 
 
-def test_edit_allows_submitted_and_rejects_approved():
+def test_submitted_and_approved_are_read_only():
+    """docs/141: tras el envío solo se edita con una devolución formal (antes un enviado sí se editaba)."""
     engine, _sessions = setup_client()
     try:
         with TestClient(app) as client:
@@ -145,7 +146,8 @@ def test_edit_allows_submitted_and_rejects_approved():
                 headers=headers,
                 json={"field_name": "algun_campo", "field_value_json": json.dumps("x"), "expected_lock_version": 1},
             )
-            assert response.status_code == 200
+            assert response.status_code == 400
+            assert "no admite edición" in response.json()["detail"]
             approved = client.patch(
                 "/api/v1/runtime/record/corr-record-approved/correction",
                 headers=headers,

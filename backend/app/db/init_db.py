@@ -52,6 +52,9 @@ def _ensure_local_compat_columns() -> None:
             statements.append("ALTER TABLE runtime_records ADD COLUMN approval_flow_id VARCHAR(36)")
         if "approval_flow_version" not in runtime_columns:
             statements.append("ALTER TABLE runtime_records ADD COLUMN approval_flow_version VARCHAR(20)")
+        for column, ddl in (("correction_user_id", "VARCHAR(36)"), ("returned_at", "DATETIME")):
+            if column not in runtime_columns:
+                statements.append(f"ALTER TABLE runtime_records ADD COLUMN {column} {ddl}")
         if "approval_flow_snapshot_json" not in runtime_columns:
             statements.append("ALTER TABLE runtime_records ADD COLUMN approval_flow_snapshot_json TEXT")
 

@@ -82,6 +82,11 @@ class ReviewService:
 
         if should_advance:
             record.status = payload.to_status
+            if isinstance(record, RuntimeRecord) and payload.to_status == "returned":
+                # Devolución simple: corrige el autor (docs/141). La
+                # reasignación usa correction_service.return_record.
+                record.correction_user_id = None
+                record.returned_at = utc_now()
             if isinstance(record, RuntimeRecord):
                 assignment_status = {"submitted": "completed", "under_review": "completed", "returned": "in_progress", "corrected": "in_progress", "approved": "closed"}.get(payload.to_status)
                 if assignment_status:
@@ -140,7 +145,7 @@ class ReviewService:
         db.refresh(row)
         return to_read(row)
 
-    def reopen_approved(self, db: Session, record_id: str, user_id: str, reason: str) -> ReviewActionRead:
+    def reopen_approved(self, db: Session, record_id: str, user_id: str, reason: str, assignee_user_id: str | None = None) -> ReviewActionRead:
         record = self._find_runtime_or_legacy_record(db, record_id)
         if not record:
             raise ValueError("Registro no encontrado")
@@ -149,6 +154,14 @@ class ReviewService:
         if isinstance(record, RuntimeRecord):
             erp_service.reverse_settlement(db, record)
             set_assignment_status(db, record.template_id, record.participant_id, "in_progress")
+        if isinstance(record, RuntimeRecord) and assignee_user_id and assignee_user_id != record.submitted_by:
+            from app.services.correction_service import validate_assignee
+            validate_assignee(db, record, assignee_user_id)
+            record.correction_user_id = assignee_user_id
+        elif isinstance(record, RuntimeRecord):
+            record.correction_user_id = None
+        if isinstance(record, RuntimeRecord):
+            record.returned_at = utc_now()
         record.status = "returned"
         record.updated_at = utc_now()
         row = ReviewAction(project_id=record.project_id, record_id=record.id, from_status="approved",

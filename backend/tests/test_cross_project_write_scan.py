@@ -20,7 +20,7 @@ from app.db.session import get_db
 from app.main import app
 from test_cross_project_access_scan import B_IDS, _seed
 
-B_VALUES = set(B_IDS.values()) | {"proj-b", "org-b", "user-b", "col-b", "cmp-b", "val-b", "evt-b", "layer-b", "feat-b", "dev-b", "pt-b", "device-b"}
+B_VALUES = set(B_IDS.values()) | {"obs-b", "proj-b", "org-b", "user-b", "col-b", "cmp-b", "val-b", "evt-b", "layer-b", "feat-b", "dev-b", "pt-b", "device-b"}
 # Acciones del propio usuario o de plataforma, no de un proyecto: no pueden tocar B por diseño.
 SKIP_PREFIXES = ("/api/v1/auth/", "/api/v1/install/", "/api/v1/public")
 

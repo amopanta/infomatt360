@@ -31,6 +31,7 @@ from app.models.gis import GisFeature, GisLayer
 from app.models.identity import Project, Role, User
 from app.models.organization import Organization
 from app.models.participants import Participant
+from app.models.review import ReviewObservation
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
 from app.core.time import utc_now
 
@@ -39,7 +40,7 @@ B_IDS = {
     "project_id": "proj-b", "template_id": "tpl-b", "record_id": "rec-b", "participant_id": "part-b",
     "file_id": "file-b", "case_id": "case-b", "team_id": "team-b", "export_id": "exp-b",
     "organization_id": "org-b", "page_id": "page-b", "section_id": "sec-b", "row_id": "row-b",
-    "item_id": "x-b", "field_name": "nombre",
+    "item_id": "x-b", "field_name": "nombre", "observation_id": "obs-b",
 }
 
 # Rutas que devuelven a propósito datos de catálogo o del propio usuario, no de un proyecto.
@@ -75,6 +76,7 @@ def _seed(db):
         GestorTeam(id="team-b", project_id="proj-b", name=f"Equipo {MARK}", created_by="user-b"),
         GestorTeamUser(team_id="team-b", user_id="user-b"),
         SavedExport(id="exp-b", project_id="proj-b", name=f"Exportación {MARK}", recipient_user_id="user-b"),
+        ReviewObservation(id="obs-b", project_id="proj-b", record_id="rec-b", field_name="nombre", reason=f"Observación {MARK}", created_by="user-b"),
         GisLayer(id="layer-b", project_id="proj-b", name=f"Capa {MARK}", layer_type="points", status="active"),
         GisFeature(id="feat-b", project_id="proj-b", layer_id="layer-b", record_id="rec-b", feature_type="Point",
                    latitude="4.6", longitude="-74.0", status="active"),

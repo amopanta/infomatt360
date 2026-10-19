@@ -29,12 +29,13 @@ from app.models.files import FileAsset
 from app.models.gis import GisFeature, GisLayer
 from app.models.identity import Project, Role, User
 from app.models.participants import Participant
+from app.models.review import ReviewObservation
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
 
 MARK = "FUERA-TERR"
 IDS = {"project_id": "proj-t", "template_id": "tpl-t", "record_id": "rec-out", "participant_id": "p-out",
        "file_id": "file-out", "case_id": "case-out", "page_id": "page-t", "section_id": "sec-t", "row_id": "row-t",
-       "field_name": "nombre"}
+       "field_name": "nombre", "observation_id": "obs-out"}
 
 
 def _seed(db):
@@ -66,6 +67,7 @@ def _seed(db):
                   original_name=f"archivo-{MARK}.pdf", storage_path="/no/existe.pdf", size_bytes=10),
         ParticipantCase(id="case-out", project_id="proj-t", participant_id="p-out", title=f"Caso {MARK}", created_by="admin", created_at=now, updated_at=now),
         CaseEvent(id="evt-out", case_id="case-out", event_type="note", from_user_id="admin", created_at=now),
+        ReviewObservation(id="obs-out", project_id="proj-t", record_id="rec-out", field_name="nombre", reason=f"Observación {MARK}", created_by="admin"),
         GisLayer(id="layer-t", project_id="proj-t", name="Capa", layer_type="points", status="active"),
         GisFeature(id="feat-out", project_id="proj-t", layer_id="layer-t", record_id="rec-out", feature_type="Point",
                    latitude="4.6", longitude="-74.0", status="active", properties_json=json.dumps({"nombre": f"Punto {MARK}"})),
@@ -116,7 +118,7 @@ def test_no_get_route_reveals_participants_outside_the_users_territory():
     assert hits == [], "Rutas que muestran datos fuera del territorio:\n" + "\n".join(hits)
 
 
-OUT_VALUES = {"p-out", "rec-out", "file-out", "case-out", "evt-out", "feat-out", "val-out"}
+OUT_VALUES = {"p-out", "rec-out", "file-out", "case-out", "evt-out", "feat-out", "val-out", "obs-out"}
 
 
 def _snapshot_out(engine) -> dict[str, list]:

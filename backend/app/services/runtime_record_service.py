@@ -920,8 +920,11 @@ class RuntimeRecordService:
         record = db.query(RuntimeRecord).filter(RuntimeRecord.id == record_id).first()
         if record is None:
             raise ValueError("Registro no encontrado")
-        if record.status not in {"draft", "submitted", "returned", "corrected"}:
-            raise ValueError(f"El registro en estado '{record.status}' no admite edición; solicita una devolución para corregirlo")
+        # docs/141: enviado y aprobado son de solo lectura; un devuelto lo
+        # corrige solo su destinatario (antes también se editaba un enviado
+        # y cualquier gestor con records.write podía corregir).
+        from app.services.correction_service import ensure_can_edit
+        ensure_can_edit(record, user_id)
         if record.lock_version != payload.expected_lock_version:
             raise ValueError(
                 "El registro fue modificado por otro usuario despues de que se cargo el formulario de correccion; "

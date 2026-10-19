@@ -1,4 +1,5 @@
 import { authorizationHeader } from '../auth/session';
+import { cachedJson } from '../offline/offlineCache';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
 
@@ -23,6 +24,10 @@ export type MyFormSummary = { assignment_count: number; form_count: number; pend
 export type OpenForm = { id: string; name: string; status: string; accepting_responses: boolean; participant_source?: { access_mode?: string } | null };
 
 export async function fetchOpenForms(projectId: string): Promise<OpenForm[]> {
+  return cachedJson(`open-forms:${projectId}`, () => loadOpenForms(projectId));
+}
+
+async function loadOpenForms(projectId: string): Promise<OpenForm[]> {
   const response = await fetch(`${API_BASE_URL}/builder/templates/${projectId}`, { headers: authorizationHeader() });
   if (!response.ok) throw new Error('No fue posible consultar los formularios abiertos.');
   const templates: OpenForm[] = await response.json();
@@ -36,9 +41,11 @@ export async function fetchMyFormSummary(projectId: string): Promise<MyFormSumma
 }
 
 export async function fetchMyFormAssignments(projectId: string): Promise<MyFormAssignment[]> {
+  return cachedJson(`my-assignments:${projectId}`, async () => {
   const response = await fetch(`${API_BASE_URL}/form-assignments/mine/${projectId}`, { headers: authorizationHeader() });
   if (!response.ok) throw new Error('No fue posible consultar tus formularios asignados.');
   return response.json();
+  });
 }
 
 export async function fetchMyProjectAssignmentCounts(): Promise<Record<string, number>> {

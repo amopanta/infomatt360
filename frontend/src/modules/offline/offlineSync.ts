@@ -9,6 +9,7 @@
 import { isDesktopApp } from '../desktop/desktopBridge';
 import type { DesktopRecordValue } from '../desktop/desktopBridge';
 import * as indexedDbQueue from './indexedDbQueue';
+import { offlineCacheUser } from './offlineCache';
 
 export type OfflineSyncResult = { attempted: number; synced: number; failed: number };
 
@@ -27,14 +28,16 @@ function notifyQueueChanged(): void {
 }
 
 export async function enqueueRecord(record: { projectId: string; templateId: string; participantId?: string | null; values: DesktopRecordValue[] }): Promise<string> {
-  const id = isDesktopApp() ? await window.desktopBridge!.enqueueRecord(record) : await indexedDbQueue.enqueue(record);
+  const owned = { ...record, userId: offlineCacheUser() || null };
+  const id = isDesktopApp() ? await window.desktopBridge!.enqueueRecord(owned) : await indexedDbQueue.enqueue(owned);
   notifyQueueChanged();
   return id;
 }
 
 export async function getPendingCount(): Promise<number> {
-  if (isDesktopApp()) return window.desktopBridge!.getPendingCount();
-  return indexedDbQueue.countPending();
+  const userId = offlineCacheUser() || null;
+  if (isDesktopApp()) return window.desktopBridge!.getPendingCount(userId);
+  return indexedDbQueue.countPending(userId);
 }
 
 /** Borra los registros ya sincronizados hace mas de `retentionDays` de la
@@ -80,13 +83,13 @@ type BulkSaveResponse = { results: BulkSaveResult[] };
  */
 export async function syncNow(credentials: { apiBaseUrl: string; accessToken: string }): Promise<OfflineSyncResult> {
   if (isDesktopApp()) {
-    const result = await window.desktopBridge!.syncNow(credentials);
+    const result = await window.desktopBridge!.syncNow({ ...credentials, userId: offlineCacheUser() || null });
     await purgeOldSynced();
     notifyQueueChanged();
     return result;
   }
 
-  const pending = await indexedDbQueue.listPending();
+  const pending = await indexedDbQueue.listPending(offlineCacheUser() || null);
   const result: OfflineSyncResult = { attempted: pending.length, synced: 0, failed: 0 };
 
   for (const group of groupByTemplate(pending).values()) {

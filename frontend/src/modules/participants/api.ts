@@ -1,4 +1,5 @@
 import { authorizationHeader } from '../auth/session';
+import { cachedJson } from '../offline/offlineCache';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
 
@@ -101,9 +102,11 @@ export async function setParticipantGroupStatus(projectId: string, groupName: st
 }
 
 export async function fetchParticipantHistory(participantId: string): Promise<ParticipantHistoryItem[]> {
-  const response = await fetch(`${API_BASE_URL}/participants/${participantId}/history`, { headers: headers() });
-  if (!response.ok) throw new Error('No fue posible consultar el historial del participante.');
-  return response.json();
+  return cachedJson(`participant-history:${participantId}`, async () => {
+    const response = await fetch(`${API_BASE_URL}/participants/${participantId}/history`, { headers: headers() });
+    if (!response.ok) throw new Error('No fue posible consultar el historial del participante.');
+    return response.json();
+  });
 }
 
 export async function fetchParticipantActivities(participantId: string): Promise<ParticipantActivity[]> {

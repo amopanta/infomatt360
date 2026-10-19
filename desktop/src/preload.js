@@ -17,7 +17,7 @@ if (location.origin !== productionOrigin && !isLocalDevelopment) {
  */
 contextBridge.exposeInMainWorld("desktopBridge", {
   enqueueRecord: (record) => ipcRenderer.invoke("desktop:enqueue-record", record),
-  getPendingCount: () => ipcRenderer.invoke("desktop:pending-count"),
+  getPendingCount: (userId) => ipcRenderer.invoke("desktop:pending-count", userId),
   syncNow: (credentials) => ipcRenderer.invoke("desktop:sync-now", credentials),
   purgeOldSynced: (retentionDays) => ipcRenderer.invoke("desktop:purge-old-synced", retentionDays),
   listPrinters: () => ipcRenderer.invoke("desktop:list-printers"),

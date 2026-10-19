@@ -8,7 +8,15 @@ import { PublicReportApp } from '../reports/PublicReportApp';
 import { changePassword, fetchSession, login, logout, refreshAccessToken, requestPasswordReset, resetPassword, verifyMfa } from './api';
 import { clearStoredSession, currentAccessToken, PROJECT_KEY, setAccessToken, storeSelectedProjectPermissions, storeSessionProjects, validSelectedProject } from './session';
 import { useI18n } from '../../i18n';
+import { isDesktopApp } from '../desktop/desktopBridge';
+import { isNetworkError, setOfflineCacheUser } from '../offline/offlineCache';
+import { clearOfflineSnapshot, hasOfflinePin, OFFLINE_MAX_DAYS, offlineSnapshotExpired, readOfflineSnapshot, saveOfflineSnapshot, verifyOfflinePin, type OfflineSnapshot } from './offlineSession';
 import type { AuthSession } from './types';
+
+const RECONNECT_INTERVAL_MS = 30_000;
+// Los enlaces de la app recargan la página; esta marca evita pedir el PIN en
+// cada pantalla. Vive solo mientras la ventana siga abierta.
+const OFFLINE_UNLOCKED_KEY = 'infomatt360_offline_unlocked';
 
 type Props = { children: React.ReactNode };
 
@@ -18,16 +26,25 @@ export function AuthGate({ children }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [mfaChallenge, setMfaChallenge] = useState('');
+  // Escritorio sin red: copia de la última sesión para entrar con PIN.
+  const [offlineCandidate, setOfflineCandidate] = useState<OfflineSnapshot | null>(null);
+  const [offlineMode, setOfflineMode] = useState(false);
+  const [reconnectNeedsLogin, setReconnectNeedsLogin] = useState(false);
   const resetToken = new URLSearchParams(window.location.search).get('token');
 
   async function closeSession() {
     try { await logout(); }
-    finally { clearStoredSession(); setSession(null); }
+    finally { clearStoredSession(); clearOfflineSnapshot(); sessionStorage.removeItem(OFFLINE_UNLOCKED_KEY); setOfflineCacheUser(''); setOfflineMode(false); setSession(null); }
   }
 
   async function loadSession(token: string) {
     try {
       const nextSession = await fetchSession(token);
+      setOfflineCacheUser(nextSession.user_id);
+      saveOfflineSnapshot(nextSession);
+      setOfflineMode(false);
+      setReconnectNeedsLogin(false);
+      sessionStorage.removeItem(OFFLINE_UNLOCKED_KEY);
       storeSessionProjects(nextSession.projects);
       const projectId = validSelectedProject(nextSession.projects, localStorage.getItem(PROJECT_KEY));
       if (projectId) {
@@ -49,11 +66,55 @@ export function AuthGate({ children }: Props) {
   useEffect(() => {
     void refreshAccessToken()
       .then((token) => loadSession(token))
-      .catch(() => setLoading(false));
+      .catch((reason) => {
+        const snapshot = isDesktopApp() && isNetworkError(reason) ? readOfflineSnapshot() : null;
+        if (snapshot && !offlineSnapshotExpired(snapshot) && sessionStorage.getItem(OFFLINE_UNLOCKED_KEY) === snapshot.session.user_id) enterOffline(snapshot);
+        else if (snapshot) setOfflineCandidate(snapshot);
+        setLoading(false);
+      });
   }, []);
 
+  // Sin conexión: al volver la red se renueva la sesión real con la cookie
+  // de refresco. Si venció, se pide iniciar sesión sin perder lo pendiente.
   useEffect(() => {
-    if (!session) return undefined;
+    if (!offlineMode) return undefined;
+    let active = true;
+    const attempt = () => {
+      if (reconnectNeedsLogin) return;
+      void refreshAccessToken()
+        .then((token) => { if (active) return loadSession(token); })
+        .catch((reason) => { if (active && !isNetworkError(reason)) setReconnectNeedsLogin(true); });
+    };
+    const timer = window.setInterval(attempt, RECONNECT_INTERVAL_MS);
+    window.addEventListener('online', attempt);
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener('online', attempt); };
+  }, [offlineMode, reconnectNeedsLogin]);
+
+  function enterOffline(snapshot: OfflineSnapshot) {
+    setOfflineCacheUser(snapshot.session.user_id);
+    storeSessionProjects(snapshot.session.projects);
+    const projectId = validSelectedProject(snapshot.session.projects, localStorage.getItem(PROJECT_KEY));
+    if (projectId) {
+      localStorage.setItem(PROJECT_KEY, projectId);
+      storeSelectedProjectPermissions(snapshot.session.projects, projectId);
+    }
+    sessionStorage.setItem(OFFLINE_UNLOCKED_KEY, snapshot.session.user_id);
+    setOfflineCandidate(null);
+    setOfflineMode(true);
+    setSession(snapshot.session);
+  }
+
+  function leaveOfflineToLogin() {
+    // La cola local y la copia descargada se conservan para esta cuenta.
+    sessionStorage.removeItem(OFFLINE_UNLOCKED_KEY);
+    setOfflineMode(false);
+    setReconnectNeedsLogin(false);
+    setOfflineCandidate(null);
+    setSession(null);
+  }
+
+  useEffect(() => {
+    if (!session || offlineMode) return undefined;
     const timer = window.setInterval(() => {
       void refreshAccessToken().catch(() => {
         clearStoredSession();
@@ -62,7 +123,7 @@ export function AuthGate({ children }: Props) {
       });
     }, 50 * 60 * 1000);
     return () => window.clearInterval(timer);
-  }, [session]);
+  }, [session, offlineMode]);
 
   if (window.location.pathname === '/reset-password' && resetToken) return <ResetPasswordPanel token={resetToken} />;
   if (window.location.pathname === '/install') return <InstallWizardApp />;
@@ -102,6 +163,7 @@ export function AuthGate({ children }: Props) {
   }
 
   if (loading) return <div className="auth-page"><p>{t('auth.validatingSession')}</p></div>;
+  if (!session && offlineCandidate) return <OfflineUnlockPanel snapshot={offlineCandidate} onUnlock={() => enterOffline(offlineCandidate)} onOnlineLogin={() => setOfflineCandidate(null)} />;
   if (!session && mfaChallenge) return <MfaPanel error={error} onSubmit={submitMfa} onCancel={() => { setMfaChallenge(''); setError(''); }} />;
   if (!session) return <LoginPanel error={error} onSubmit={submitLogin} />;
 
@@ -125,7 +187,56 @@ export function AuthGate({ children }: Props) {
     );
   }
 
+  if (offlineMode) {
+    return <>
+      <div className="offline-mode-banner" role="status">
+        <span>{reconnectNeedsLogin ? t('offlineDesktop.reconnectLogin') : t('offlineDesktop.banner')}</span>
+        {reconnectNeedsLogin && <button type="button" onClick={leaveOfflineToLogin}>{t('offlineDesktop.loginAgain')}</button>}
+      </div>
+      {children}
+    </>;
+  }
+
   return <>{children}</>;
+}
+
+function OfflineUnlockPanel({ snapshot, onUnlock, onOnlineLogin }: { snapshot: OfflineSnapshot; onUnlock: () => void; onOnlineLogin: () => void }) {
+  const { t } = useI18n();
+  const [pin, setPin] = useState('');
+  const [message, setMessage] = useState('');
+  const [checking, setChecking] = useState(false);
+  const userId = snapshot.session.user_id;
+  const expired = offlineSnapshotExpired(snapshot);
+  const pinReady = hasOfflinePin(userId);
+  async function submit() {
+    setChecking(true);
+    try {
+      const result = await verifyOfflinePin(userId, pin);
+      if (result.ok) { onUnlock(); return; }
+      setPin('');
+      setMessage(result.reason === 'locked' ? t('offlineDesktop.locked') : result.reason === 'missing' ? t('offlineDesktop.noPin') : t('offlineDesktop.wrongPin', { left: result.attemptsLeft }));
+    } finally {
+      setChecking(false);
+    }
+  }
+  return (
+    <div className="auth-page">
+      <form className="auth-card" onSubmit={(event) => { event.preventDefault(); void submit(); }}>
+        <BrandLogo />
+        <h1>{t('offlineDesktop.unlockTitle')}</h1>
+        {expired ? <p role="alert">{t('offlineDesktop.expired', { days: OFFLINE_MAX_DAYS })}</p>
+          : !pinReady ? <p role="alert">{t('offlineDesktop.noPin')}</p>
+          : <>
+            <p>{t('offlineDesktop.unlockDesc', { name: snapshot.session.full_name })}</p>
+            <label>{t('offlineDesktop.pin')}<input type="password" inputMode="numeric" autoComplete="off" required pattern="[0-9]{4,8}" maxLength={8} value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))} /></label>
+            {message ? <p role="alert">{message}</p> : null}
+            <button type="submit" disabled={checking || pin.length < 4}>{t('offlineDesktop.unlock')}</button>
+          </>}
+        <button className="secondary" type="button" onClick={() => window.location.reload()}>{t('offlineDesktop.retry')}</button>
+        <button className="secondary" type="button" onClick={onOnlineLogin}>{t('offlineDesktop.otherUser')}</button>
+      </form>
+    </div>
+  );
 }
 
 function MfaPanel({ error, onSubmit, onCancel }: { error: string; onSubmit: (code: string) => Promise<void>; onCancel: () => void }) {

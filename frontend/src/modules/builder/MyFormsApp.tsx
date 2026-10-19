@@ -5,6 +5,7 @@ import { fetchParticipantHistory, type ParticipantHistoryItem } from '../partici
 import { fetchRecord, type RuntimeRecord } from '../records/api';
 import { fetchMyFormAssignments, fetchOpenForms, type MyFormAssignment, type OpenForm } from './myFormsApi';
 import { useI18n } from '../../i18n';
+import { OfflineWorkPanel } from '../offline/OfflineWorkPanel';
 
 const canCapture = (row: MyFormAssignment) => ['assigned', 'in_progress'].includes(row.assignment_status);
 
@@ -66,6 +67,7 @@ export function MyFormsApp() {
 
   return <AppShell title={t('builder.myForms.myAssignedForms')}><main className="forms-home my-forms-journey">
     <header className="forms-home-head"><div><h1>{t('builder.myForms.myAssignedForms')}</h1><p>{t('builder.myForms.consultParticipant')}</p></div><button type="button" onClick={() => void refresh()}>{t('builder.myForms.refreshAssignments')}</button></header>
+    <OfflineWorkPanel projectId={projectId} onDownloaded={() => void refresh()} />
     {message && <p role="status">{message}</p>}
     <nav className="my-forms-views" aria-label={t('builder.myForms.viewSelector')}>
       <button type="button" aria-current={view === 'assigned' ? 'page' : undefined} onClick={() => setView('assigned')}>{t('builder.myForms.assignedView')}</button>

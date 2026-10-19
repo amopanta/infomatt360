@@ -6,6 +6,7 @@
  */
 
 import { authorizationHeader, jsonAuthHeaders } from '../auth/session';
+import { cachedJson } from '../offline/offlineCache';
 import type { RuntimeDeviceVerificationValue, RuntimeFileValue, RuntimeFormValues, RuntimeTemplate } from './types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
@@ -95,6 +96,10 @@ export async function finishDeviceVerification(verificationId: string, credentia
 }
 
 export async function fetchRuntimeTemplate(templateId: string): Promise<RuntimeTemplate> {
+  return cachedJson(`runtime-template:${templateId}`, () => loadRuntimeTemplate(templateId));
+}
+
+async function loadRuntimeTemplate(templateId: string): Promise<RuntimeTemplate> {
   const response = await fetch(`${API_BASE_URL}/runtime/template/${templateId}`, {
     headers: authHeaders(),
   });
@@ -129,7 +134,13 @@ export type CaptureAssignment = {
   record_id: string | null;
 };
 
-export async function fetchCaptureParticipants(templateId: string): Promise<{ keyField: 'document_id' | 'external_code'; accessMode: 'legacy' | 'open' | 'closed'; participants: EligibleParticipant[]; assignments: CaptureAssignment[] }> {
+type CaptureParticipants = { keyField: 'document_id' | 'external_code'; accessMode: 'legacy' | 'open' | 'closed'; participants: EligibleParticipant[]; assignments: CaptureAssignment[] };
+
+export async function fetchCaptureParticipants(templateId: string): Promise<CaptureParticipants> {
+  return cachedJson(`capture-participants:${templateId}`, () => loadCaptureParticipants(templateId));
+}
+
+async function loadCaptureParticipants(templateId: string): Promise<CaptureParticipants> {
   const [detailResponse, participantsResponse, assignmentsResponse] = await Promise.all([
     fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}`, { headers: authorizationHeader() }),
     fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}/eligible-participants`, { headers: authorizationHeader() }),

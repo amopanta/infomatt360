@@ -3,6 +3,8 @@ import { AppShell } from '../../components/AppShell';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
 import { createParticipantInForm, fetchCaptureParticipants, fetchRuntimeTemplate, saveRuntimeRecord, startFormAssignment, toRuntimeValueList } from './api';
 import { enqueueRecord } from '../offline/offlineSync';
+import { isNetworkError, offlineCacheEnabled } from '../offline/offlineCache';
+import { markCapturedOffline } from '../offline/offlinePackage';
 import type { CaptureAssignment, EligibleParticipant } from './api';
 import { ParticipantSummaryTable } from './ParticipantSummaryTable';
 import { ParticipantPhoneCheck } from './ParticipantPhoneCheck';
@@ -74,7 +76,13 @@ export function RuntimeApp() {
     setAssignmentReady(false);
     startFormAssignment(templateId, participantId)
       .then(() => { if (active) setAssignmentReady(true); })
-      .catch((error: Error) => { if (active) setStatus(error.message); });
+      .catch((error: Error) => {
+        if (!active) return;
+        // Sin red en el escritorio: "iniciar" solo marca la actividad en curso;
+        // el registro se valida igual en el servidor al sincronizar.
+        if (isNetworkError(error) && offlineCacheEnabled()) setAssignmentReady(true);
+        else setStatus(error.message);
+      });
     return () => { active = false; };
   }, [templateId, participantId, accessMode, isPreview]);
 
@@ -120,7 +128,7 @@ export function RuntimeApp() {
       setShowNewParticipant(false);
       setNewName(''); setNewMunicipality(''); setNewDepartment('');
       setStatus(t('runtime.participantRegistered'));
-    } catch (error) { setStatus(error instanceof Error ? error.message : t('runtime.registerFailed')); }
+    } catch (error) { setStatus(isNetworkError(error) ? t('offlineDesktop.needsConnection') : error instanceof Error ? error.message : t('runtime.registerFailed')); }
     finally { setCreatingParticipant(false); }
   }
 
@@ -156,6 +164,10 @@ export function RuntimeApp() {
           throw new Error(t('runtime.offlineNotAvailable'));
         }
         await enqueueRecord({ projectId, templateId: template.template_id, participantId, values: toRuntimeValueList(resolved) });
+        await markCapturedOffline(projectId, template.template_id, participantId).catch(() => undefined);
+        setAssignments((current) => current.map((assignment) => assignment.participant_id === participantId ? { ...assignment, status: 'completed' } : assignment));
+        setReviewing(false);
+        startedAt.current = Date.now();
         clearDraft();
         setParticipantKey('');
         setStatus(t('runtime.savedOffline'));

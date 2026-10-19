@@ -22,6 +22,8 @@ export type QueuedRecord = {
   projectId: string;
   templateId: string;
   participantId?: string | null;
+  /** Quién capturó: solo su sesión envía el registro. Vacío en registros anteriores. */
+  userId?: string | null;
   values: QueuedValue[];
   status: 'pending' | 'synced';
   createdAt: string;
@@ -63,13 +65,14 @@ async function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStor
   }
 }
 
-export async function enqueue(record: { projectId: string; templateId: string; participantId?: string | null; values: QueuedValue[] }): Promise<string> {
+export async function enqueue(record: { projectId: string; templateId: string; participantId?: string | null; userId?: string | null; values: QueuedValue[] }): Promise<string> {
   const id = crypto.randomUUID();
   const entry: QueuedRecord = {
     id,
     projectId: record.projectId,
     templateId: record.templateId,
     participantId: record.participantId ?? null,
+    userId: record.userId ?? null,
     values: record.values,
     status: 'pending',
     createdAt: new Date().toISOString(),
@@ -78,12 +81,14 @@ export async function enqueue(record: { projectId: string; templateId: string; p
   return id;
 }
 
-export async function listPending(): Promise<QueuedRecord[]> {
-  return withStore<QueuedRecord[]>('readonly', (store) => store.index(STATUS_INDEX).getAll('pending'));
+/** Con `userId`, solo los de esa persona y los antiguos sin dueño. */
+export async function listPending(userId?: string | null): Promise<QueuedRecord[]> {
+  const rows = await withStore<QueuedRecord[]>('readonly', (store) => store.index(STATUS_INDEX).getAll('pending'));
+  return userId ? rows.filter((row) => !row.userId || row.userId === userId) : rows;
 }
 
-export async function countPending(): Promise<number> {
-  return (await listPending()).length;
+export async function countPending(userId?: string | null): Promise<number> {
+  return (await listPending(userId)).length;
 }
 
 async function updateRecord(id: string, mutate: (record: QueuedRecord) => void): Promise<void> {

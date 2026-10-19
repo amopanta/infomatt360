@@ -21,11 +21,11 @@ pruebas están en `src/offlineQueue.test.js`.
 
 ## Límites actuales
 
-- El primer inicio y el inicio de sesión requieren conexión al VPS. La
-  apertura sin red depende de los recursos que haya guardado el navegador
-  integrado.
-- La captura sin red de registros vinculados a participantes todavía no está
-  habilitada; se debe validar la relación con el servidor antes de guardar.
+- El primer inicio requiere conexión al VPS. Después, la app entra **sin
+  red con un PIN** y captura con el paquete descargado en *Llenar
+  formularios* (ver `docs/130`, sección "Escritorio sin conexión").
+- Registrar participantes nuevos, la verificación de huella y `pulldata`
+  en línea siguen necesitando conexión.
 - Los servicios de correo, mensajería y otras integraciones externas dependen
   de las credenciales y la configuración del VPS.
 - El instalador no incluye actualizaciones automáticas. Para una nueva versión

@@ -149,7 +149,7 @@ def test_rejecting_record_records_failure_without_breaking_the_review_action():
             response = client.post(
                 "/api/v1/review/actions",
                 headers=headers,
-                json={"project_id": "wa-project", "record_id": "wa-record-2", "to_status": "rejected", "action": "reject"},
+                json={"project_id": "wa-project", "record_id": "wa-record-2", "to_status": "rejected", "action": "reject", "notes": "Falta informacion"},
             )
             assert response.status_code == 200, response.text
 
@@ -173,7 +173,7 @@ def test_rejecting_record_without_waha_configured_is_recorded_as_skipped():
             response = client.post(
                 "/api/v1/review/actions",
                 headers=headers,
-                json={"project_id": "wa-project", "record_id": "wa-record-3", "to_status": "rejected", "action": "reject"},
+                json={"project_id": "wa-project", "record_id": "wa-record-3", "to_status": "rejected", "action": "reject", "notes": "Falta informacion"},
             )
             assert response.status_code == 200, response.text
 
@@ -217,7 +217,7 @@ def test_rejecting_record_without_owner_phone_does_not_attempt_send():
             response = client.post(
                 "/api/v1/review/actions",
                 headers=headers,
-                json={"project_id": "wa-project", "record_id": "wa-record-5", "to_status": "rejected", "action": "reject"},
+                json={"project_id": "wa-project", "record_id": "wa-record-5", "to_status": "rejected", "action": "reject", "notes": "Falta informacion"},
             )
             assert response.status_code == 200, response.text
 
@@ -238,7 +238,7 @@ def test_list_notifications_requires_project_permission():
             client.post(
                 "/api/v1/review/actions",
                 headers=headers,
-                json={"project_id": "wa-project", "record_id": "wa-record-6", "to_status": "rejected", "action": "reject"},
+                json={"project_id": "wa-project", "record_id": "wa-record-6", "to_status": "rejected", "action": "reject", "notes": "Falta informacion"},
             )
 
             response = client.get("/api/v1/whatsapp/notifications/project/wa-project", headers=headers)

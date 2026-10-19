@@ -57,7 +57,7 @@ export function RuntimeApp() {
   const existingAssignment = matchingAssignments.length === 1 && (matchingAssignments[0].record_id || ['completed', 'closed'].includes(matchingAssignments[0].status)) ? matchingAssignments[0] : null;
   const selectedParticipant = !existingAssignment && matchingParticipants.length === 1 ? matchingParticipants[0] : null;
   const participantId = selectedParticipant?.id || '';
-  const { values, setValues, clearDraft, ready: draftReady } = useRuntimeDraft(`${templateId || 'sin-template'}${isPreview ? '-vista-previa' : ''}`, participantId);
+  const { values, setValues, clearDraft, ready: draftReady, storageKey: draftKey } = useRuntimeDraft(`${templateId || 'sin-template'}${isPreview ? '-vista-previa' : ''}`, participantId);
   const { pulls, error: pullError, ready: pullsReady } = usePullData(template, values);
 
   useEffect(() => {
@@ -185,7 +185,7 @@ export function RuntimeApp() {
   return (
     <AppShell title={t('runtime.formViewTitle')}>
       <div className="runtime-themed" style={themeStyle(template.theme_json)}>
-        <RuntimeRenderer template={template} projectId={projectId} values={values} onValueChange={updateValue}
+        <RuntimeRenderer template={template} projectId={projectId} values={values} onValueChange={updateValue} positionKey={isPreview ? undefined : draftKey}
           showQuestions={isPreview || Boolean(selectedParticipant && assignmentReady)}
           participantSection={!isPreview && <section className="runtime-participant-picker" aria-label={t('runtime.identifyParticipant')}>
             <h2>{t('runtime.identifyParticipant')}</h2>

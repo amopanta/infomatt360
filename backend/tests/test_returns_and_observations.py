@@ -219,3 +219,57 @@ def test_bulk_return_1000_rows_with_partial_errors_retries_without_duplicates():
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
+
+
+def test_large_form_350_questions_with_pages_repeat_and_conditionals_captures_and_returns():
+    """docs/141 §11: formulario de 350+ preguntas con páginas configuradas por el constructor."""
+    import io
+    from openpyxl import Workbook
+    from app.models.builder import BuilderComponent
+    from app.models.builder_layout import BuilderPage, BuilderSection
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            coord = auth(client, "assign-admin@example.com", "Admin12345!")
+            juan = auth(client, "assign-owner@example.com", "Owner12345!")
+            wb = Workbook(); ws = wb.active; ws.title = "survey"
+            ws.append(["type", "name", "label", "required", "relevant"])
+            for page in range(10):  # 10 páginas diseñadas, nunca por cantidad fija
+                ws.append(["begin_group", f"pagina_{page}", f"Página {page + 1}", "", ""])
+                for q in range(34):
+                    relevant = f"${{p{page}_q0}} = 'si'" if q == 33 else ""
+                    ws.append(["text", f"p{page}_q{q}", f"Pregunta {page}.{q}", "", relevant])
+                ws.append(["end_group", "", "", "", ""])
+            ws.append(["begin_repeat", "integrantes", "Integrantes del hogar", "", ""])
+            for q in range(15):
+                ws.append(["text", f"int_q{q}", f"Integrante {q}", "", ""])
+            ws.append(["end_repeat", "", "", "", ""])
+            buf = io.BytesIO(); wb.save(buf)
+            imported = client.post("/api/v1/xlsform/import", headers=coord, data={"project_id": PROJECT},
+                                   files={"upload": ("grande.xlsx", buf.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+            assert imported.status_code == 200, imported.text
+            template_id = imported.json()["template_id"]
+            assert imported.json()["imported_fields"] == 341  # 340 preguntas + el grupo REPEAT
+            with sessions() as db:
+                db.get(BuilderTemplate, template_id).status = "published"
+                db.commit()
+                assert db.query(BuilderComponent).filter_by(template_id=template_id).count() >= 341
+            runtime = client.get(f"/api/v1/runtime/template/{template_id}", headers=juan).json()
+            total = sum(len(col["components"]) for page in runtime["pages"] for sec in page["sections"] for row in sec["rows"] for col in row["columns"])
+            repeat = next(c for page in runtime["pages"] for sec in page["sections"] for row in sec["rows"] for col in row["columns"] for c in col["components"] if c["type"] == "REPEAT")
+            assert total - 1 + len(json.loads(repeat["config_json"])["fields"]) == 355  # 355 preguntas en total
+            assert len(runtime["pages"]) >= 1 and sum(len(page["sections"]) for page in runtime["pages"]) >= 10  # secciones del diseño
+            values = [{"field_name": f"p{p}_q{q}", "field_value_json": json.dumps("si" if q == 0 else f"v{p}.{q}")} for p in range(10) for q in range(34)]
+            values.append({"field_name": "integrantes", "field_value_json": json.dumps(
+                [{"id": f"integrantes_{i + 1}", "index": i, "values": {f"int_q{q}": f"i{i}.{q}" for q in range(15)}} for i in range(4)])})
+            saved = client.post("/api/v1/runtime/save", headers=juan, json={"project_id": PROJECT, "template_id": template_id, "values": values})
+            assert saved.status_code == 200, saved.text
+            record_id = saved.json()["id"]
+            back = client.post(f"/api/v1/review/records/{record_id}/return", headers=coord, json={
+                "notes": "Revisar integrante 3", "observations": [{"field_name": "int_q7", "repeat_path": "integrantes[2].int_q7", "reason": "Dato incompleto"}]})
+            assert back.status_code == 200, back.text
+            clean = client.get(f"/api/v1/runtime/template/{template_id}/records/clean-export.csv", headers=coord, params={"status": "todos"}).content.decode("utf-8-sig")
+            assert clean.count(record_id) == 1 and "Dato incompleto" not in clean
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)

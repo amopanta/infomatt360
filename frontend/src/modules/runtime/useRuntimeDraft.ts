@@ -33,8 +33,9 @@ export function useRuntimeDraft(templateId: string, participantId = '') {
 
   function clearDraft() {
     localStorage.removeItem(storageKey);
+    localStorage.removeItem(`${storageKey}_page`);
     setValues({});
   }
 
-  return { values, setValues, clearDraft, ready: activeKey === storageKey };
+  return { values, setValues, clearDraft, ready: activeKey === storageKey, storageKey };
 }

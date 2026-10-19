@@ -66,6 +66,7 @@ def record_to_read(db: Session, row: RuntimeRecord) -> RuntimeRecordRead:
         approval_flow_version=row.approval_flow_version,
         status=row.status,
         submitted_by=row.submitted_by,
+        correction_user_id=(row.correction_user_id or row.submitted_by) if row.status in {"returned", "corrected"} else None,
         device_id=row.device_id,
         ip_address=row.ip_address,
         parent_record_id=row.parent_record_id,

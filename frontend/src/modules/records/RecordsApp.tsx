@@ -3,6 +3,9 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { AppShell } from '../../components/AppShell';
 import { useI18n } from '../../i18n';
 import { PROJECT_KEY, currentProjectPermissions, hasAnyCurrentProjectPermission } from '../auth/session';
+import { ObservationsPanel } from './ObservationsPanel';
+import { BulkReturnsPanel } from './BulkReturnsPanel';
+import { currentUserId, downloadCleanAnswers, downloadObservations } from './feedbackApi';
 import { applyReviewAction, correctRecordField, downloadRecord, downloadTemplateRecords, duplicateRecord, fetchProjectTemplates, fetchRecord, fetchRecordNeighbors, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, reopenApprovedRecord, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
 import { fetchActaTemplates, printActaBatch, printActaFromRecord, renderActaBatch, renderActaFromRecord, renderDefaultRecordActa } from '../acta/api';
@@ -345,7 +348,8 @@ function ReviewPanel({
 function CorrectionSubmitPanel({ projectId, record, onRecordUpdated, onMessage }: { projectId: string; record: RuntimeRecord; onRecordUpdated: (record: RuntimeRecord) => void; onMessage: (value: string) => void }) {
   const { t } = useI18n();
   const canWrite = hasAnyCurrentProjectPermission(['records.write']);
-  if (!canWrite || !['returned', 'corrected'].includes(record.status)) return null;
+  // docs/141: solo quien debe corregir (autor o destinatario designado) reenvía
+  if (!canWrite || !['returned', 'corrected'].includes(record.status) || record.correction_user_id !== currentUserId()) return null;
   const toStatus = record.status === 'returned' ? 'corrected' : 'submitted';
   const label = record.status === 'returned' ? t('recordsView.finishedCorrection') : t('recordsView.resendForApproval');
   async function submit() {
@@ -426,7 +430,9 @@ function CorrectableField({
     } catch { return ''; }
   });
   const [saving, setSaving] = useState(false);
-  const canEditHere = ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && hasAnyCurrentProjectPermission(['records.write']);
+  // docs/141: enviado y aprobado son de solo lectura; un devuelto lo edita solo su destinatario
+  const canEditHere = ['draft', 'returned', 'corrected'].includes(record.status) && hasAnyCurrentProjectPermission(['records.write'])
+    && (record.status === 'draft' || record.correction_user_id === currentUserId());
 
   function startEditing() {
     let parsed: unknown = null;
@@ -691,6 +697,7 @@ function DeepLinkedRecordCard({
         {visibleValues.map((value) => (
           <div
             key={value.id}
+            id={`field-${value.field_name}`}
             ref={(node) => { fieldRefs.current[value.field_name] = node; }}
             className={value.field_name === highlightField ? 'record-field-highlighted' : undefined}
           >
@@ -702,6 +709,7 @@ function DeepLinkedRecordCard({
       {!visibleValues.length && <p>{t('recordsView.noQuestionsFound')}</p>}
       <LinkedSubformSection projectId={projectId} record={record} onMessage={onMessage} />
       <CorrectionSubmitPanel projectId={projectId} record={record} onMessage={onMessage} onRecordUpdated={onRecordUpdated} />
+      <ObservationsPanel projectId={projectId} record={record} onMessage={onMessage} onChanged={() => void fetchRecord(record.id).then(onRecordUpdated)} />
       <ReviewPanel projectId={projectId} record={record} onMessage={onMessage} onRecordUpdated={onRecordUpdated} />
       <GenerateActaPanel projectId={projectId} record={record} onMessage={onMessage} />
     </section>
@@ -836,6 +844,10 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
   const pageIds = useMemo(() => records.map((record) => record.id), [records]);
   const pageFullySelected = isPageFullySelected(selectedIds, pageIds);
 
+  const [exportFrom, setExportFrom] = useState('');
+  const [exportTo, setExportTo] = useState('');
+  const [exportAllStatuses, setExportAllStatuses] = useState(false);
+
   async function exportCsv() {
     try {
       await downloadTemplateRecords(templateId, { search: query.trim(), status });
@@ -893,6 +905,18 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
             <button onClick={() => void exportCsv()}>{t('recordsView.exportCsv')}</button>
           </div>
         </div>
+        <details className="records-clean-exports">
+          <summary>{t('feedback.exportsTitle')}</summary>
+          <div className="participants-group-toolbar">
+            <label>{t('feedback.exportFrom')}<input type="date" value={exportFrom} onChange={(event) => setExportFrom(event.target.value)} /></label>
+            <label>{t('feedback.exportTo')}<input type="date" value={exportTo} onChange={(event) => setExportTo(event.target.value)} /></label>
+            <label><input type="checkbox" checked={exportAllStatuses} onChange={(event) => setExportAllStatuses(event.target.checked)} /> {t('feedback.exportAllStatuses')}</label>
+            <button type="button" onClick={() => void downloadCleanAnswers(templateId, { status: exportAllStatuses ? 'todos' : 'approved', dateFrom: exportFrom, dateTo: exportTo }).catch((error: Error) => setMessage(error.message))}>{t('feedback.exportClean')}</button>
+            <button type="button" onClick={() => void downloadObservations(templateId).catch((error: Error) => setMessage(error.message))}>{t('feedback.exportObservations')}</button>
+          </div>
+          <p className="devices-note">{t('feedback.exportsHint')}</p>
+        </details>
+        {hasAnyCurrentProjectPermission(['records.review', 'records.approve']) && <details><summary>{t('feedback.bulkTitle')}</summary><BulkReturnsPanel projectId={projectId} /></details>}
         <div className="records-pagination" aria-live="polite">
           <span>{t('recordsView.paginationRange', { start: pageStart, end: pageEnd, total })}</span>
           <button className="secondary" disabled={total === 0 || selectAllMatchingFilter} onClick={activateSelectAllMatchingFilter}>

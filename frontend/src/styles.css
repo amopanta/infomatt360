@@ -1521,3 +1521,15 @@ svg.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor
 .devices-map { height: 440px; border-radius: 10px; border: 1px solid #d8e1eb; }
 .device-card button.danger { border-color: #dc2626; color: #b91c1c; background: #fff; }
 .device-card button.danger:hover { background: #fef2f2; }
+.feedback-panel .feedback-recipient { font-weight: 600; color: #0f766e; }
+.feedback-list { padding-left: 20px; display: grid; gap: 8px; }
+.feedback-item { border: 1px solid #d8e1eb; border-left: 5px solid #f59e0b; border-radius: 8px; padding: 10px 12px; background: #fff; }
+.feedback-item.status-corrected { border-left-color: #2563eb; }
+.feedback-item.status-verified { border-left-color: #16a34a; }
+.feedback-item.status-rejected { border-left-color: #dc2626; }
+.feedback-item > div:first-child { display: flex; justify-content: space-between; gap: 8px; }
+.feedback-status { font-size: .78rem; font-weight: 700; color: #586b82; }
+.feedback-form { display: grid; gap: 8px; margin-top: 12px; }
+.feedback-draft { display: grid; grid-template-columns: minmax(160px, 1fr) 2fr 1.5fr auto; gap: 6px; }
+@media (max-width: 760px) { .feedback-draft { grid-template-columns: 1fr; } }
+.records-clean-exports { margin: 8px 0; }

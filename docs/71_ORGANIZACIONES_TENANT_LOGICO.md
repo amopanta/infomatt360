@@ -34,6 +34,10 @@ payload: tokens emitidos antes de este cambio siguen siendo validos.
 | `PUT` | `/api/v1/organizations/{id}/branding` | `organizations.branding.manage` u `organizations.manage` |
 | `GET` | `/api/v1/organizations/{id}/branding` | `organizations.branding.manage` u `organizations.manage` |
 
+`organizations.branding.manage` debe tenerse en un proyecto de **esa**
+organizacion (`require_branding_access`, H11); `organizations.manage` es de
+plataforma y alcanza a todas.
+
 ## Limites conocidos
 
 - No hay pantalla de administracion de organizaciones en el frontend todavia

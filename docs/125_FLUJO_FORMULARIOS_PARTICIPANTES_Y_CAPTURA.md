@@ -28,6 +28,8 @@ Un formulario importado antes de esa corrección conserva su versión anterior. 
 
 ## Captura sin conexión: límite vigente
 
+**App móvil oficial (Expo):** después de la primera descarga con conexión, la tablet guarda formularios, participantes, asignaciones y respuestas previas en su base local y permite **iniciar capturas nuevas sin red**, guardar borradores y corregir registros devueltos; todo se envía al reconectar, con idempotencia por `client_ref` (docs/140 H01–H03, [docs/142](142_VALIDACION_FUNCIONALIDADES_DOCS141.md)). Lo que sigue aplica a la web y al escritorio.
+
 La carga inicial de formularios, participantes y asignaciones requiere conexión. Si un formulario asignado ya está abierto y habilitado, una pérdida posterior de red puede dejar la respuesta pendiente en la cola local para sincronizarla al volver la conexión; debe verificarse en campo que el servidor la recibe una sola vez y con el participante correcto. Esto no equivale a iniciar una captura nueva sin red. El primer inicio de sesión de la aplicación de escritorio también requiere conexión. Véanse `desktop/README.md`, `docs/106`–`107` y [docs/130](130_SINCRONIZACION_ENTRE_INTERFACES.md) para el alcance de la cola local.
 
 ## Verificación y trazabilidad

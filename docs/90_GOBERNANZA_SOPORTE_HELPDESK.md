@@ -244,7 +244,7 @@ sin sesion.
 
 Se verifico que ni el instalador de primer arranque
 (`backend/app/services/installation_service.py`,
-[docs/72_SETUP_WIZARD_INSTALADOR.md](72_SETUP_WIZARD_INSTALADOR.md)) ni
+[docs/73_INSTALADOR_SETUP_WIZARD.md](73_INSTALADOR_SETUP_WIZARD.md)) ni
 ningun otro flujo del backend dependen de que estas rutas sean publicas
 (`identity_service.create_user` se invoca directamente desde el codigo de
 carga masiva Excel, no via HTTP). Se agrego `Depends(get_current_user)` +

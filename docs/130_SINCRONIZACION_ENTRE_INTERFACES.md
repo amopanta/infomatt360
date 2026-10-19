@@ -1,5 +1,7 @@
 # Sincronización entre navegador, escritorio y servidor
 
+> La app móvil oficial tiene su propio modelo sin conexión (captura nueva sin red, correcciones diferenciales): ver el repositorio `infomatt360-mobile` (`docs/ARQUITECTURA.md`) y [docs/142](142_VALIDACION_FUNCIONALIDADES_DOCS141.md). Este documento cubre web y escritorio.
+
 ## Flujo de captura
 
 Una respuesta se valida y se envía con el identificador del participante. Si falla el transporte, la aplicación conserva la respuesta en la cola local del navegador (IndexedDB) o del escritorio (SQLite). El usuario ve un mensaje de guardado local. Un error HTTP de validación o permisos se muestra para corregirse y no entra en la cola.
@@ -12,4 +14,4 @@ La sincronización automática reintenta con espera progresiva mientras haya con
 
 Las pruebas automáticas cubren el envío del participante y respuestas parciales en navegador y escritorio, además de los casos previos de red, error HTTP, lotes y persistencia. La compilación del frontend confirma que el formulario usa la misma cola. Para una prueba de campo, abrir un formulario asignado con conexión, desconectar la red, guardar una respuesta, comprobar el contador pendiente, reconectar y verificar el registro y su participante en el servidor.
 
-La carga inicial de formularios, participantes y grupos Pull todavía requiere conexión. La cola protege respuestas de formularios ya abiertos y habilitados que pierden la conexión durante el diligenciamiento. No debe interpretarse como disponibilidad completa de todos los formularios desde un arranque sin red.
+En web y escritorio, la carga inicial de formularios, participantes y grupos Pull todavía requiere conexión. La cola protege respuestas de formularios ya abiertos y habilitados que pierden la conexión durante el diligenciamiento. No debe interpretarse como disponibilidad completa de todos los formularios desde un arranque sin red.

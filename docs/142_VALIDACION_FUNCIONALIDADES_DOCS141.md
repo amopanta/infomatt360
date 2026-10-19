@@ -43,3 +43,20 @@ nuevas (observaciones), entre proyectos y por territorio, y siguen limpios.
 - La UAT con usuarios reales y un formulario de 350+ preguntas en una tablet física, para medir rendimiento en un equipo real.
 - El ícono del menú lateral para la devolución masiva: hoy está dentro de la lista de registros de cada formulario.
 - Las devoluciones de los registros de la tabla `records` heredada: las observaciones estructuradas aplican a `runtime_records`.
+
+## Revisión de la documentación (2026-10-18)
+
+Se revisó `docs/` contra el código y se dejó una versión oficial (índice en el `README.md`):
+
+- **Retirados** (siguen en el historial de git):
+  - `17_BACKEND_BASE_ESPEJO`: lo reemplaza [102](102_BASE_ESPEJO_REAL.md).
+  - `40_ENTREGA_MVP_REVISION` y `43_NOTAS_VERSION_MVP`: estado del MVP ya superado.
+  - `BITACORA_ESTADO_2026-10-17`: lo reemplazan 140, 141 y este documento.
+  - `135_ALMACENAMIENTO_GOOGLE_DRIVE`: se fusionó en [79](79_CONECTOR_GOOGLE_DRIVE.md).
+- **Renumerado:** `135_BRECHAS_COMMCARE…` pasó a [143](143_BRECHAS_COMMCARE_INTEGRACION_INCREMENTAL.md), con los estados al día; el número 135 estaba repetido.
+- **Corregidos:**
+  - 60, 71, 72 y 122: la marca de una organización solo la edita quien tiene el permiso en esa organización (H11), y `organizations.manage` es de plataforma. También se documentó la regla de asignación de roles administrativos.
+  - 125 y 130: la app móvil sí inicia capturas nuevas sin red; el límite de "carga inicial con conexión" aplica a la web y al escritorio.
+  - 00: el estado del documento.
+  - 90: un enlace roto.
+- **App móvil** (`infomatt360-mobile`): `README.md`, `docs/ARQUITECTURA.md` y `AGENTS.md` describen ahora la base por usuario, las correcciones, el monitoreo, las tablas reales y React Navigation.

@@ -1,4 +1,6 @@
-# Integración incremental de capacidades comparadas con CommCare
+# 143. Integración incremental de capacidades comparadas con CommCare
+
+Actualizado: 2026-10-18. Complementa a [124](124_COMPARACION_COMMCARE_Y_SEGUIMIENTO.md).
 
 Este trabajo amplía los módulos existentes de InfoMatt360. No crea un segundo servicio de casos, participantes, mensajería ni exportaciones, y no retira rutas actuales.
 
@@ -9,11 +11,11 @@ Este trabajo amplía los módulos existentes de InfoMatt360. No crea un segundo 
 | Casos tipados y relación padre/hijo | `ParticipantCase`, `/cases` | Primer incremento implementado; falta editor visual de vínculos entre participantes. |
 | Exportación consolidada de casos | `SavedExport`, `run_saved_export`, `worker-scheduler` | Primer incremento implementado en CSV, con filtro territorial y frecuencia existente. |
 | Actualización de casos desde formularios | `runtime_record_service.save_record` + `BuilderTemplate` | Pendiente: contrato de mapeo explícito por plantilla, idempotencia y auditoría antes de activar. |
-| Casos sin conexión | Cola local y sincronización por lotes de Runtime | Pendiente: snapshot de propiedades, versión por caso, resolución de conflictos y pruebas en dos dispositivos. |
+| Casos sin conexión | Cola local y sincronización por lotes de Runtime | En curso (H08–H10): la app móvil tiene la base local (`src/cases/caseStore.ts`), aún sin conectar. Falta en el servidor versión por caso, `client_ref`, `occurred_at` y paquete offline; luego conflictos y pruebas en dos dispositivos. |
 | Compartir casos entre equipos | `GestorTeam`, asignaciones de participantes y permisos | Pendiente: reglas de visibilidad y transferencia que no amplíen el acceso territorial. |
 | SMS, IVR y encuestas bidireccionales | `message_service`, conectores y scheduler | Pendiente: proveedor, consentimiento, costos y recepción verificable; no se simula con WhatsApp. |
 | Detección configurable de casos duplicados | Detección de participante/documento y `duplicate_flag` | Pendiente: reglas por tipo/propiedades, revisión humana y prohibición de fusionar automáticamente. |
-| Jerarquía territorial configurable | `UserTerritory` y filtros de permisos | Pendiente: árbol por proyecto y auditoría de todas las rutas de lectura/exportación. |
+| Jerarquía territorial configurable | `UserTerritory` y filtros de permisos | Auditoría hecha (H11): barrido territorial automático de las rutas de lectura y exportación (`test_territorial_access_scan.py`, docs/140 §10). Pendiente: árbol configurable por proyecto. |
 | Edición/importación masiva de casos | Carga Excel y motor de casos | Pendiente: vista previa, versión esperada, validación por fila y registro de cambios. |
 | Alertas condicionales por propiedades | `ScheduledTask` y canales existentes | Pendiente: predicados configurables, control de repeticiones y destinatarios. |
 
@@ -29,4 +31,4 @@ Este trabajo amplía los módulos existentes de InfoMatt360. No crea un segundo 
 
 Las pruebas de `test_case_management.py` cubren la creación y lectura de casos hijos, el filtro territorial y la exportación de casos con el programador existente. La migración `0080_case_relations_and_exports` debe aplicarse antes de arrancar una imagen que use las nuevas columnas.
 
-El primer incremento no constituye equivalencia con CommCare. En particular, la cola sin conexión actual guarda formularios, no cambios de casos. No debe anunciarse sincronización longitudinal de casos hasta disponer de pruebas reales de desconexión y conflictos.
+El primer incremento no constituye equivalencia con CommCare. En particular, la cola sin conexión guarda formularios y correcciones de registros devueltos (docs/142), no cambios de casos. No debe anunciarse sincronización longitudinal de casos hasta disponer de pruebas reales de desconexión y conflictos.

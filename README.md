@@ -6,8 +6,10 @@ mensajeria, API keys, sincronizacion masiva y seguridad de usuarios.
 
 ## Estado actual
 
-MVP funcional reforzado, con backend, frontend, datos demo, pruebas
-automatizadas, smoke full-stack y paquete ZIP de entrega.
+Plataforma en operación con backend, web/PWA, escritorio y app móvil oficial
+(Expo), captura en línea y sin conexión, devoluciones y correcciones
+diferenciales, pruebas automatizadas y despliegue de referencia. La
+documentación vigente se resume en [Documentación oficial](#documentación-oficial).
 
 Incluye:
 
@@ -32,6 +34,22 @@ Incluye:
 - El antiguo módulo `mobile/` (Express + SQLite propia + Capacitor) y sus instaladores `install.sh` / `deploy-mobile.sh` se retiraron: no compartían datos con la plataforma.
 
 El menú está organizado por tareas: **Inicio · Formularios · Datos · Revisión y reportes · Configuración · Avanzado**. Cada opción se muestra según los permisos del usuario. Detalle en `docs/140_REESTRUCTURACION_UX_Y_CLIENTE_MOVIL_UNICO.md`.
+## Documentación oficial
+
+La carpeta `docs/` es la fuente oficial (revisada el 2026-10-18; los
+documentos retirados o duplicados siguen en el historial de git).
+
+- **Visión y requisitos:** [docs/00](docs/00_DOCUMENTO_MAESTRO_INFOMATT360.md).
+- **Estado y plan vigente:** [docs/140](docs/140_REESTRUCTURACION_UX_Y_CLIENTE_MOVIL_UNICO.md) (UX, cliente móvil único, plan H01–H19 y barridos de seguridad).
+- **Funcionalidades acordadas:** [docs/141](docs/141_FUNCIONALIDADES_ADICIONADAS_Y_PLAN_DE_IMPLEMENTACION.md) (versión oficial del documento Word) y su validación en [docs/142](docs/142_VALIDACION_FUNCIONALIDADES_DOCS141.md).
+- **Comparación con CommCare:** [docs/124](docs/124_COMPARACION_COMMCARE_Y_SEGUIMIENTO.md) y brechas en [docs/143](docs/143_BRECHAS_COMMCARE_INTEGRACION_INCREMENTAL.md).
+- **Permisos:** [docs/60](docs/60_CATALOGO_PERMISOS.md).
+- **App móvil:** `README.md` y `docs/ARQUITECTURA.md` del repositorio `infomatt360-mobile`.
+
+Los documentos numerados describen cada módulo cuando se construyó; si alguno
+contradice a 140–142, prevalecen estos. Los informes con fecha (por ejemplo
+129, 131 y 132) son evidencia de ese momento.
+
 ## Arranque rapido en Windows
 
 Desde la raiz del proyecto:

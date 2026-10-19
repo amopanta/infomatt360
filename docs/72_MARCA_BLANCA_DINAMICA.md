@@ -19,8 +19,8 @@ files); branding no gestiona su propio almacenamiento de imagenes.
 | Metodo | Ruta | Auth | Uso |
 | --- | --- | --- | --- |
 | `GET` | `/api/v1/public/branding?slug=...` | Ninguna | Precarga antes de iniciar sesion (web y PWA) |
-| `PUT` | `/api/v1/organizations/{id}/branding` | `organizations.branding.manage` | Configurar marca |
-| `GET` | `/api/v1/organizations/{id}/branding` | `organizations.branding.manage` | Consultar configuracion actual |
+| `PUT` | `/api/v1/organizations/{id}/branding` | `organizations.branding.manage` en esa organizacion, u `organizations.manage` | Configurar marca |
+| `GET` | `/api/v1/organizations/{id}/branding` | `organizations.branding.manage` en esa organizacion, u `organizations.manage` | Consultar configuracion actual |
 
 ## Frontend
 

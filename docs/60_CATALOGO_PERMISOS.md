@@ -32,8 +32,8 @@ o permisos escritos de forma diferente.
 | `messages.read` | Leer mensajes/notificaciones del proyecto. |
 | `messages.write` | Crear mensajes/notificaciones del proyecto. |
 | `integrations.api_keys.manage` | Crear, revocar y administrar API keys de integracion. |
-| `organizations.manage` | Crear y listar organizaciones (tenants logicos) y asociarlas a proyectos. |
-| `organizations.branding.manage` | Configurar marca blanca (logo, colores, eslogan) de una organizacion. |
+| `organizations.manage` | Permiso **de plataforma**: crear y listar todas las organizaciones (tenants logicos), asociarlas a proyectos y gestionar la marca de cualquiera. |
+| `organizations.branding.manage` | Configurar marca blanca (logo, colores, eslogan) de una organizacion. Solo vale en la organizacion de los proyectos donde se tiene (H11); antes bastaba tenerlo en cualquier proyecto. |
 | `backups.manage` | Ejecutar y consultar respaldos de base de datos desde la web. |
 | `erp.manage` | Administrar inventario, configuracion ERP por plantilla y honorarios del motor contable headless. |
 | `integrations.donor_sync.manage` | Configurar fuentes externas (ActivityInfo/TolaData u otras), mapeos de campos y consultar el historial de envios. |
@@ -49,6 +49,17 @@ o permisos escritos de forma diferente.
 | --- | --- | --- |
 | `BULK_ADMIN_PERMISSIONS` | `integrations.api_keys.manage`, `records.write` | Panel admin para seguimiento de lotes bulk. |
 | `METRICS_VIEW_PERMISSIONS` | `identity.users.manage`, `integrations.api_keys.manage`, `records.approve`, `records.write` | Endpoint y panel de metricas operativas. |
+
+## Regla de asignacion de roles
+
+Un encargado de usuarios (`identity.users.manage`) puede asignar roles de
+captura y revision a su equipo, pero no un rol que incluya permisos
+administrativos (`organizations.*`, `backups.manage`, `mirror.manage`,
+`storage.manage`, `erp.manage`, `ai.audit.manage`, `integrations.api_keys.manage`,
+`integrations.donor_sync.manage`, `support.tickets.manage`) que el mismo no
+tenga en ese proyecto (`ADMIN_PERMISSIONS` en
+`backend/app/api/v1/assignments.py`). `organizations.manage` no tiene esa
+restriccion.
 
 ## Permisos historicos
 

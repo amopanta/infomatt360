@@ -1,7 +1,7 @@
 # 142. Validación e implementación de las funcionalidades de docs/141
 
 Fecha: 2026-10-18. Rama: `feature/hybrid-offline-capture-20261017`.
-Fuente: `INFO_MATT_360_Funcionalidades_Adicionadas_y_Plan_de_Implementacion.docx`, docs/140_DEVOLUCIONES… y docs/141.
+Fuente oficial: [docs/141](141_FUNCIONALIDADES_ADICIONADAS_Y_PLAN_DE_IMPLEMENTACION.md), tomado de `INFO_MATT_360_Funcionalidades_Adicionadas_y_Plan_de_Implementacion.docx`.
 
 ## Matriz: qué había y qué se construyó
 

@@ -112,7 +112,7 @@ export async function fetchParticipantActivities(participantId: string): Promise
   return response.json();
 }
 
-export type ParticipantCase = { id: string; title: string; status: string; assigned_user_id?: string | null; due_at?: string | null; created_at: string; properties: Record<string, unknown> };
+export type ParticipantCase = { id: string; title: string; case_type: string; parent_case_id?: string | null; status: string; assigned_user_id?: string | null; due_at?: string | null; created_at: string; properties: Record<string, unknown> };
 export type ScheduledCase = ParticipantCase & { participant_id: string; participant_name: string };
 export type CaseEvent = { id: string; event_type: string; note?: string | null; from_user_id: string; to_user_id?: string | null; created_at: string };
 export type CaseAssignee = { id: string; full_name: string };
@@ -128,7 +128,7 @@ export const fetchParticipantCases = (id: string) => jsonRequest<ParticipantCase
 export const fetchProjectSchedule = (projectId: string) => jsonRequest<ScheduledCase[]>(`/cases/project/${projectId}/schedule`);
 export const fetchCaseEvents = (id: string) => jsonRequest<CaseEvent[]>(`/cases/${id}/events`);
 export const fetchCaseAssignees = (projectId: string) => jsonRequest<CaseAssignee[]>(`/cases/project/${projectId}/assignees`);
-export const createParticipantCase = (data: { participant_id: string; title: string; assigned_user_id?: string | null; due_at?: string | null; reminder_channels?: string[] }) => jsonRequest<ParticipantCase>('/cases/', { method: 'POST', body: JSON.stringify(data) });
+export const createParticipantCase = (data: { participant_id: string; title: string; case_type?: string; parent_case_id?: string | null; assigned_user_id?: string | null; due_at?: string | null; reminder_channels?: string[] }) => jsonRequest<ParticipantCase>('/cases/', { method: 'POST', body: JSON.stringify(data) });
 export const updateParticipantCase = (id: string, data: { status?: string; assigned_user_id?: string | null; due_at?: string | null; note?: string }) => jsonRequest<ParticipantCase>(`/cases/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 export const fetchTerritories = (projectId: string) => jsonRequest<UserTerritory[]>(`/territories/${projectId}`);
 export const assignTerritory = (projectId: string, data: { user_id: string; department: string; municipality: string }) => jsonRequest<UserTerritory>(`/territories/${projectId}`, { method: 'POST', body: JSON.stringify(data) });

@@ -2349,6 +2349,10 @@
       "barAria": "Bar chart"
     },
     "exports": {
+      "kindAria": "Export type",
+      "kindForm": "Form responses",
+      "kindCases": "Consolidated cases",
+      "selectForm": "Select form",
       "title": "Saved and scheduled exports",
       "description": "Save a project or form export. Scheduled exports generate a daily or weekly file and notify the recipient.",
       "nameAria": "Export name",

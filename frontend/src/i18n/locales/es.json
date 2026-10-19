@@ -2349,6 +2349,10 @@
       "barAria": "Grafico de barras"
     },
     "exports": {
+      "kindAria": "Tipo de exportación",
+      "kindForm": "Respuestas de un formulario",
+      "kindCases": "Casos consolidados",
+      "selectForm": "Seleccionar formulario",
       "title": "Exportaciones guardadas y programadas",
       "description": "Guarda una exportación del proyecto o de un formulario. Las programadas generan un archivo diario o semanal y avisan al destinatario.",
       "nameAria": "Nombre de la exportación",

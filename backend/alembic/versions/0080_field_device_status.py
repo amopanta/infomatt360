@@ -1,10 +1,13 @@
-"""Field device status (heartbeat) and gestor route points."""
+"""Field device status (heartbeat) and gestor route points.
+
+Va después de 0080_case_relations_and_exports (PR #48): ambas partían de 0079.
+"""
 
 from alembic import op
 import sqlalchemy as sa
 
 revision = "0080_field_device_status"
-down_revision = "0079_device_verification"
+down_revision = "0080_case_relations_and_exports"
 branch_labels = None
 depends_on = None
 

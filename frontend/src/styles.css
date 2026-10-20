@@ -1543,3 +1543,23 @@ svg.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor
 .feedback-draft { display: grid; grid-template-columns: minmax(160px, 1fr) 2fr 1.5fr auto; gap: 6px; }
 @media (max-width: 760px) { .feedback-draft { grid-template-columns: 1fr; } }
 .records-clean-exports { margin: 8px 0; }
+
+/* Planeador mensual (docs/144) */
+.planner-page { display: flex; flex-direction: column; gap: 16px; }
+.planner-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.planner-head h1 { margin: 0; }
+.planner-head p { margin: 4px 0 0; color: var(--text-muted); }
+.planner-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.planner-filters, .planner-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.planner-filters label, .planner-grid label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 700; }
+.planner-grid .planner-wide { grid-column: 1 / -1; }
+.planner-form { display: flex; flex-direction: column; gap: 12px; }
+.planner-form > button { align-self: flex-start; }
+.planner-form p, .planner-hint { margin: 0; color: var(--text-muted); font-size: 13px; }
+.planner-closed { margin: 0; padding: 8px 12px; border-radius: var(--radius-md); background: #e0f2fe; color: #075985; font-weight: 700; }
+.planner-message { margin: 0; }
+.planner-bar { display: inline-block; width: 64px; height: 8px; margin-right: 6px; border-radius: 4px; background: var(--border); vertical-align: middle; overflow: hidden; }
+.planner-bar > span { display: block; height: 100%; background: #0f766e; }
+.planner-bar-mid > span { background: #d97706; }
+.planner-bar-low > span { background: #dc2626; }
+.planner-row-error td { background: #fef2f2; }

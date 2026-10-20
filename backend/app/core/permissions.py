@@ -26,6 +26,8 @@ RECORDS_APPROVE = "records.approve"
 RECORDS_VOID = "records.void"
 
 REPORTS_EXPORT = "reports.export"
+# Planeador mensual (docs/144): metas, población, configuración y cortes.
+PLANNER_MANAGE = "planner.manage"
 GIS_READ = "gis.read"
 BUILDER_WRITE = "builder.write"
 MESSAGES_READ = "messages.read"
@@ -65,6 +67,7 @@ ALL_PERMISSIONS = {
     RECORDS_APPROVE,
     RECORDS_VOID,
     REPORTS_EXPORT,
+    PLANNER_MANAGE,
     GIS_READ,
     BUILDER_WRITE,
     MESSAGES_READ,

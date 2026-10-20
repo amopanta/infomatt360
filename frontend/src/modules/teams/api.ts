@@ -2,7 +2,7 @@ import { authorizationHeader } from '../auth/session';
 
 const API = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
 export type GestorTeam = { id: string; project_id: string; name: string; user_ids: string[]; participant_ids: string[] };
-export type GestorTeamSummary = { id: string; project_id: string; name: string; user_count: number; participant_count: number };
+export type GestorTeamSummary = { id: string; project_id: string; name: string; coordinator_user_id?: string | null; user_count: number; participant_count: number };
 export type TeamSearchResult = { id: string; name: string; identifier: string; selected: boolean };
 export type TeamBulkPreview = { rows: number; teams_to_create: number; new_members: number; already_members: number; issues: string[]; applied: number };
 
@@ -33,4 +33,5 @@ export async function downloadGestorTeamTemplate(projectId: string): Promise<voi
 export const createGestorTeam = (projectId: string, name: string) => request<GestorTeam>(`/project/${projectId}`, { method: 'POST', body: JSON.stringify({ name }) });
 export const renameGestorTeam = (teamId: string, name: string) => request<GestorTeam>(`/${teamId}`, { method: 'PATCH', body: JSON.stringify({ name }) });
 export const saveGestorTeamMembers = (teamId: string, userIds: string[], participantIds: string[]) => request<GestorTeam>(`/${teamId}/members`, { method: 'PUT', body: JSON.stringify({ user_ids: userIds, participant_ids: participantIds }) });
+export const setGestorTeamCoordinator = (teamId: string, coordinatorUserId: string | null) => request<GestorTeam>(`/${teamId}/coordinator`, { method: 'PUT', body: JSON.stringify({ coordinator_user_id: coordinatorUserId }) });
 export const deleteGestorTeam = (teamId: string) => request<{ deleted: boolean }>(`/${teamId}`, { method: 'DELETE' });

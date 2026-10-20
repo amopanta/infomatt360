@@ -63,6 +63,7 @@ const MENU: MenuGroup[] = [
       { labelKey: 'ux.nav.fieldDevices', href: '/field-devices', icon: 'tablet', permissions: ['records.review', 'records.coordinate', 'identity.users.manage'] },
       { labelKey: 'nav.approvalFlows', href: '/admin/approval-flows', icon: 'check', permissions: ['records.approve'] },
       { labelKey: 'nav.messages', href: '/messages', icon: 'msg' },
+      { labelKey: 'ux.nav.planner', href: '/planner', icon: 'metric', permissions: ['planner.manage', 'identity.users.manage', 'records.review', 'records.approve', 'records.coordinate', 'reports.export', 'records.write'] },
       { labelKey: 'nav.reports', href: '/reports', icon: 'report' },
       { labelKey: 'nav.audit', href: '/audit', icon: 'shield' },
       { labelKey: 'nav.metrics', href: '/admin/metrics', icon: 'metric', permissions: ['identity.users.manage', 'integrations.api_keys.manage', 'records.approve', 'records.write'] },

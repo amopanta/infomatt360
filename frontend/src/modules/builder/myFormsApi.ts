@@ -17,6 +17,7 @@ export type MyFormAssignment = {
   municipality?: string | null;
   assignment_status: string;
   record_id: string | null;
+  record_status?: string | null;
 };
 
 export type MyFormSummary = { assignment_count: number; form_count: number; pending: Array<Pick<MyFormAssignment, 'template_id' | 'template_name' | 'participant_id' | 'participant_name' | 'document_id'>> };

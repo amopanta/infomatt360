@@ -170,3 +170,28 @@ def test_bootstrap_creates_optional_mail_storage_and_backup_when_provided():
         install_guard_module.SessionLocal = original_session_local
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
+
+
+def test_requirements_check_database_version_like_moodle():
+    """docs/147: el asistente no deja seguir si la base está en una versión
+    anterior al código e indica el comando de migración."""
+    from sqlalchemy import text
+    engine, sessions = setup_client()
+    try:
+        with sessions() as db:
+            db.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(32) NOT NULL)"))
+            db.execute(text("INSERT INTO alembic_version VALUES ('0085_user_profile_capturer')"))
+            db.commit()
+        with TestClient(app) as client:
+            body = client.get("/api/v1/install/requirements").json()
+            check = {item["key"]: item for item in body["checks"]}["migrations"]
+            assert check["status"] == "error" and "run --rm migrate" in check["detail"]
+            assert body["ready"] is False
+            with sessions() as db:
+                db.execute(text("UPDATE alembic_version SET version_num = '0086_db_sync'"))
+                db.commit()
+            body = client.get("/api/v1/install/requirements").json()
+            assert {item["key"]: item for item in body["checks"]}["migrations"]["status"] == "ok" and body["ready"] is True
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)

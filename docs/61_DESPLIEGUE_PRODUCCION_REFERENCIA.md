@@ -80,10 +80,17 @@ Antes de migrar, tomar backup:
 .\scripts\backup-postgres.cmd -EnvFile .env.production
 ```
 
-```powershell
-cd backend
-.\.venv\Scripts\python.exe -m alembic upgrade head
+En el servidor Linux (docs/147), con el servicio de una sola ejecución que va
+directo a Postgres:
+
+```bash
+docker compose -f docker-compose.production.example.yml --env-file .env.production run --rm migrate
 ```
+
+> **Actualizado 2026-10-19:** para una instalación nueva o una actualización
+> completa usa `scripts/infomatt360-install.sh` o
+> `scripts/infomatt360-upgrade.sh` (copia, migraciones, reinicio y
+> verificación). Ver [docs/147](147_GUIA_INSTALACION_Y_ACTUALIZACION.md).
 
 6. Levantar `postgres`, `redis`, `pgbouncer` y las replicas del backend
    primero (el stack de observabilidad necesita un token que solo se puede

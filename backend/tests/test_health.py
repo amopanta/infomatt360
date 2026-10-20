@@ -207,7 +207,10 @@ def test_security_headers_are_returned_on_api_responses() -> None:
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["x-frame-options"] == "DENY"
     assert response.headers["referrer-policy"] == "no-referrer"
-    assert "geolocation=()" in response.headers["permissions-policy"]
+    assert response.headers["permissions-policy"] == settings.permissions_policy
+    # Por defecto, GPS, cámara y micrófono solo para el propio sitio (docs/147);
+    # un .env local puede sobrescribirlo.
+    assert "geolocation=(self)" in type(settings).model_fields["permissions_policy"].default
     assert "default-src 'self'" in response.headers["content-security-policy"]
 
 

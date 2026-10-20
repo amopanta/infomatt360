@@ -112,7 +112,7 @@ class Settings(BaseSettings):
     security_headers_enabled: bool = True
     content_security_policy: str = "default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'"
     referrer_policy: str = "no-referrer"
-    permissions_policy: str = "geolocation=(), microphone=(), camera=()"
+    permissions_policy: str = "geolocation=(self), microphone=(self), camera=(self)"
     x_frame_options: str = "DENY"
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8-sig", extra="ignore")

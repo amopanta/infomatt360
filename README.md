@@ -46,11 +46,12 @@ documentos retirados o duplicados siguen en el historial de git).
 - **Planeador mensual y validación del diagnóstico del 19-oct:** [docs/144](docs/144_PLANEADOR_MENSUAL_Y_VALIDACION_DIAGNOSTICO.md).
 - **Perfil de usuario y datos de quien captura:** [docs/145](docs/145_PERFIL_DE_USUARIO_Y_CAPTURADOR.md).
 - **Integración con bases externas (proyecto completo, importación, programación):** [docs/146](docs/146_INTEGRACION_CON_BASES_EXTERNAS.md).
+- **Instalación y actualización del servidor:** [docs/147](docs/147_GUIA_INSTALACION_Y_ACTUALIZACION.md).
 - **Permisos:** [docs/60](docs/60_CATALOGO_PERMISOS.md).
 - **App móvil:** `README.md` y `docs/ARQUITECTURA.md` del repositorio `infomatt360-mobile`.
 
 Los documentos numerados describen cada módulo cuando se construyó; si alguno
-contradice a 140–146, prevalecen estos. Los informes con fecha (por ejemplo
+contradice a 140–147, prevalecen estos. Los informes con fecha (por ejemplo
 129, 131 y 132) son evidencia de ese momento.
 
 ## Arranque rapido en Windows
@@ -231,6 +232,8 @@ Los archivos quedan en:
 ```
 
 ## Produccion
+
+Instalación nueva o actualización del servidor: [docs/147](docs/147_GUIA_INSTALACION_Y_ACTUALIZACION.md) (`scripts/infomatt360-install.sh`, `infomatt360-upgrade.sh` y `infomatt360-rollback.sh`; asistente web en `/install`).
 
 Antes de produccion real:
 

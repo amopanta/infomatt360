@@ -16,7 +16,12 @@ Columnas esperadas: `correo`/`email` (obligatorio) y `rol`/`nombre del rol` (obl
 
 A diferencia de `entity_type="users"` (que crea usuarios nuevos), la carga de asignaciones **asume que el usuario y el rol ya existen**: busca el usuario por correo (`identity_service.get_user_by_email`, insensible a mayúsculas) y el rol por nombre (insensible a mayúsculas), y crea la fila `UserProjectAssignment` correspondiente. Si el usuario no existe, la fila falla con `"No existe un usuario con el correo '...'"`; si el rol no existe, falla con `"No existe un rol llamado '...'"` — ambos casos quedan en el reporte de errores del lote sin detener las demás filas, igual que el resto del importador.
 
-**Honestidad:** no hay deduplicación. Si la misma fila se importa dos veces, o el usuario ya tenía una asignación activa en el proyecto, queda una fila `UserProjectAssignment` más — mismo comportamiento que crear una asignación individual hoy (`POST /assignments/` tampoco deduplica). No se resolvió aquí porque es un comportamiento preexistente, no algo que este cambio introduce.
+> **Actualizado 2026-10-19 ([docs/145](145_PERFIL_DE_USUARIO_Y_CAPTURADOR.md)):** el párrafo siguiente ya no aplica.
+> - Una persona que ya tiene acceso al proyecto no recibe una segunda asignación: la fila falla con «ya tiene acceso».
+> - Quien aprueba solo entrega roles cuyos permisos tenga en el proyecto (regla del PR #46).
+> - La carga de usuarios (`users`) ahora también da acceso al proyecto con su rol.
+
+**Honestidad (original):** no hay deduplicación. Si la misma fila se importa dos veces, o el usuario ya tenía una asignación activa en el proyecto, queda una fila `UserProjectAssignment` más — mismo comportamiento que crear una asignación individual hoy (`POST /assignments/` tampoco deduplica). No se resolvió aquí porque es un comportamiento preexistente, no algo que este cambio introduce.
 
 ## Frontend
 

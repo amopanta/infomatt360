@@ -49,8 +49,64 @@ El PR #46 queda incluido aquí y puede cerrarse sin unir.
   anterior (`PATCH /security/admin/projects/{p}/users/{u}/profile`).
 - Los usuarios creados antes de este cambio muestran el aviso «Faltan datos
   obligatorios» hasta que se completen.
-- La importación de usuarios por Excel exige también `cargo`, `departamento`
-  y `municipio`.
+
+## Creación masiva por Excel
+
+**Configuración → Carga masiva Excel**, tipo «Usuarios». La plantilla trae
+estas columnas:
+
+| Columna | Obligatoria | Nota |
+|---|---|---|
+| Documento | Sí | único, mínimo 5 caracteres |
+| Nombre completo | Sí | |
+| Correo | Sí | único; con él se inicia sesión |
+| Teléfono | No | |
+| Cargo | Sí | |
+| Departamento | Sí | |
+| Municipio | Sí | |
+| Rol | Sí | nombre de un rol existente |
+| Limitar acceso | No | `no` para no restringir el acceso a su municipio; vacío o `sí` lo restringe |
+
+Mismo flujo que el resto de cargas: subir → revisar el mapeo de columnas →
+validar → aprobar → reporte de errores por fila. Cada fila:
+- crea la cuenta con su perfil;
+- le da acceso al proyecto con el rol indicado;
+- si no dice `no` en «Limitar acceso», crea su territorio;
+- queda en la auditoría (`project_user_imported`).
+
+Una fila falla, sin detener las demás, si:
+- falta un dato obligatorio;
+- el documento o el correo ya existen;
+- el rol no existe;
+- el rol tiene permisos que quien aprueba no tiene en el proyecto (misma
+  regla que la creación individual, PR #46).
+
+Antes, esta carga creaba solo la persona, sin acceso a ningún proyecto, y
+no aparecía en Usuarios.
+
+**Contraseñas:** cada cuenta nace con una contraseña aleatoria que nadie
+conoce y con cambio obligatorio. Para entregar el acceso se usa, en la
+grilla de usuarios, «Reiniciar contraseña», que muestra una temporal una sola
+vez, o el QR de enrolamiento. El archivo de resultados nunca lleva
+contraseñas.
+
+La carga de **asignaciones** (usuarios que ya existen) aplica la misma regla
+de permisos y no crea una segunda asignación a quien ya tiene acceso
+(actualiza docs/103).
+
+## Grilla de usuarios del proyecto
+
+**Configuración → Usuarios** muestra, debajo de «Crear usuario», la grilla
+**Usuarios creados**:
+- Columnas: nombre, documento, cargo, municipio, correo, rol, acceso y fecha
+  de creación. Los más recientes van primero.
+- **Buscar** por nombre, documento, cargo, municipio, departamento, correo o
+  rol, sin importar tildes ni mayúsculas (por ejemplo, «apartado» encuentra
+  «Apartadó»).
+- **Filtros:** acceso (activos, suspendidos o con datos incompletos) y rol.
+- **Gestionar** abre la ficha de esa persona: datos de la persona, rol y
+  acceso, correo, contraseña, MFA y QR.
+- Los datos que faltan aparecen marcados como «Falta».
 
 ## Datos de quien captura en cada registro
 
@@ -91,9 +147,19 @@ registros quedaron con capturador.
   - el perfil y el territorio se guardan;
   - se puede crear sin limitar el acceso;
   - la corrección del perfil pide la contraseña y queda auditada.
+- `tests/test_excel_import.py`:
+  - la plantilla trae las columnas;
+  - la carga crea perfil, acceso y territorio, o no limita el acceso con
+    «no»;
+  - falla sin cargo, con un rol con más permisos de los que tiene quien
+    aprueba, o con un documento repetido;
+  - la grilla devuelve documento, cargo y fecha;
+  - las asignaciones respetan permisos y no se duplican.
 - `tests/test_capturer_snapshot.py`: el registro guarda el perfil de quien
   captura, no cambia si después cambia el perfil, y sale en el CSV.
 - `tests/test_planner.py`: el Excel del planeador trae documento y cargo.
 - Suite completa del backend: 549 pruebas. Web: 129 pruebas.
-- Navegador, con la base demo: se creó «Laura Prueba Perfil», gestora social
-  de Apartadó, y quedó con su territorio de acceso.
+- Navegador, con la base demo:
+  - se creó «Laura Prueba Perfil», gestora social de Apartadó, y quedó con su
+    territorio de acceso;
+  - en la grilla, buscar «apartado» la encuentra y «Gestionar» abre su ficha.

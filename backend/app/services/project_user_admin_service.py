@@ -35,7 +35,7 @@ def user_to_admin_read(db: Session, user: User, assignment: UserProjectAssignmen
     permissions = (_permissions(role) if role and assignment.status == "active" else set()) | inherited
     return AdminUserRead(
         id=user.id, full_name=user.full_name, document_id=user.document_id, position=user.position,
-        department=user.department, municipality=user.municipality, phone=user.phone, email=user.email, status=user.status,
+        department=user.department, municipality=user.municipality, phone=user.phone, created_at=user.created_at, email=user.email, status=user.status,
         must_change_password=user.must_change_password, mfa_enabled=user.mfa_enabled,
         role_id=assignment.role_id, role_name=role.name if role else None,
         assignment_status=assignment.status, permissions=sorted(permissions),

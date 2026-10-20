@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -22,6 +23,7 @@ class AdminUserRead(BaseModel):
     department: str | None = None
     municipality: str | None = None
     phone: str | None = None
+    created_at: datetime | None = None
     email: EmailStr
     status: str
     must_change_password: bool

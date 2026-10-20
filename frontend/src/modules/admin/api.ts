@@ -1,4 +1,4 @@
-export type AdminUser = { id: string; full_name: string; document_id?: string | null; position?: string | null; department?: string | null; municipality?: string | null; phone?: string | null; email: string; status: string; must_change_password: boolean; mfa_enabled: boolean; role_id?: string | null; role_name?: string | null; assignment_status?: string; permissions?: string[]; inherited_permissions?: string[] };
+export type AdminUser = { id: string; full_name: string; document_id?: string | null; position?: string | null; department?: string | null; municipality?: string | null; phone?: string | null; created_at?: string | null; email: string; status: string; must_change_password: boolean; mfa_enabled: boolean; role_id?: string | null; role_name?: string | null; assignment_status?: string; permissions?: string[]; inherited_permissions?: string[] };
 export type AdminRole = { id: string; name: string; permissions: string[] };
 
 import { jsonAuthHeaders } from '../auth/session';

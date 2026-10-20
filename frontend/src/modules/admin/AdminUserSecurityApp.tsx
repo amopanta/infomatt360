@@ -16,6 +16,19 @@ export function AdminUserSecurityApp() {
   const [roles, setRoles] = useState<AdminRole[]>([]);
   const [grantable, setGrantable] = useState<string[]>([]);
   const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [selectedId, setSelectedId] = useState('');
+  // Grilla de usuarios del proyecto (docs/145): búsqueda por nombre, documento,
+  // cargo, municipio, correo o rol; los más recientes primero.
+  const normalized = (value: string | null | undefined) => (value ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
+  const visibleUsers = users
+    .filter((user) => !statusFilter || (statusFilter === 'incomplete' ? !user.position || !user.municipality : user.assignment_status === statusFilter))
+    .filter((user) => !roleFilter || user.role_id === roleFilter)
+    .filter((user) => !query.trim() || [user.full_name, user.document_id, user.position, user.municipality, user.department, user.email, user.role_name]
+      .some((value) => normalized(value).includes(normalized(query.trim()))))
+    .sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''));
+  const selectedUser = users.find((user) => user.id === selectedId);
 
   useEffect(() => {
     let cancelled = false;
@@ -36,10 +49,25 @@ export function AdminUserSecurityApp() {
       <main className="admin-users">
         <h2>{t('admin.users.projectUsers')}</h2>
         <p>{t('admin.users.sensitiveOpsWarning')}</p>
-        <UserProvisioning projectId={projectId} roles={roles} grantable={grantable} onCreated={(user) => setUsers((rows) => [...rows, user])} onRoleCreated={(role) => setRoles((rows) => [...rows, role])} />
-        <label>Buscar usuario<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre, correo o rol" /></label>
+        <UserProvisioning projectId={projectId} roles={roles} grantable={grantable} onCreated={(user) => { setUsers((rows) => [user, ...rows]); setSelectedId(user.id); }} onRoleCreated={(role) => setRoles((rows) => [...rows, role])} />
+        <section className="admin-users-grid" aria-label="Usuarios creados en el proyecto">
+          <h3>Usuarios creados ({visibleUsers.length} de {users.length})</h3>
+          <div className="admin-users-filters">
+            <label>Buscar usuario<input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Nombre, documento, cargo, municipio, correo o rol" /></label>
+            <label>Acceso<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">Todos</option><option value="active">Activos</option><option value="suspended">Suspendidos</option><option value="incomplete">Con datos incompletos</option></select></label>
+            <label>Rol<select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}><option value="">Todos</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>
+          </div>
+          <div className="records-table-wrap"><table className="records-table"><thead><tr><th>Nombre</th><th>Documento</th><th>Cargo</th><th>Municipio</th><th>Correo</th><th>Rol</th><th>Acceso</th><th>Creado</th><th /></tr></thead>
+            <tbody>{visibleUsers.map((user) => <tr key={user.id} className={user.id === selectedId ? 'is-selected' : ''}>
+              <td>{user.full_name}</td><td>{user.document_id || '—'}</td><td>{user.position || <em>Falta</em>}</td>
+              <td>{user.municipality ? `${user.municipality}${user.department ? `, ${user.department}` : ''}` : <em>Falta</em>}</td>
+              <td>{user.email}</td><td>{user.role_name || '—'}</td><td>{operationalStatusLabel(user.assignment_status)}</td>
+              <td>{user.created_at ? new Date(user.created_at.endsWith('Z') ? user.created_at : `${user.created_at}Z`).toLocaleDateString() : '—'}</td>
+              <td><button type="button" className="secondary" onClick={() => setSelectedId(user.id === selectedId ? '' : user.id)}>{user.id === selectedId ? 'Cerrar' : 'Gestionar'}</button></td></tr>)}
+              {!visibleUsers.length && <tr><td colSpan={9}>No hay usuarios con esos filtros.</td></tr>}</tbody></table></div>
+        </section>
         {message ? <p role="status">{message}</p> : null}
-        {users.filter((user) => [user.full_name, user.email, user.role_name].some((value) => value?.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))).map((user) => (
+        {(selectedUser ? [selectedUser] : []).map((user) => (
           <AdminUserCard
             key={user.id}
             projectId={projectId}

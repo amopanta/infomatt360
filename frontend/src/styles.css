@@ -1570,3 +1570,12 @@ svg.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor
 .planner-bar-mid > span { background: #d97706; }
 .planner-bar-low > span { background: #dc2626; }
 .planner-row-error td { background: #fef2f2; }
+
+/* Grilla de usuarios del proyecto (docs/145) */
+.admin-users-grid { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+.admin-users-grid h3 { margin: 0; }
+.admin-users-filters { display: grid; grid-template-columns: minmax(220px, 2fr) repeat(2, minmax(140px, 1fr)); gap: 10px; }
+.admin-users-filters label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 700; }
+.admin-users-grid tr.is-selected td { background: var(--brand-primary-soft); }
+.admin-users-grid em { color: var(--danger); font-style: normal; font-weight: 700; }
+@media (max-width: 720px) { .admin-users-filters { grid-template-columns: 1fr; } }

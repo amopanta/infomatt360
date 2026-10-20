@@ -1,3 +1,4 @@
+import { formatOperationalDate, operationalStatusLabel } from '../../lib/operationalFormat';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
@@ -300,7 +301,7 @@ function ReviewPanel({
             <article key={`${item.action}-${item.to_status}`}>
               <strong>{t('recordsView.partialApproval', { label: item.label })}</strong>
               <span>{t('recordsView.approvalProgress', { approved: item.approved_count, required: item.required_count, pending: item.pending_count })}</span>
-              <small>{t('recordsView.destination', { status: item.to_status })}</small>
+              <small>{t('recordsView.destination', { status: operationalStatusLabel(item.to_status) })}</small>
             </article>
           ))}
         </div>
@@ -331,7 +332,7 @@ function ReviewPanel({
         {history.length ? (
           history.map((item) => (
             <p key={item.id}>
-              {item.created_at ? new Date(item.created_at).toLocaleString() : ''} · {item.action}: {item.from_status || '—'} → {item.to_status}
+              {item.created_at ? formatOperationalDate(item.created_at) : ''} · {operationalStatusLabel(item.action)}: {operationalStatusLabel(item.from_status)} → {operationalStatusLabel(item.to_status)}
               {item.approval_flow_version ? ` · ${t('recordsView.flowVersion', { version: item.approval_flow_version })}` : ''}
               {item.notes ? ` · ${item.notes}` : ''}
               {item.rejected_field_name ? ` · ${t('recordsView.fieldLabel', { name: item.rejected_field_name })}` : ''}
@@ -388,7 +389,7 @@ function TemplateList() {
             <a className="record-template-card" key={template.id} href={`/records/${template.id}`}>
               <strong>{template.name}</strong>
               <span>{template.description || t('recordsView.noDescription')}</span>
-              <small>{template.status}</small>
+              <small>{operationalStatusLabel(template.status)}</small>
             </a>
           ))}
         </div>
@@ -685,7 +686,7 @@ function DeepLinkedRecordCard({
       </div>
       <header>
         <strong>{editMode ? t('recordsView.editResponseTitle') : t('recordsView.fullResponse')}</strong>
-        <span className={`record-status ${record.status}`}>{record.status}</span>
+        <span className={`record-status ${record.status}`}>{operationalStatusLabel(record.status)}</span>
       </header>
       <div className="record-participant-summary">
         <strong>{t('recordsView.associatedParticipant')}</strong>
@@ -980,9 +981,9 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
                     <td>{record.participant_document_id || '—'}</td>
                     <td>{record.participant_external_code || '—'}</td>
                     <td>{record.participant_municipality || '—'}</td>
-                    <td>{new Date(record.created_at).toLocaleString()}</td>
-                    <td><span className={`record-status ${record.status}`}>{record.status}</span></td>
-                    <td title={record.submitted_by ?? ''}>{record.submitted_by || '—'}</td>
+                    <td>{formatOperationalDate(record.created_at)}</td>
+                    <td><span className={`record-status ${record.status}`}>{operationalStatusLabel(record.status)}</span></td>
+                    <td title={record.submitted_by ?? ''}>{record.submitted_by_name || record.submitted_by || '—'}</td>
                     {fields.map((field) => {
                       const value = formatValue(record.values.find((item) => item.field_name === field.name)?.field_value_json, true, t);
                       return <td key={field.name} title={value}>{value}</td>;
@@ -1011,7 +1012,7 @@ function formatValue(raw?: string, detailed = false, t?: (key: string, params?: 
     if (typeof value === 'string' || typeof value === 'number') return String(value);
     if (value && typeof value === 'object' && value.method === 'device_user_verification') {
       const label = t ? t('recordsView.deviceVerified') : 'Dispositivo verificado';
-      return `${label}${value.verified_at ? ` · ${new Date(value.verified_at).toLocaleString()}` : ''}`;
+      return `${label}${value.verified_at ? ` · ${formatOperationalDate(value.verified_at)}` : ''}`;
     }
     // GPS coordinates: { lat, lng, accuracy } or { latitude, longitude, ... }
     if (value && typeof value === 'object' && !Array.isArray(value) && (('lat' in value && 'lng' in value) || ('latitude' in value && 'longitude' in value))) {

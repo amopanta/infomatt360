@@ -167,6 +167,7 @@ class RuntimeRecordRead(BaseModel):
     submitted_by: str | None = None
     # Quién debe corregir si está devuelto (autor o destinatario designado)
     correction_user_id: str | None = None
+    submitted_by_name: str | None = None
     device_id: str | None = None
     ip_address: str | None = None
     parent_record_id: str | None = None

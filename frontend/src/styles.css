@@ -121,8 +121,15 @@ input, select, textarea, button { font-family: inherit; font-size: var(--font-si
 .admin-user-card { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0; padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
 .admin-user-card h3, .admin-user-card small, .admin-user-card div, .admin-user-card p { grid-column: 1 / -1; margin: 0; }
 .admin-user-card label { display: flex; flex-direction: column; gap: 6px; font-weight: 700; }
-.admin-user-card input { border: 1px solid var(--border-strong); border-radius: 9px; padding: 10px; font: inherit; }
+.admin-user-card input, .admin-user-card select { border: 1px solid var(--border-strong); border-radius: 9px; padding: 10px; font: inherit; }
 .admin-user-card button { margin-right: 8px; border: 0; border-radius: 9px; padding: 10px 13px; color: #ffffff; background: var(--brand-primary); font-weight: 800; cursor: pointer; }
+.admin-user-card details { grid-column: 1 / -1; }
+.admin-user-card summary { cursor: pointer; font-weight: 700; margin-bottom: 10px; }
+.admin-user-card label.admin-permission-choice { flex-direction: row; align-items: center; font-weight: 500; margin: 8px 0; }
+.admin-user-card input[type="checkbox"] { width: auto; flex-shrink: 0; }
+.admin-user-card button:disabled { opacity: .55; cursor: not-allowed; }
+.admin-user-card code { overflow-wrap: anywhere; }
+@media (max-width: 600px) { .admin-user-card { grid-template-columns: 1fr; } }
 .access-denied { max-width: 720px; margin: 40px auto; padding: 28px; border: 1px solid var(--danger-soft); border-radius: var(--radius-lg); background: #fffafa; box-shadow: var(--shadow-md); }
 .access-denied h2 { margin: 0 0 10px; color: var(--danger); }
 .access-denied p { margin: 0 0 18px; color: var(--text-muted); font-weight: 700; }

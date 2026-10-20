@@ -52,7 +52,7 @@ El PR #46 queda incluido aquí y puede cerrarse sin unir.
 
 ## Creación masiva por Excel
 
-**Configuración → Carga masiva Excel**, tipo «Usuarios». La plantilla trae
+**Avanzado → Carga masiva Excel**, tipo «Usuarios», o el botón **Crear varios usuarios por Excel** en Configuración → Usuarios, que la abre con ese tipo ya elegido. La plantilla trae
 estas columnas:
 
 | Columna | Obligatoria | Nota |

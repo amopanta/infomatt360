@@ -49,6 +49,7 @@ export function AdminUserSecurityApp() {
       <main className="admin-users">
         <h2>{t('admin.users.projectUsers')}</h2>
         <p>{t('admin.users.sensitiveOpsWarning')}</p>
+        <p className="admin-users-bulk"><a className="button-link" href="/admin/excel-import?tipo=users">Crear varios usuarios por Excel</a> <small>(también en Avanzado → Carga masiva Excel → tipo «Usuarios»)</small></p>
         <UserProvisioning projectId={projectId} roles={roles} grantable={grantable} onCreated={(user) => { setUsers((rows) => [user, ...rows]); setSelectedId(user.id); }} onRoleCreated={(role) => setRoles((rows) => [...rows, role])} />
         <section className="admin-users-grid" aria-label="Usuarios creados en el proyecto">
           <h3>Usuarios creados ({visibleUsers.length} de {users.length})</h3>

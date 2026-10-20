@@ -30,7 +30,11 @@ function statusClass(status: string) {
 export function ExcelImportApp() {
   const { t } = useI18n();
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
-  const [entityType, setEntityType] = useState('participants');
+  // ?tipo=users abre la carga con ese tipo elegido (enlace desde Usuarios, docs/145).
+  const [entityType, setEntityType] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('tipo') ?? '';
+    return ['participants', 'participant_updates', 'users', 'assignments', 'records'].includes(requested) ? requested : 'participants';
+  });
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [templateId, setTemplateId] = useState('');
   const [groupName, setGroupName] = useState('');

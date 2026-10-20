@@ -5,8 +5,8 @@ import { useI18n } from '../../i18n';
 import { PROJECT_KEY } from '../auth/session';
 import { permissionLabel } from '../../lib/permissionLabels';
 import { operationalStatusLabel } from '../../lib/operationalFormat';
-import { createAdminRole, createAdminUser, fetchAdminRoles, fetchAdminUsers, fetchGrantablePermissions, generateEnrollmentQr, resetUserMfa, resetUserPassword, updateAdminAccess, updateUserEmail } from './api';
-import type { AdminRole, AdminUser } from './api';
+import { createAdminRole, createAdminUser, updateAdminProfile, fetchAdminRoles, fetchAdminUsers, fetchGrantablePermissions, generateEnrollmentQr, resetUserMfa, resetUserPassword, updateAdminAccess, updateUserEmail } from './api';
+import type { AdminRole, AdminUser, NewProjectUser } from './api';
 
 export function AdminUserSecurityApp() {
   const { t } = useI18n();
@@ -54,7 +54,7 @@ export function AdminUserSecurityApp() {
 }
 
 function UserProvisioning({ projectId, roles, grantable, onCreated, onRoleCreated }: { projectId: string; roles: AdminRole[]; grantable: string[]; onCreated: (user: AdminUser) => void; onRoleCreated: (role: AdminRole) => void }) {
-  const [draft, setDraft] = useState({ full_name: '', document_id: '', email: '', role_id: '' });
+  const [draft, setDraft] = useState<NewProjectUser>({ full_name: '', document_id: '', email: '', role_id: '', position: '', department: '', municipality: '', restrict_to_territory: true });
   const [password, setPassword] = useState('');
   const [roleName, setRoleName] = useState('');
   const [permissions, setPermissions] = useState<string[]>([]);
@@ -68,7 +68,7 @@ function UserProvisioning({ projectId, roles, grantable, onCreated, onRoleCreate
       if (kind === 'user') {
         const result = await createAdminUser(projectId, draft, password);
         onCreated(result.user); setTemporary(result.temporary_password);
-        setDraft({ full_name: '', document_id: '', email: '', role_id: '' });
+        setDraft({ full_name: '', document_id: '', email: '', role_id: '', position: '', department: '', municipality: '', restrict_to_territory: true });
         setMessage('Usuario creado. Deberá cambiar la contraseña al ingresar.');
       } else {
         onRoleCreated(await createAdminRole(projectId, roleName.trim(), permissions, password));
@@ -80,12 +80,16 @@ function UserProvisioning({ projectId, roles, grantable, onCreated, onRoleCreate
   return <section className="admin-user-card">
     <h3>Crear usuario</h3>
     <label>Nombre completo<input value={draft.full_name} onChange={(event) => setDraft({ ...draft, full_name: event.target.value })} /></label>
-    <label>Documento<input value={draft.document_id} onChange={(event) => setDraft({ ...draft, document_id: event.target.value })} /></label>
+    <label>Número de documento<input value={draft.document_id} onChange={(event) => setDraft({ ...draft, document_id: event.target.value })} /></label>
+    <label>Cargo<input value={draft.position} placeholder="Ej. Gestor de campo" onChange={(event) => setDraft({ ...draft, position: event.target.value })} /></label>
+    <label>Departamento<input value={draft.department} onChange={(event) => setDraft({ ...draft, department: event.target.value })} /></label>
+    <label>Municipio<input value={draft.municipality} onChange={(event) => setDraft({ ...draft, municipality: event.target.value })} /></label>
+    <label className="admin-permission-choice"><input type="checkbox" checked={draft.restrict_to_territory} onChange={(event) => setDraft({ ...draft, restrict_to_territory: event.target.checked })} />Limitar su acceso a este municipio (gestores y personal de campo)</label>
     <label>Correo del nuevo usuario<input type="email" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} /></label>
     <label>Rol del nuevo usuario<select value={draft.role_id} onChange={(event) => setDraft({ ...draft, role_id: event.target.value })}><option value="">Seleccionar rol</option>{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>
     <details><summary>Crear un rol y seleccionar permisos</summary><label>Nombre del rol<input value={roleName} onChange={(event) => setRoleName(event.target.value)} /></label>{grantable.map((permission) => <label className="admin-permission-choice" key={permission}><input type="checkbox" checked={permissions.includes(permission)} onChange={(event) => setPermissions((current) => event.target.checked ? [...current, permission] : current.filter((item) => item !== permission))} />{permissionLabel(permission)}</label>)}<button disabled={busy || !password || roleName.trim().length < 3 || !permissions.length} onClick={() => void provision('role')}>Crear rol</button></details>
     <label>Contraseña administrativa para crear<input type="password" autoComplete="current-password" maxLength={72} value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-    <button disabled={busy || !password || draft.full_name.trim().length < 3 || draft.document_id.trim().length < 5 || !draft.email || !draft.role_id} onClick={() => void provision('user')}>{busy ? 'Procesando…' : 'Crear usuario'}</button>
+    <button disabled={busy || !password || draft.full_name.trim().length < 3 || draft.document_id.trim().length < 5 || draft.position.trim().length < 2 || draft.department.trim().length < 2 || draft.municipality.trim().length < 2 || !draft.email || !draft.role_id} onClick={() => void provision('user')}>{busy ? 'Procesando…' : 'Crear usuario'}</button>
     {message && <p role="status">{message}</p>}
     {temporary && <div role="status"><p>Contraseña temporal: <code>{temporary}</code></p><button onClick={() => setTemporary('')}>Ocultar contraseña</button></div>}
   </section>;
@@ -102,6 +106,16 @@ function AdminUserCard({ projectId, user, roles, onUpdated }: { projectId: strin
   const [assignmentStatus, setAssignmentStatus] = useState(user.assignment_status ?? 'active');
   useEffect(() => { setRoleId(user.role_id ?? ''); setAssignmentStatus(user.assignment_status ?? 'active'); }, [user.role_id, user.assignment_status]);
   const [accessBusy, setAccessBusy] = useState(false);
+  const [profile, setProfile] = useState({ full_name: user.full_name, position: user.position ?? '', department: user.department ?? '', municipality: user.municipality ?? '', phone: user.phone ?? '' });
+  useEffect(() => { setProfile({ full_name: user.full_name, position: user.position ?? '', department: user.department ?? '', municipality: user.municipality ?? '', phone: user.phone ?? '' }); }, [user.full_name, user.position, user.department, user.municipality, user.phone]);
+
+  async function changeProfile() {
+    if (accessBusy || !window.confirm(`¿Actualizar los datos de ${user.full_name}? Los registros ya capturados conservan los datos que tenía al capturar.`)) return;
+    setAccessBusy(true);
+    try { onUpdated(await updateAdminProfile(projectId, user.id, profile, adminPassword)); setResult('Datos actualizados.'); }
+    catch (error) { setResult(error instanceof Error ? error.message : 'Error al actualizar los datos.'); }
+    finally { setAccessBusy(false); setAdminPassword(''); }
+  }
 
   async function changeAccess() {
     if (accessBusy || !window.confirm(`¿Actualizar el rol y acceso de ${user.full_name} en este proyecto?`)) return;
@@ -158,6 +172,16 @@ function AdminUserCard({ projectId, user, roles, onUpdated }: { projectId: strin
   return (
     <section className="admin-user-card">
       <h3>{user.full_name}</h3>
+      <p className="admin-user-profile">Documento {user.document_id || '—'} · {user.position || 'Sin cargo'} · {[user.municipality, user.department].filter(Boolean).join(', ') || 'Sin municipio'}</p>
+      {!user.position || !user.municipality ? <p role="alert">Faltan datos obligatorios (cargo y municipio): complétalos en «Datos de la persona».</p> : null}
+      <details><summary>Datos de la persona</summary>
+        <label>Nombre completo<input value={profile.full_name} onChange={(event) => setProfile({ ...profile, full_name: event.target.value })} /></label>
+        <label>Cargo<input value={profile.position} onChange={(event) => setProfile({ ...profile, position: event.target.value })} /></label>
+        <label>Departamento<input value={profile.department} onChange={(event) => setProfile({ ...profile, department: event.target.value })} /></label>
+        <label>Municipio<input value={profile.municipality} onChange={(event) => setProfile({ ...profile, municipality: event.target.value })} /></label>
+        <label>Teléfono<input value={profile.phone} onChange={(event) => setProfile({ ...profile, phone: event.target.value })} /></label>
+        <button disabled={accessBusy || !adminPassword || profile.full_name.trim().length < 3 || profile.position.trim().length < 2 || profile.department.trim().length < 2 || profile.municipality.trim().length < 2} onClick={() => void changeProfile()}>Guardar datos (requiere tu contraseña administrativa, abajo)</button>
+      </details>
       <small>Cuenta: {operationalStatusLabel(user.status)} · Acceso al proyecto: {operationalStatusLabel(user.assignment_status)} · MFA {user.mfa_enabled ? 'activo' : 'inactivo'}{user.must_change_password ? ' · Debe cambiar contraseña' : ''}</small>
       <label>Rol de {user.full_name}<select value={roleId} onChange={(event) => setRoleId(event.target.value)}><option value="">Sin rol</option>{user.role_id && !roles.some((role) => role.id === user.role_id) && <option value={user.role_id}>{user.role_name ?? 'Rol actual (no asignable)'}</option>}{roles.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}</select></label>
       <label>Acceso de {user.full_name}<select value={assignmentStatus} onChange={(event) => setAssignmentStatus(event.target.value)}><option value="active">Activo</option><option value="suspended">Suspendido en este proyecto</option></select></label>

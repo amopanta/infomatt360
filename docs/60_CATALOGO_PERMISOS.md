@@ -53,14 +53,12 @@ o permisos escritos de forma diferente.
 
 ## Regla de asignacion de roles
 
-Un encargado de usuarios (`identity.users.manage`) puede asignar roles de
-captura y revision a su equipo, pero no un rol que incluya permisos
-administrativos (`organizations.*`, `backups.manage`, `mirror.manage`,
-`storage.manage`, `erp.manage`, `ai.audit.manage`, `integrations.api_keys.manage`,
-`integrations.donor_sync.manage`, `support.tickets.manage`) que el mismo no
-tenga en ese proyecto (`ADMIN_PERMISSIONS` en
-`backend/app/api/v1/assignments.py`). `organizations.manage` no tiene esa
-restriccion.
+Quien administra usuarios (`identity.users.manage`) solo puede entregar un
+rol cuyos permisos tenga el mismo en ese proyecto (PR #46,
+`project_user_admin_service._role`, aplicado tambien en
+`POST /assignments/`). Un administrador de plataforma (`organizations.manage`)
+no tiene esa restriccion. Crear una cuenta exige documento, nombre, cargo y
+municipio (`docs/145_PERFIL_DE_USUARIO_Y_CAPTURADOR.md`).
 
 ## Permisos historicos
 

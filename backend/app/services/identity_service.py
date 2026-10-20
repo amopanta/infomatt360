@@ -33,6 +33,9 @@ def _user_to_read(user: User) -> UserRead:
         document_id=user.document_id,
         email=user.email,
         phone=user.phone,
+        position=user.position,
+        department=user.department,
+        municipality=user.municipality,
         status=user.status,
         allowed_channels=user.allowed_channels.split(",") if user.allowed_channels else [],
     )
@@ -70,6 +73,9 @@ class IdentityService:
             password_hash=hash_password(secrets.token_urlsafe(32)),
             must_change_password=True,
             phone=payload.phone,
+            position=(payload.position or "").strip() or None,
+            department=(payload.department or "").strip() or None,
+            municipality=(payload.municipality or "").strip() or None,
             status=payload.status.value,
             allowed_channels=_channels_to_text(payload.allowed_channels),
         )

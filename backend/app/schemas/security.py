@@ -17,6 +17,11 @@ class CurrentUserResponse(BaseModel):
 class AdminUserRead(BaseModel):
     id: str
     full_name: str
+    document_id: str | None = None
+    position: str | None = None
+    department: str | None = None
+    municipality: str | None = None
+    phone: str | None = None
     email: EmailStr
     status: str
     must_change_password: bool
@@ -29,7 +34,23 @@ class AdminUserRead(BaseModel):
 
 
 class AdminProjectUserCreate(UserCreate):
+    # Mínimo para crear una cuenta (docs/145): documento, nombre, cargo y municipio.
+    position: str = Field(..., min_length=2, max_length=120)
+    department: str = Field(..., min_length=2, max_length=120)
+    municipality: str = Field(..., min_length=2, max_length=120)
+    # Además, limitar su acceso a ese municipio (lo usual para gestores).
+    restrict_to_territory: bool = True
     role_id: str
+    admin_password: str = Field(..., min_length=6, max_length=128)
+    _password_fits_bcrypt = field_validator("admin_password")(validate_bcrypt_password)
+
+
+class AdminProjectProfileUpdate(BaseModel):
+    full_name: str = Field(..., min_length=3, max_length=180)
+    position: str = Field(..., min_length=2, max_length=120)
+    department: str = Field(..., min_length=2, max_length=120)
+    municipality: str = Field(..., min_length=2, max_length=120)
+    phone: str | None = Field(default=None, max_length=50)
     admin_password: str = Field(..., min_length=6, max_length=128)
     _password_fits_bcrypt = field_validator("admin_password")(validate_bcrypt_password)
 

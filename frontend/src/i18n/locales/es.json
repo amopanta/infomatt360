@@ -628,7 +628,7 @@
     "unifiedHistory": "Historial unificado ({count} formulario(s))",
     "form": "Formulario",
     "date": "Fecha",
-    "capturedBy": "Capturado por",
+   
     "viewRecord": "Ver registro",
     "noFormsLinked": "Este participante aún no tiene formularios enlazados en ningún canal.",
     "statusLabels": {
@@ -1368,7 +1368,7 @@
     "deleteRecord": "Eliminar registro",
     "editResponseTitle": "Editar respuesta",
     "fullResponse": "Respuesta completa",
-    "associatedParticipant": "Participante asociado",
+    "associatedParticipant": "Participante asociado", "capturedBy": "Capturado por", "position": "Cargo",
     "nameNotAvailable": "Nombre no disponible",
     "document": "Documento",
     "code": "Código",

@@ -692,6 +692,10 @@ function DeepLinkedRecordCard({
         <strong>{t('recordsView.associatedParticipant')}</strong>
         {record.participant_id ? <span>{record.participant_name || t('recordsView.nameNotAvailable')} · {t('recordsView.document')}: {record.participant_document_id || '—'} · {t('recordsView.code')}: {record.participant_external_code || '—'} · {t('recordsView.municipality')}: {record.participant_municipality || '—'}</span> : <span>{t('recordsView.noParticipantLinked')}</span>}
       </div>
+      {record.captured_by ? <div className="record-participant-summary">
+        <strong>{t('recordsView.capturedBy')}</strong>
+        <span>{record.captured_by.name || '—'} · {t('recordsView.document')}: {record.captured_by.document_id || '—'} · {t('recordsView.position')}: {record.captured_by.position || '—'} · {t('recordsView.municipality')}: {record.captured_by.municipality || '—'}</span>
+      </div> : null}
       <label className="record-field-search">{t('recordsView.searchQuestion')}<input type="search" value={fieldQuery} onChange={(event) => setFieldQuery(event.target.value)} placeholder={t('recordsView.questionPlaceholder')} /></label>
       <p className="record-field-count">{t('recordsView.fieldCount', { visible: visibleValues.length, total: record.values.length })}</p>
       <dl className="record-detail">

@@ -13,7 +13,7 @@ from app.schemas.security import AdminEmailUpdate, AdminMfaReset, AdminPasswordR
 from app.services.account_admin_service import account_admin_service
 from app.api.permissions import get_project_permissions
 from app.schemas.identity import RoleRead
-from app.schemas.security import AdminProjectAccessUpdate, AdminProjectRoleCreate, AdminProjectUserCreate, AdminProjectUserCreated
+from app.schemas.security import AdminProjectAccessUpdate, AdminProjectRoleCreate, AdminProjectProfileUpdate, AdminProjectUserCreate, AdminProjectUserCreated
 from app.services.project_user_admin_service import project_user_admin_service
 
 router = APIRouter()
@@ -45,6 +45,12 @@ def list_project_users(project_id: str, db: Session = Depends(get_db), current_u
 def admin_create_project_user(project_id: str, payload: AdminProjectUserCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> AdminProjectUserCreated:
     require_project_permission(db, current_user.id, project_id, IDENTITY_USERS_MANAGE)
     return project_user_admin_service.create_user(db, project_id, payload, current_user)
+
+
+@router.patch("/admin/projects/{project_id}/users/{user_id}/profile", response_model=AdminUserRead)
+def admin_update_project_user_profile(project_id: str, user_id: str, payload: AdminProjectProfileUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> AdminUserRead:
+    require_project_permission(db, current_user.id, project_id, IDENTITY_USERS_MANAGE)
+    return project_user_admin_service.update_profile(db, project_id, user_id, payload, current_user)
 
 
 @router.patch("/admin/projects/{project_id}/users/{user_id}/access", response_model=AdminUserRead)

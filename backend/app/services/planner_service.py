@@ -201,9 +201,13 @@ def coordinator_by_gestor(db: Session, project_id: str) -> dict[str, str | None]
 
 
 def gestor_municipality(db: Session, project_id: str, user_id: str) -> str:
-    """Municipio heredado de la asignación territorial vigente, si es único."""
+    """Municipio heredado de la asignación territorial vigente si es único; si
+    no, el municipio del perfil del usuario (docs/145)."""
     rows = {t.municipality.strip() for t in db.query(UserTerritory).filter(UserTerritory.project_id == project_id, UserTerritory.user_id == user_id).all() if t.municipality}
-    return rows.pop() if len(rows) == 1 else ""
+    if len(rows) == 1:
+        return rows.pop()
+    user = db.get(User, user_id)
+    return (user.municipality or "").strip() if user and not rows else ""
 
 
 # ── Hechos: ejecución válida ──────────────────────────────────────────────
@@ -268,6 +272,8 @@ def compute_facts(db: Session, project_id: str, year: int, settings: PlannerSett
         municipality = str(meta.get("municipality") or meta.get("municipio") or "").strip()
         if not municipality and settings.municipality_field:
             municipality = str(own.get(settings.municipality_field) or "").strip()
+        if not municipality and record.captured_by_municipality:
+            municipality = record.captured_by_municipality.strip()
         if not municipality and record.submitted_by:
             if record.submitted_by not in gestor_town:
                 gestor_town[record.submitted_by] = gestor_municipality(db, project_id, record.submitted_by)
@@ -739,6 +745,8 @@ def build_report(db: Session, project_id: str, scope: PlannerScope, filters: Fil
         detail_rows.append({
             "month": row["month"], "coordinator": names["users"].get(row["coordinator_user_id"] or "", ""),
             "gestor": names["users"].get(row["gestor_user_id"] or "", "Sin gestor"), "gestor_user_id": row["gestor_user_id"],
+            "gestor_document": names["profiles"].get(row["gestor_user_id"] or "", {}).get("document_id", ""),
+            "gestor_position": names["profiles"].get(row["gestor_user_id"] or "", {}).get("position", ""),
             "municipality": row["municipality"] or "Sin municipio", "activity": names["templates"].get(row["template_id"], row["template_id"]),
             "start_date": min((p.start_date for p in planned), default=None), "end_date": max((p.end_date for p in planned), default=None),
             "planned_quantity": sum(p.planned_quantity for p in planned), "planned_participants": sum(p.planned_participants for p in planned),
@@ -813,8 +821,9 @@ def _names(db: Session, project_id: str, facts: list[dict], targets: list[dict],
     user_ids = {r.get("gestor_user_id") for r in facts + targets} | {r.get("coordinator_user_id") for r in facts + targets}
     user_ids |= {p.gestor_user_id for p in plans} | {p.coordinator_user_id for p in plans}
     user_ids.discard(None)
-    users = {u.id: u.full_name for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
-    return {"templates": templates, "users": users}
+    people = db.query(User).filter(User.id.in_(user_ids)).all() if user_ids else []
+    return {"templates": templates, "users": {u.id: u.full_name for u in people},
+            "profiles": {u.id: {"document_id": u.document_id, "position": u.position or "", "municipality": u.municipality or ""} for u in people}}
 
 
 MONTHS = ["", "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"]
@@ -852,11 +861,11 @@ def export_xlsx(report: dict) -> bytes:
             r["activities"]["pending"], _pct(r["activities"]["compliance"]), r["families"]["target"], r["families"]["executed"],
             _pct(r["families"]["compliance"]), "Cerrado" if r["closed"] else "Vivo"] for r in report["municipal"]], {8, 11})
     sheet(book.create_sheet("Detalle por gestor"),
-          ["Mes", "Coordinador", "Gestor", "Municipio", "Actividad", "Fecha inicio", "Fecha fin", "Programado", "Participantes previstos",
-           "Meta", "Ejecutado", "Pendiente", "% cumplimiento", "Familias únicas", "Estado"],
-          [[MONTHS[r["month"]], r["coordinator"], r["gestor"], r["municipality"], r["activity"], r["start_date"], r["end_date"], r["planned_quantity"],
-            r["planned_participants"], r["activities"]["target"], r["activities"]["executed"], r["activities"]["pending"],
-            _pct(r["activities"]["compliance"]), r["families_executed"], r["state"]] for r in report["gestor"]], {13})
+          ["Mes", "Coordinador", "Gestor", "Documento", "Cargo", "Municipio", "Actividad", "Fecha inicio", "Fecha fin", "Programado",
+           "Participantes previstos", "Meta", "Ejecutado", "Pendiente", "% cumplimiento", "Familias únicas", "Estado"],
+          [[MONTHS[r["month"]], r["coordinator"], r["gestor"], r["gestor_document"], r["gestor_position"], r["municipality"], r["activity"],
+            r["start_date"], r["end_date"], r["planned_quantity"], r["planned_participants"], r["activities"]["target"], r["activities"]["executed"],
+            r["activities"]["pending"], _pct(r["activities"]["compliance"]), r["families_executed"], r["state"]] for r in report["gestor"]], {15})
     general = book.create_sheet("Consolidado general")
     rows = [[MONTHS[r["month"]], r["municipality"], r["coordinator"], r["activity"], r["target"], r["executed"], r["pending"], _pct(r["compliance"])]
             for r in report["general"]]

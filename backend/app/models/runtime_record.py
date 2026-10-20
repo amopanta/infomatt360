@@ -64,6 +64,13 @@ class RuntimeRecord(Base):
     approval_flow_snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(40), default="submitted", nullable=False, index=True)
     submitted_by: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    # Quién capturó, como estaba su perfil al capturar (docs/145): un cambio
+    # posterior de cargo o municipio no reescribe registros anteriores.
+    captured_by_name: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    captured_by_document: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    captured_by_position: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    captured_by_department: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    captured_by_municipality: Mapped[str | None] = mapped_column(String(120), nullable=True)
     device_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(String(80), nullable=True)
     content_hash: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)

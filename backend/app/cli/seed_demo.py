@@ -58,6 +58,9 @@ def seed(db: Session) -> dict[str, str]:
         email=DEMO_EMAIL,
         password_hash=hash_password(DEMO_PASSWORD),
         phone="3000000000",
+        position="Administrador del proyecto",
+        department="Bogotá D.C.",
+        municipality="Bogotá",
         status="active",
         must_change_password=False,
         mfa_enabled=False,
@@ -67,6 +70,7 @@ def seed(db: Session) -> dict[str, str]:
                         permissions="projects.read,records.read,records.write,participants.create")
     field_user = upsert(db, User, DEMO_FIELD_USER_ID, full_name="Gestora de Campo Demo", document_id="DEMO-GESTOR",
                         email=DEMO_FIELD_EMAIL, password_hash=hash_password(DEMO_PASSWORD), status="active",
+                        position="Gestora de campo", department="Antioquia", municipality="Turbo",
                         must_change_password=False, mfa_enabled=False)
     upsert(db, UserProjectAssignment, "demo-field-assignment", user_id=field_user.id, project_id=project.id, role_id=field_role.id, status="active")
     template = upsert(

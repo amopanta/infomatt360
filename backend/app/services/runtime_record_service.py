@@ -53,6 +53,15 @@ def value_to_read(row: RuntimeRecordValue) -> RuntimeValueRead:
     )
 
 
+def capturer_snapshot(db: Session, user_id: str | None) -> dict:
+    """Datos del perfil de quien captura, copiados al registro (docs/145)."""
+    user = db.get(User, user_id) if user_id else None
+    if user is None:
+        return {}
+    return {"captured_by_name": user.full_name, "captured_by_document": user.document_id, "captured_by_position": user.position,
+            "captured_by_department": user.department, "captured_by_municipality": user.municipality}
+
+
 def record_to_read(db: Session, row: RuntimeRecord, submitter_names: dict[str, str] | None = None) -> RuntimeRecordRead:
     """Convierte la cabecera y sus valores en una respuesta consolidada."""
     values = db.query(RuntimeRecordValue).filter(RuntimeRecordValue.record_id == row.id).all()
@@ -71,6 +80,8 @@ def record_to_read(db: Session, row: RuntimeRecord, submitter_names: dict[str, s
         submitted_by=row.submitted_by,
         correction_user_id=(row.correction_user_id or row.submitted_by) if row.status in {"returned", "corrected"} else None,
         submitted_by_name=submitter_name,
+        captured_by={"name": row.captured_by_name, "document_id": row.captured_by_document, "position": row.captured_by_position,
+                     "department": row.captured_by_department, "municipality": row.captured_by_municipality} if row.captured_by_name else None,
         device_id=row.device_id,
         ip_address=row.ip_address,
         parent_record_id=row.parent_record_id,
@@ -158,6 +169,7 @@ class RuntimeRecordService:
             approval_flow_snapshot_json=approval_flow_snapshot_json,
             status=payload.status,
             submitted_by=user_id,
+            **capturer_snapshot(db, user_id),
             device_id=payload.device_id,
             ip_address=payload.ip_address,
             parent_record_id=payload.parent_record_id,
@@ -861,7 +873,7 @@ class RuntimeRecordService:
         now = utc_now()
         clone = RuntimeRecord(
             project_id=source.project_id, template_id=source.template_id, version_id=source.version_id,
-            participant_id=source.participant_id, status="draft", submitted_by=user_id,
+            participant_id=source.participant_id, status="draft", submitted_by=user_id, **capturer_snapshot(db, user_id),
             approval_flow_id=source.approval_flow_id, approval_flow_version=source.approval_flow_version,
             approval_flow_snapshot_json=source.approval_flow_snapshot_json, duplicate_flag="manual",
             created_at=now, updated_at=now,
@@ -1057,7 +1069,9 @@ class RuntimeRecordService:
         output = StringIO()
         output.write("\ufeff")
         writer = csv.writer(output, lineterminator="\n")
-        writer.writerow(["record_id", "participante_nombre", "participante_documento", "participante_codigo", "participante_municipio", "fecha", "estado", "capturado_por", *[self._safe_csv_cell(name) for name in field_names]])
+        writer.writerow(["record_id", "participante_nombre", "participante_documento", "participante_codigo", "participante_municipio", "fecha", "estado",
+                         "capturado_por", "capturador_documento", "capturador_cargo", "capturador_municipio",
+                         *[self._safe_csv_cell(name) for name in field_names]])
         for record in records:
             row_values = by_record.get(record.id, {})
             participant = participants.get(record.participant_id)
@@ -1070,7 +1084,10 @@ class RuntimeRecordService:
                 self._safe_csv_cell(str(metadata.get("municipality") or metadata.get("municipio") or "")) if isinstance(metadata, dict) else "",
                 record.created_at.isoformat(),
                 record.status,
-                record.submitted_by or "",
+                self._safe_csv_cell(record.captured_by_name or record.submitted_by or ""),
+                self._safe_csv_cell(record.captured_by_document or ""),
+                self._safe_csv_cell(record.captured_by_position or ""),
+                self._safe_csv_cell(record.captured_by_municipality or ""),
                 *[self._safe_csv_cell(row_values.get(name, "")) for name in field_names],
             ])
         return output.getvalue()

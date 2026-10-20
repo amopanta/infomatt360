@@ -12,9 +12,10 @@ from app.core.permissions import ALL_PERMISSIONS
 from app.core.security import hash_password
 from app.models.assignment import UserOrganizationAssignment, UserProjectAssignment
 from app.models.audit import AuditLog
+from app.models.case_management import UserTerritory
 from app.models.identity import Project, Role, User
 from app.schemas.identity import RoleRead
-from app.schemas.security import AdminProjectAccessUpdate, AdminProjectRoleCreate, AdminProjectUserCreate, AdminProjectUserCreated, AdminUserRead
+from app.schemas.security import AdminProjectAccessUpdate, AdminProjectRoleCreate, AdminProjectProfileUpdate, AdminProjectUserCreate, AdminProjectUserCreated, AdminUserRead
 from app.services.account_admin_service import account_admin_service
 from app.services.permission_cache_service import invalidate_permissions_for_user
 
@@ -33,7 +34,8 @@ def user_to_admin_read(db: Session, user: User, assignment: UserProjectAssignmen
     inherited = _inherited(db, assignment.project_id, user.id)
     permissions = (_permissions(role) if role and assignment.status == "active" else set()) | inherited
     return AdminUserRead(
-        id=user.id, full_name=user.full_name, email=user.email, status=user.status,
+        id=user.id, full_name=user.full_name, document_id=user.document_id, position=user.position,
+        department=user.department, municipality=user.municipality, phone=user.phone, email=user.email, status=user.status,
         must_change_password=user.must_change_password, mfa_enabled=user.mfa_enabled,
         role_id=assignment.role_id, role_name=role.name if role else None,
         assignment_status=assignment.status, permissions=sorted(permissions),
@@ -82,7 +84,8 @@ class ProjectUserAdminService:
             raise HTTPException(status_code=409, detail="El correo o documento ya está registrado")
         temporary = account_admin_service._generate_temporary_password()
         user = User(full_name=payload.full_name.strip(), document_id=document, email=email,
-                    phone=payload.phone, status=payload.status.value,
+                    phone=payload.phone, status=payload.status.value, position=payload.position.strip(),
+                    department=payload.department.strip(), municipality=payload.municipality.strip(),
                     allowed_channels=",".join(channel.value for channel in payload.allowed_channels),
                     password_hash=hash_password(temporary), must_change_password=True)
         try:
@@ -90,9 +93,13 @@ class ProjectUserAdminService:
             db.flush()
             assignment = UserProjectAssignment(user_id=user.id, project_id=project_id, role_id=payload.role_id, status="active")
             db.add(assignment)
+            if payload.restrict_to_territory:
+                db.add(UserTerritory(project_id=project_id, user_id=user.id, department=user.department, municipality=user.municipality))
             db.flush()
             self._audit(db, project_id, admin, "project_user_created", user.id, None,
-                        {"role_id": payload.role_id, "assignment_status": "active", "must_change_password": True})
+                        {"role_id": payload.role_id, "assignment_status": "active", "must_change_password": True,
+                         "position": user.position, "department": user.department, "municipality": user.municipality,
+                         "restrict_to_territory": payload.restrict_to_territory})
             db.commit()
         except IntegrityError:
             db.rollback()
@@ -132,6 +139,26 @@ class ProjectUserAdminService:
                     {"role_id": assignment.role_id, "assignment_status": assignment.status})
         db.commit()
         invalidate_permissions_for_user(user_id)
+        return user_to_admin_read(db, user, assignment)
+
+    def update_profile(self, db: Session, project_id: str, user_id: str, payload: AdminProjectProfileUpdate, admin: User) -> AdminUserRead:
+        """Corrige nombre, cargo, municipio y teléfono. El documento y el correo tienen su propio flujo."""
+        account_admin_service._reauthenticate(admin, payload.admin_password)
+        assignment = db.query(UserProjectAssignment).filter_by(user_id=user_id, project_id=project_id).first()
+        user = db.get(User, user_id)
+        if assignment is None or user is None:
+            raise HTTPException(status_code=404, detail="Usuario no encontrado en este proyecto")
+        before = {"full_name": user.full_name, "position": user.position, "department": user.department,
+                  "municipality": user.municipality, "phone": user.phone}
+        user.full_name = payload.full_name.strip()
+        user.position = payload.position.strip()
+        user.department = payload.department.strip()
+        user.municipality = payload.municipality.strip()
+        user.phone = (payload.phone or "").strip() or None
+        self._audit(db, project_id, admin, "project_user_profile_updated", user.id, before,
+                    {"full_name": user.full_name, "position": user.position, "department": user.department,
+                     "municipality": user.municipality, "phone": user.phone})
+        db.commit()
         return user_to_admin_read(db, user, assignment)
 
     def create_role(self, db: Session, project_id: str, payload: AdminProjectRoleCreate, admin: User) -> RoleRead:

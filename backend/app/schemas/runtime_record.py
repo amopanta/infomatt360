@@ -168,6 +168,8 @@ class RuntimeRecordRead(BaseModel):
     # Quién debe corregir si está devuelto (autor o destinatario designado)
     correction_user_id: str | None = None
     submitted_by_name: str | None = None
+    # Perfil de quien capturó al momento de capturar (docs/145).
+    captured_by: dict | None = None
     device_id: str | None = None
     ip_address: str | None = None
     parent_record_id: str | None = None

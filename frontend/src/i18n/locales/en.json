@@ -628,7 +628,7 @@
     "unifiedHistory": "Unified history ({count} form(s))",
     "form": "Form",
     "date": "Date",
-    "capturedBy": "Captured by",
+   
     "viewRecord": "View record",
     "noFormsLinked": "This participant has no linked forms in any channel yet.",
     "statusLabels": {
@@ -1368,7 +1368,7 @@
     "deleteRecord": "Delete record",
     "editResponseTitle": "Edit response",
     "fullResponse": "Full response",
-    "associatedParticipant": "Associated participant",
+    "associatedParticipant": "Associated participant", "capturedBy": "Captured by", "position": "Position",
     "nameNotAvailable": "Name not available",
     "document": "Document",
     "code": "Code",

@@ -5,6 +5,7 @@ from app.core.security import verify_password
 from app.models.identity import Project, Role, User
 from app.models.assignment import UserProjectAssignment
 from app.models.audit import AuditLog
+from app.models.case_management import UserTerritory
 from app.api.permissions import get_project_permissions
 from app.services.permission_cache_service import invalidate_permissions_for_user
 
@@ -23,6 +24,9 @@ def test_create_user_is_atomic_unique_and_forces_password_change(security_contex
     client, sessions = security_context
     headers = setup_admin(client, sessions)
     payload = dict(full_name='Nueva Persona', document_id='new-doc', email='new@example.com', role_id='basic-role', admin_password='AdminPassword123')
+    # docs/145: cargo y municipio son obligatorios al crear la cuenta.
+    assert client.post(BASE + '/users', headers=headers, json=payload).status_code == 422
+    payload.update(position='Gestora de campo', department='Antioquia', municipality='Turbo')
     response = client.post(BASE + '/users', headers=headers, json=payload)
     assert response.status_code == 201, response.text
     created = response.json()
@@ -33,6 +37,9 @@ def test_create_user_is_atomic_unique_and_forces_password_change(security_contex
         assert verify_password(created['temporary_password'], user.password_hash)
         assert not verify_password('ChangeMe123', user.password_hash)
         assert db.query(UserProjectAssignment).filter_by(user_id=user.id, project_id='project').count() == 1
+        assert (user.position, user.department, user.municipality) == ('Gestora de campo', 'Antioquia', 'Turbo')
+        territory = db.query(UserTerritory).filter_by(user_id=user.id, project_id='project').one()
+        assert (territory.department, territory.municipality) == ('Antioquia', 'Turbo')
         logs = db.query(AuditLog).filter_by(entity_id=user.id).all()
         assert logs and created['temporary_password'] not in json.dumps([log.after_json for log in logs])
     assert client.post(BASE + '/users', headers=headers, json=payload).status_code == 409
@@ -128,3 +135,29 @@ def test_suspension_cannot_hide_inherited_organization_access(security_context):
     invalidate_permissions_for_user('target')
     payload = dict(role_id='basic-role', assignment_status='suspended', admin_password='AdminPassword123')
     assert client.patch(BASE + '/users/target/access', headers=headers, json=payload).status_code == 409
+
+
+def test_profile_update_and_unrestricted_creation(security_context):
+    """docs/145: el perfil se corrige con contraseña administrativa y queda auditado;
+    crear sin limitar el acceso no agrega territorio."""
+    client, sessions = security_context
+    headers = setup_admin(client, sessions)
+    payload = dict(full_name='Coordinadora Nacional', document_id='nat-doc', email='nat@example.com', role_id='basic-role',
+                   admin_password='AdminPassword123', position='Coordinadora', department='Bogotá D.C.', municipality='Bogotá',
+                   restrict_to_territory=False)
+    created = client.post(BASE + '/users', headers=headers, json=payload)
+    assert created.status_code == 201, created.text
+    user_id = created.json()['user']['id']
+    assert created.json()['user']['position'] == 'Coordinadora'
+    with sessions() as db:
+        assert db.query(UserTerritory).filter_by(user_id=user_id).count() == 0
+    change = dict(full_name='Coordinadora Nacional', position='Coordinadora regional', department='Antioquia', municipality='Medellín',
+                  admin_password='incorrecta-1')
+    assert client.patch(BASE + f'/users/{user_id}/profile', headers=headers, json=change).status_code in (401, 403)
+    change['admin_password'] = 'AdminPassword123'
+    updated = client.patch(BASE + f'/users/{user_id}/profile', headers=headers, json=change)
+    assert updated.status_code == 200, updated.text
+    assert updated.json()['municipality'] == 'Medellín' and updated.json()['document_id'] == 'nat-doc'
+    with sessions() as db:
+        log = db.query(AuditLog).filter_by(entity_id=user_id, action='project_user_profile_updated').one()
+        assert json.loads(log.before_json)['position'] == 'Coordinadora' and json.loads(log.after_json)['municipality'] == 'Medellín'

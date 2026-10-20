@@ -41,7 +41,7 @@ def _seed(db):
         Role(id="r-gestor", name="Gestor", permissions="projects.read,records.write,records.read"),
         User(id="admin", full_name="Admin", document_id="A", email="admin@x.org", password_hash=hash_password(PASSWORD)),
         User(id="coord", full_name="Coordinadora Turbo", document_id="C", email="coord@x.org", password_hash=hash_password(PASSWORD)),
-        User(id="g1", full_name="Gestor Uno", document_id="G1", email="g1@x.org", password_hash=hash_password(PASSWORD)),
+        User(id="g1", full_name="Gestor Uno", document_id="G1", email="g1@x.org", password_hash=hash_password(PASSWORD), position="Gestor de campo", municipality="Turbo"),
         User(id="g2", full_name="Gestora Dos", document_id="G2", email="g2@x.org", password_hash=hash_password(PASSWORD)),
         User(id="ajeno", full_name="Ajeno", document_id="Z", email="ajeno@x.org", password_hash=hash_password(PASSWORD)),
         UserProjectAssignment(user_id="admin", project_id=P, role_id="r-admin", status="active"),
@@ -293,7 +293,9 @@ def test_excel_three_sheets_match_dashboard(client):
     general = list(book["Consolidado general"].iter_rows(min_row=2, values_only=True))
     assert sum(row[5] for row in general if row[0] in {"Noviembre"} and row[3] != "Total del mes") == 168
     detail = list(book["Detalle por gestor"].iter_rows(min_row=2, values_only=True))
-    assert sum(row[10] for row in detail) == 168  # el detalle cuadra con el resumen municipal
+    assert sum(row[12] for row in detail) == 168  # el detalle cuadra con el resumen municipal
+    gestor_row = next(row for row in detail if row[2] == "Gestor Uno")
+    assert gestor_row[3] == "G1" and gestor_row[4] == "Gestor de campo"  # documento y cargo del perfil (docs/145)
     v4 = municipal(report, "Visita 4 VMC")
     assert v4["activities"]["target"] == 40  # sin meta municipal, suma las metas de los gestores
     assert ("Sin meta" in [row[7] for row in summary])  # Apartadó

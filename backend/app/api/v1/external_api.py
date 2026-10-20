@@ -65,10 +65,13 @@ def list_external_records(
 
 @router.get("/participants", response_model=list[ParticipantRead], summary="Consultar participantes del proyecto de la API key")
 def list_external_participants(
+    limit: int | None = Query(default=None, ge=1, le=1000, description="Opcional: tamaño de página (docs/146). Sin él se devuelven todos, como antes."),
+    offset: int = Query(default=0, ge=0),
     db: Session = Depends(get_db),
     api_key: ApiKeyAuthContext = Depends(require_api_key_permission(RECORDS_READ)),
 ) -> list[ParticipantRead]:
-    return participant_service.list_participants(db, api_key.project_id)
+    rows = participant_service.list_participants(db, api_key.project_id)
+    return rows[offset:offset + limit] if limit is not None else rows[offset:]
 
 
 @router.get("/summary", response_model=ReportProjectSummary, summary="Consultar indicadores agregados del proyecto de la API key")

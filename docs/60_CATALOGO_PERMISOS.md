@@ -41,7 +41,7 @@ o permisos escritos de forma diferente.
 | `organizations.tenant_clean` | Ejecutar la purga controlada de datos de prueba de una organizacion (accion critica, requiere 2FA y confirmacion explicita del slug). |
 | `support.tickets.manage` | Revisar y resolver manualmente tickets de la mesa de ayuda que no se resolvieron por el motor de reglas automatico. |
 | `storage.manage` | Conectar el destino de almacenamiento de multimedia del proyecto (boveda S3/MinIO, cuenta de Google Drive). Antes de este permiso, cualquier miembro del proyecto podia hacerlo (ver `docs/89_ALMACENAMIENTO_S3_BOVEDA_MULTIMEDIA.md`). |
-| `mirror.manage` | Conectar una base de datos externa como espejo del proyecto (destino, credenciales, planes y ejecucion de sincronizacion) -- ver `docs/102_BASE_ESPEJO_REAL.md`. |
+| `mirror.manage` | Conectar bases de datos externas al proyecto: espejo y proyecto completo hacia la base externa, y la importacion desde ella (junto con el permiso de lo que se importa) -- ver `docs/102_BASE_ESPEJO_REAL.md` y `docs/146_INTEGRACION_CON_BASES_EXTERNAS.md`. |
 | `planner.manage` | Gestionar el planeador mensual: reglas de conteo, metas e importación, población objetivo, cortes y la programación de cualquier gestor (`docs/144_PLANEADOR_MENSUAL_Y_VALIDACION_DIAGNOSTICO.md`). Ver el tablero basta con permisos de revisión, coordinación o `reports.export`; el gestor ve lo suyo. |
 
 ## Grupos operativos actuales

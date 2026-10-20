@@ -45,11 +45,12 @@ documentos retirados o duplicados siguen en el historial de git).
 - **Comparación con CommCare:** [docs/124](docs/124_COMPARACION_COMMCARE_Y_SEGUIMIENTO.md) y brechas en [docs/143](docs/143_BRECHAS_COMMCARE_INTEGRACION_INCREMENTAL.md).
 - **Planeador mensual y validación del diagnóstico del 19-oct:** [docs/144](docs/144_PLANEADOR_MENSUAL_Y_VALIDACION_DIAGNOSTICO.md).
 - **Perfil de usuario y datos de quien captura:** [docs/145](docs/145_PERFIL_DE_USUARIO_Y_CAPTURADOR.md).
+- **Integración con bases externas (proyecto completo, importación, programación):** [docs/146](docs/146_INTEGRACION_CON_BASES_EXTERNAS.md).
 - **Permisos:** [docs/60](docs/60_CATALOGO_PERMISOS.md).
 - **App móvil:** `README.md` y `docs/ARQUITECTURA.md` del repositorio `infomatt360-mobile`.
 
 Los documentos numerados describen cada módulo cuando se construyó; si alguno
-contradice a 140–145, prevalecen estos. Los informes con fecha (por ejemplo
+contradice a 140–146, prevalecen estos. Los informes con fecha (por ejemplo
 129, 131 y 132) son evidencia de ese momento.
 
 ## Arranque rapido en Windows

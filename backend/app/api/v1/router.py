@@ -50,6 +50,7 @@ from app.api.v1.report_catalog import router as report_catalog_router
 from app.api.v1.review import router as review_router
 from app.api.v1.runtime import router as runtime_router
 from app.api.v1.planner import router as planner_router
+from app.api.v1.db_sync import router as db_sync_router
 from app.api.v1.scheduler import router as scheduler_router
 from app.api.v1.security import router as security_router
 from app.api.v1.storage import router as storage_router
@@ -112,6 +113,7 @@ api_v1_router.include_router(erp_router, prefix="/erp", tags=["erp"])
 api_v1_router.include_router(whatsapp_router, prefix="/whatsapp", tags=["whatsapp"])
 api_v1_router.include_router(runtime_router, prefix="/runtime", tags=["runtime"])
 api_v1_router.include_router(planner_router, prefix="/planner", tags=["planner"])
+api_v1_router.include_router(db_sync_router, prefix="/db-sync", tags=["db-sync"])
 api_v1_router.include_router(public_forms_router, prefix="/public-forms", tags=["public-forms"])
 api_v1_router.include_router(form_lookups_router, prefix="/form-lookups", tags=["form-lookups"])
 api_v1_router.include_router(compiler_router, prefix="/compiler", tags=["compiler"])

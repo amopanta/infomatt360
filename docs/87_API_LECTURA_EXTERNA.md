@@ -60,15 +60,16 @@ proyecto en la URL.
   donante externo); pasar `status=` vacio devuelve todos los estados.
   Rechaza con `403` si `template_id` no pertenece al proyecto de la API
   key.
-- **`GET /participants`** — todos los participantes del proyecto, sin
-  paginar (ver limite conocido abajo).
+- **`GET /participants`** — participantes del proyecto. Con `limit`
+  (1–1000) y `offset` opcionales pagina; sin ellos devuelve todos, como
+  antes (docs/146).
 - **`GET /summary`** — el mismo resumen agregado (conteos por estado,
   etc.) que usa el panel de reportes interno.
 
 ## Limites conocidos
 
-- `GET /participants` no pagina todavia; en un proyecto con muchos miles
-  de participantes esto puede ser una respuesta grande.
+- `GET /participants` sin `limit` sigue devolviendo todos; para proyectos
+  grandes conviene paginar con `limit`/`offset` (docs/146).
 - `GET /records` exige `template_id`: un partner externo debe conocer el
   identificador de la plantilla que le interesa (no hay un endpoint de
   "todos los registros del proyecto sin importar plantilla").

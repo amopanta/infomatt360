@@ -15,6 +15,8 @@ import {
 } from './mirrorApi';
 import type { BIConnectionInfo, MirrorPlan, MirrorRun, MirrorTarget } from './mirrorApi';
 import { createScheduledTask, fetchScheduledTasks } from './schedulerApi';
+import { DbImportPanel } from './DbImportPanel';
+import type { MirrorRunSummary } from './mirrorApi';
 import type { ScheduledTask } from './schedulerApi';
 
 const ENGINE_LABELS: Record<string, string> = { postgres: 'PostgreSQL', mysql: 'MySQL', mssql: 'SQL Server', sqlite: 'SQLite' };
@@ -48,6 +50,10 @@ export function MirrorApp() {
   const [showNewPlan, setShowNewPlan] = useState(false);
   const [pName, setPName] = useState('');
   const [pMode, setPMode] = useState<'full_mirror' | 'insert_only' | 'incremental'>('incremental');
+  // docs/146: «Proyecto completo» copia todo con una sola conexión, sin configurar formulario por formulario.
+  const [pScope, setPScope] = useState<'project' | 'records'>('project');
+  const [schedTime, setSchedTime] = useState('02:00');
+  const [schedTz, setSchedTz] = useState('America/Bogota');
 
   // BI connection
   const [biInfo, setBiInfo] = useState<BIConnectionInfo | null>(null);
@@ -123,7 +129,7 @@ export function MirrorApp() {
     if (!selectedTarget) return;
     setLoading(true);
     try {
-      await createMirrorPlan({ target_id: selectedTarget.id, name: pName, schedule_mode: pMode });
+      await createMirrorPlan({ target_id: selectedTarget.id, name: pName, schedule_mode: pMode, scope: pScope });
       setShowNewPlan(false);
       setPName('');
       await loadPlans(selectedTarget.id);
@@ -136,8 +142,8 @@ export function MirrorApp() {
     setLoading(true);
     try {
       const run = await runMirrorPlan(planId);
-      setMessage(run.status === 'completed'
-        ? `${t('admin.mirror.runSuccess')}: ${run.records_synced} ${t('admin.mirror.records')}, ${run.values_synced} ${t('admin.mirror.values')}`
+      setMessage(run.status === 'completed' || run.status === 'completed_with_differences'
+        ? `${t('admin.mirror.runSuccess')}: ${run.records_synced} ${t('admin.mirror.records')}, ${run.values_synced} ${t('admin.mirror.values')}${run.summary ? (run.summary.reconciled ? ' · origen y destino cuadran' : ' · hay diferencias entre origen y destino, revisa la conciliación') : ''}`
         : `${t('admin.mirror.runFailed')}: ${run.error ?? ''}`);
       if (selectedTarget) await loadPlans(selectedTarget.id);
       if (selectedPlan?.id === planId) await loadRuns(planId);
@@ -154,7 +160,8 @@ export function MirrorApp() {
     if (!selectedPlan) return;
     setScheduling(true);
     try {
-      await createScheduledTask({ project_id: projectId, name: `Espejo: ${selectedPlan.name}`, task_type: 'mirror', target_id: selectedPlan.id, frequency: schedFreq });
+      const config = schedFreq === 'hourly' || !schedTime ? null : JSON.stringify({ run_time: schedTime, timezone: schedTz || 'America/Bogota' });
+      await createScheduledTask({ project_id: projectId, name: `Espejo: ${selectedPlan.name}`, task_type: 'mirror', target_id: selectedPlan.id, frequency: schedFreq, config_json: config });
       await loadSchedule();
       setMessage(t('admin.mirror.scheduled'));
     } catch (e) { setMessage(e instanceof Error ? e.message : 'Error'); }
@@ -266,6 +273,10 @@ export function MirrorApp() {
             <div className="card" style={{ padding: 16, marginBottom: 16 }}>
               <div style={{ display: 'grid', gap: 12 }}>
                 <input placeholder={t('admin.mirror.planName')} value={pName} onChange={(e) => setPName(e.target.value)} />
+                <label>Qué copiar<select value={pScope} onChange={(e) => setPScope(e.target.value as 'project' | 'records')}>
+                  <option value="project">Proyecto completo: participantes, asignaciones, respuestas y una tabla por formulario (recomendado)</option>
+                  <option value="records">Solo registros en formato clave-valor (modo anterior)</option>
+                </select></label>
                 <select value={pMode} onChange={(e) => setPMode(e.target.value as any)}>
                   {Object.entries(MODE_KEYS).map(([k, tk]) => <option key={k} value={k}>{t(tk)}</option>)}
                 </select>
@@ -276,11 +287,12 @@ export function MirrorApp() {
 
           {plans.length === 0 ? <p style={{ color: 'var(--text-muted)' }}>{t('admin.mirror.noPlans')}</p> : (
             <table className="data-table">
-              <thead><tr><th>{t('common.name')}</th><th>{t('admin.mirror.mode')}</th><th>{t('admin.mirror.lastResult')}</th><th>{t('common.actions')}</th></tr></thead>
+              <thead><tr><th>{t('common.name')}</th><th>Qué copia</th><th>{t('admin.mirror.mode')}</th><th>{t('admin.mirror.lastResult')}</th><th>{t('common.actions')}</th></tr></thead>
               <tbody>
                 {plans.map((plan) => (
                   <tr key={plan.id} className={selectedPlan?.id === plan.id ? 'selected-row' : ''}>
                     <td><button className="btn-link" onClick={() => handleSelectPlan(plan)}>{plan.name}</button></td>
+                    <td>{plan.scope === 'project' ? 'Proyecto completo' : 'Registros clave-valor'}</td>
                     <td>{t(MODE_KEYS[plan.schedule_mode] ?? 'admin.mirror.modeFull')}</td>
                     <td style={{ fontSize: '0.85em' }}>{plan.last_result ?? '—'}</td>
                     <td>
@@ -307,11 +319,19 @@ export function MirrorApp() {
                 <option value="daily">{t('admin.backups.frequencyDaily')}</option>
                 <option value="weekly">{t('admin.backups.frequencyWeekly')}</option>
               </select>
+              {schedFreq !== 'hourly' ? <>
+                <label>Hora<input type="time" value={schedTime} onChange={(e) => setSchedTime(e.target.value)} /></label>
+                <label>Zona horaria<input value={schedTz} onChange={(e) => setSchedTz(e.target.value)} /></label>
+              </> : null}
               <button className="btn btn-primary" onClick={handleSchedule} disabled={scheduling}>{t('admin.mirror.scheduleBtn')}</button>
             </div>
           )}
         </section>
       )}
+
+      {selectedPlan && runs[0]?.summary ? <Reconciliation summary={runs[0].summary} /> : null}
+
+      {selectedTarget && <DbImportPanel projectId={projectId} source={selectedTarget} />}
 
       {/* Runs Section */}
       {selectedPlan && runs.length > 0 && (
@@ -335,4 +355,15 @@ export function MirrorApp() {
       )}
     </AppShell>
   );
+}
+
+/** Conciliación de la última corrida: filas de origen frente a destino por tabla (docs/146). */
+function Reconciliation({ summary }: { summary: MirrorRunSummary }) {
+  const rows = [...Object.entries(summary.tables).map(([name, item]) => ({ name, label: name, ...item })),
+    ...Object.entries(summary.form_tables).map(([name, item]) => ({ name, label: `${item.form ?? name} (${name}, ${item.columns ?? 0} preguntas)`, ...item }))];
+  return <section style={{ marginBottom: 24 }}>
+    <h3>Conciliación de la última corrida {summary.reconciled ? '— origen y destino cuadran' : '— hay diferencias'}</h3>
+    <table className="data-table"><thead><tr><th>Tabla en la base externa</th><th>Origen</th><th>Destino</th><th>Estado</th></tr></thead>
+      <tbody>{rows.map((row) => <tr key={row.name}><td>{row.label}</td><td>{row.source}</td><td>{row.destination}</td><td>{row.ok ? 'Cuadra' : 'Diferencia'}</td></tr>)}</tbody></table>
+  </section>;
 }

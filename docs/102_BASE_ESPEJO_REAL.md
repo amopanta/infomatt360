@@ -13,7 +13,16 @@ Antes de este cambio, `app/models/mirror.py` (`MirrorTarget`, `MirrorPlan`) y `a
 - **Modos de sincronización:** `full_mirror` (espejo completo: borra y reinserta todas las filas del proyecto en cada corrida) e `insert_only` (agrega solo lo nuevo por id, nunca toca ni borra lo existente — bueno para logs inmutables).
 - **Disparo:** manual, vía `POST /mirror/plans/{id}/run`.
 
-**Pendiente, documentado honestamente (no resuelto aquí):** MySQL y SQL Server (requieren instalar `pymysql`/`pyodbc`, no es solo código), modo incremental (por marca de tiempo), "respaldo analítico" como modo distinto, una tabla ancha pivotada por plantilla (más cómoda para BI directo, pero exige DDL dinámico por formulario), integración con `ScheduledTask` para sincronización programada/recurrente (hoy solo manual), y — igual que roles/asignaciones — no hay UI de frontend.
+> **Actualizado 2026-10-19 ([docs/146](146_INTEGRACION_CON_BASES_EXTERNAS.md)):** ya están resueltos varios pendientes del párrafo siguiente:
+> - controladores de MySQL y SQL Server instalados (`PyMySQL`, `pymssql`);
+> - modo incremental;
+> - una tabla por formulario («Proyecto completo»);
+> - programación diaria a hora fija;
+> - pantalla en Avanzado → Base espejo;
+> - conciliación de origen y destino;
+> - importación desde la base externa.
+
+**Pendiente original (antes de docs/146):** MySQL y SQL Server (requieren instalar `pymysql`/`pyodbc`, no es solo código), modo incremental (por marca de tiempo), "respaldo analítico" como modo distinto, una tabla ancha pivotada por plantilla (más cómoda para BI directo, pero exige DDL dinámico por formulario), integración con `ScheduledTask` para sincronización programada/recurrente (hoy solo manual), y — igual que roles/asignaciones — no hay UI de frontend.
 
 ## Fixes de seguridad encontrados de paso
 

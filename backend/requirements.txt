@@ -7,6 +7,9 @@ pytest
 httpx
 sqlalchemy
 psycopg2-binary
+# Base espejo e importación hacia MySQL/MariaDB y SQL Server (docs/146)
+PyMySQL
+pymssql
 geoalchemy2
 shapely
 alembic

@@ -48,6 +48,11 @@ class MirrorPlanCreate(BaseModel):
     target_id: str
     name: str
     schedule_mode: Literal["full_mirror", "insert_only", "incremental"] = "full_mirror"
+    # "project": el proyecto completo (participantes, asignaciones, registros
+    # y una tabla por formulario, docs/146); la pantalla lo propone por
+    # defecto. "records": el espejo clave-valor original (docs/102); sigue
+    # siendo el valor por defecto de la API para no cambiar el contrato.
+    scope: Literal["project", "records"] = "records"
     status: str = "active"
 
 
@@ -55,6 +60,7 @@ class MirrorPlanRead(BaseModel):
     id: str
     target_id: str
     name: str
+    scope: str = "records"
     schedule_mode: str
     status: str
     last_result: str | None = None
@@ -70,3 +76,4 @@ class MirrorRunRead(BaseModel):
     error: str | None = None
     started_at: datetime
     finished_at: datetime | None = None
+    summary: dict | None = None

@@ -3,6 +3,17 @@
 > Pendiente operativo #3 de docs/96: documentar los pasos de configuración
 > de dominio y certificado TLS para despliegue en producción.
 
+> **Dominios reales (2026-10-20, docs/148):**
+> - la plataforma está en **`infomatt360.tecnomatt.com`**, con nginx de
+>   aaPanel, Let's Encrypt en `/etc/letsencrypt/live/infomatt360.tecnomatt.com/`
+>   y proxy a `127.0.0.1:18080`, el nginx de la web, que a su vez envía
+>   `/api/` al balanceador;
+> - `mobile-infomatt360.tecnomatt.com` y `mobile.infomatt360.tecnomatt.com`
+>   ya no tienen servicio.
+>
+> Los ejemplos de abajo usan `app.infomatt360.com`: reemplázalo por el
+> dominio real.
+
 ---
 
 ## 1. Requisitos previos

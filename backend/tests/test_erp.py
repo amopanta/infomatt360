@@ -109,12 +109,16 @@ def test_reopening_reverses_erp_and_reapproval_settles_corrected_quantity_once()
             manager = auth(client, "erp-manager@example.com", "Manager12345!")
             action = {"project_id": "erp-project", "record_id": "erp-record-reopen", "to_status": "approved", "action": "approve"}
             assert client.post("/api/v1/review/actions", headers=approver, json=action).status_code == 200
+            # Excepción administrativa: quien reabre se designa para corregir (docs/141)
             reopened = client.post("/api/v1/review/records/erp-record-reopen/reopen", headers=manager,
-                json={"reason": "Cantidad entregada incorrecta"})
+                json={"reason": "Cantidad entregada incorrecta", "assignee_user_id": "erp-manager"})
             assert reopened.status_code == 200, reopened.text
             with sessions() as db:
                 assert db.get(ErpInventoryItem, "erp-item-kit").quantity_on_hand == 10
                 assert db.query(ErpPayrollEntry).filter_by(reference_record_id="erp-record-reopen", status="reversed").count() == 1
+                reversed_entry = db.query(ErpPayrollEntry).filter_by(reference_record_id="erp-record-reopen", status="reversed").one()
+                reversed_id = reversed_entry.id
+            assert client.patch(f"/api/v1/erp/payroll/{reversed_id}/mark-paid", headers=manager).status_code == 409
             corrected = client.patch("/api/v1/runtime/record/erp-record-reopen/correction", headers=manager,
                 json={"field_name": "cantidad", "field_value_json": '"2"', "expected_lock_version": 1})
             assert corrected.status_code == 200, corrected.text

@@ -37,6 +37,7 @@ async function initQueue(dbPath) {
       project_id TEXT NOT NULL,
       template_id TEXT NOT NULL,
       participant_id TEXT,
+      user_id TEXT,
       payload_json TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending',
       created_at TEXT NOT NULL,
@@ -44,9 +45,11 @@ async function initQueue(dbPath) {
       error TEXT
     )
   `);
-  if (!runQuery(db, "PRAGMA table_info(queued_records)").some((column) => column.name === "participant_id")) {
-    db.run("ALTER TABLE queued_records ADD COLUMN participant_id TEXT");
-  }
+  const columns = runQuery(db, "PRAGMA table_info(queued_records)").map((column) => column.name);
+  if (!columns.includes("participant_id")) db.run("ALTER TABLE queued_records ADD COLUMN participant_id TEXT");
+  // Quién capturó: solo su sesión envía el registro (varios usuarios en el
+  // mismo equipo). Los registros anteriores quedan sin dueño.
+  if (!columns.includes("user_id")) db.run("ALTER TABLE queued_records ADD COLUMN user_id TEXT");
   // Ver auditoria tecnica de julio 2026, hallazgo SYNC-004: listPending ya
   // filtraba con WHERE en SQL (no un full scan en JS como IndexedDB), pero
   // sin indice sigue siendo un recorrido completo de la tabla a partir de
@@ -84,22 +87,26 @@ function runQuery(db, sql, params = []) {
  * el mismo formato que espera `RuntimeRecordCreate` en el backend, para que
  * `syncPending` pueda reenviarlo tal cual sin transformarlo de nuevo.
  */
-function enqueue(queue, { projectId, templateId, participantId = null, values }) {
+function enqueue(queue, { projectId, templateId, participantId = null, userId = null, values }) {
   const id = crypto.randomUUID();
   queue.db.run(
-    "INSERT INTO queued_records (id, project_id, template_id, participant_id, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-    [id, projectId, templateId, participantId, JSON.stringify(values), new Date().toISOString()]
+    "INSERT INTO queued_records (id, project_id, template_id, participant_id, user_id, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [id, projectId, templateId, participantId, userId, JSON.stringify(values), new Date().toISOString()]
   );
   persist(queue);
   return id;
 }
 
-function listPending(queue) {
+/** Con `userId`, solo los de esa persona y los antiguos sin dueño. */
+function listPending(queue, userId = null) {
+  if (userId) return runQuery(queue.db, "SELECT * FROM queued_records WHERE status = 'pending' AND (user_id IS NULL OR user_id = ?) ORDER BY created_at ASC", [userId]);
   return runQuery(queue.db, "SELECT * FROM queued_records WHERE status = 'pending' ORDER BY created_at ASC");
 }
 
-function countPending(queue) {
-  const rows = runQuery(queue.db, "SELECT COUNT(*) AS count FROM queued_records WHERE status = 'pending'");
+function countPending(queue, userId = null) {
+  const rows = userId
+    ? runQuery(queue.db, "SELECT COUNT(*) AS count FROM queued_records WHERE status = 'pending' AND (user_id IS NULL OR user_id = ?)", [userId])
+    : runQuery(queue.db, "SELECT COUNT(*) AS count FROM queued_records WHERE status = 'pending'");
   return rows[0] ? rows[0].count : 0;
 }
 
@@ -159,8 +166,8 @@ function hashIds(ids) {
  * usuario -- el intento inicial de reutilizarlo devolvia 401 "API key
  * requerida" al probarlo con el backend real.
  */
-async function syncPending(queue, { apiBaseUrl, accessToken, fetchImpl = fetch }) {
-  const pending = listPending(queue);
+async function syncPending(queue, { apiBaseUrl, accessToken, userId = null, fetchImpl = fetch }) {
+  const pending = listPending(queue, userId);
   const result = { attempted: pending.length, synced: 0, failed: 0 };
 
   for (const group of groupByTemplate(pending).values()) {

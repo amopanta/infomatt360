@@ -251,6 +251,16 @@ class XlsformImportService:
                     continue
                 repeat = repeat_stack.pop()
                 config = {"fields": repeat["fields"]}
+                if repeat_stack:
+                    # Repeat anidado: queda como campo del repeat que lo contiene,
+                    # en vez de aplanarse como componente aparte.
+                    repeat_stack[-1]["fields"].append({
+                        "name": str(repeat["name"]) or f"repeat_{sort_order}",
+                        "label": str(repeat["label"]) or "Repetible",
+                        "component_type": "REPEAT",
+                        "config": config,
+                    })
+                    continue
                 create_field_component(
                     db, template_id, current_section_id, sort_order,
                     component_type="REPEAT", name=str(repeat["name"]) or f"repeat_{sort_order}",
@@ -320,9 +330,36 @@ class XlsformImportService:
             warning = None if options or not list_name else f"lista de opciones '{list_name}' no encontrada en la hoja choices"
             return mapped, config, warning
         try:
-            return normalize_field_type(base_type), None, None
+            mapped = normalize_field_type(base_type)
         except ValueError:
             return "HIDDEN", None, f"tipo '{base_type}' no tiene equivalente directo; se importo como campo oculto"
+        return self._resolve_canonical_options(mapped, parts, choices_by_list)
+
+    # Tipo canónico de escala -> (lista convencional en choices, escala por defecto)
+    SCALE_DEFAULTS = {
+        "LIKERT_5": ("likert5", range(1, 6)),
+        "LIKERT_7": ("likert7", range(1, 8)),
+        "NPS": ("nps", range(0, 11)),
+        "RATING": ("rating", range(1, 6)),
+    }
+    LIST_REQUIRED_TYPES = {"SELECT", "MULTISELECT", "DROPDOWN", "RANKING"}
+
+    def _resolve_canonical_options(self, mapped: str, parts: list[str], choices_by_list: dict[str, list[dict[str, str]]]) -> tuple[str, dict | None, str | None]:
+        """Opciones para tipos canónicos escritos sin `select_one lista`
+        (p. ej. `LIKERT_5` o `DROPDOWN opciones`): lista indicada en el tipo,
+        lista convencional de la hoja choices o escala numérica estándar."""
+        list_name = parts[1] if len(parts) > 1 else ""
+        if list_name:
+            options = choices_by_list.get(list_name, [])
+            warning = None if options else f"lista de opciones '{list_name}' no encontrada en la hoja choices"
+            return mapped, {"options": options} if options else None, warning
+        if mapped in self.SCALE_DEFAULTS:
+            conventional, scale = self.SCALE_DEFAULTS[mapped]
+            options = choices_by_list.get(conventional) or [{"value": str(n), "label": str(n)} for n in scale]
+            return mapped, {"options": options}, None
+        if mapped in self.LIST_REQUIRED_TYPES:
+            return mapped, None, f"tipo {mapped} sin lista de opciones; usa '{mapped} nombre_lista' o 'select_one nombre_lista'"
+        return mapped, None, None
 
     def _apply_common_columns(
         self, config: dict | None, mapped_type: str, *,

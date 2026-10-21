@@ -70,6 +70,13 @@ desde un formulario web sin mentir sobre lo que realmente pasa. Por eso el
 paso 1 del wizard **verifica** la conexion ya configurada en vez de ofrecer
 cambiarla — ver `installation_service.requirements()`.
 
+## Requisito nuevo: base de datos actualizada (2026-10-19)
+
+El paso 1 también compara la versión de migraciones de la base con la del
+código, igual que el aviso de actualización de Moodle. Si la base está
+atrasada, el asistente no deja continuar y muestra el comando de migración
+(docs/147).
+
 ## Activar el instalador
 
 Para forzar el flujo completo (por ejemplo, para probarlo o en un

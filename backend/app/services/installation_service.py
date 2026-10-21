@@ -83,8 +83,35 @@ class InstallationService:
         else:
             checks.append(InstallRequirementCheck(key="database_engine", label="Motor de base de datos", status="ok"))
 
+        checks.append(self._migration_check(db))
+
         ready = all(check.status != "error" for check in checks)
         return InstallRequirementsResponse(ready=ready, checks=checks)
+
+    def _migration_check(self, db: Session) -> InstallRequirementCheck:
+        """Como el instalador de Moodle: la base debe estar en la misma versión
+        que el código. Las migraciones se aplican fuera del navegador
+        (docs/147), así que aquí solo se verifica y se indica el comando."""
+        label = "Base de datos actualizada (migraciones)"
+        command = "docker compose -f docker-compose.production.example.yml --env-file .env.production run --rm migrate"
+        try:
+            from alembic.config import Config
+            from alembic.runtime.migration import MigrationContext
+            from alembic.script import ScriptDirectory
+            backend_root = Path(__file__).resolve().parents[2]
+            config = Config(str(backend_root / "alembic.ini"))
+            config.set_main_option("script_location", str(backend_root / "alembic"))
+            heads = set(ScriptDirectory.from_config(config).get_heads())
+            current = set(MigrationContext.configure(db.connection()).get_current_heads())
+        except Exception as exc:  # pragma: no cover - depende del entorno
+            return InstallRequirementCheck(key="migrations", label=label, status="warning", detail=f"No se pudo verificar: {exc}")
+        if current == heads:
+            return InstallRequirementCheck(key="migrations", label=label, status="ok", detail=f"Versión {', '.join(sorted(heads))}")
+        if not current and settings.auto_create_tables:
+            return InstallRequirementCheck(key="migrations", label=label, status="warning",
+                                           detail="Tablas creadas sin Alembic (AUTO_CREATE_TABLES). En producción usa migraciones.")
+        return InstallRequirementCheck(key="migrations", label=label, status="error",
+                                       detail=f"La base está en {', '.join(sorted(current)) or 'vacía'} y el código pide {', '.join(sorted(heads))}. Ejecuta en el servidor: {command}")
 
     def bootstrap(self, db: Session, payload: InstallBootstrapRequest) -> InstallBootstrapResponse:
         if self.is_installed(db):

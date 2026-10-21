@@ -1,6 +1,10 @@
+from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.schemas.auth import validate_bcrypt_password
+from app.schemas.identity import UserCreate
 
 
 class CurrentUserResponse(BaseModel):
@@ -14,10 +18,62 @@ class CurrentUserResponse(BaseModel):
 class AdminUserRead(BaseModel):
     id: str
     full_name: str
+    document_id: str | None = None
+    position: str | None = None
+    department: str | None = None
+    municipality: str | None = None
+    phone: str | None = None
+    created_at: datetime | None = None
     email: EmailStr
     status: str
     must_change_password: bool
     mfa_enabled: bool
+    role_id: str | None = None
+    role_name: str | None = None
+    assignment_status: str = "active"
+    permissions: list[str] = Field(default_factory=list)
+    inherited_permissions: list[str] = Field(default_factory=list)
+
+
+class AdminProjectUserCreate(UserCreate):
+    # Mínimo para crear una cuenta (docs/145): documento, nombre, cargo y municipio.
+    position: str = Field(..., min_length=2, max_length=120)
+    department: str = Field(..., min_length=2, max_length=120)
+    municipality: str = Field(..., min_length=2, max_length=120)
+    # Además, limitar su acceso a ese municipio (lo usual para gestores).
+    restrict_to_territory: bool = True
+    role_id: str
+    admin_password: str = Field(..., min_length=6, max_length=128)
+    _password_fits_bcrypt = field_validator("admin_password")(validate_bcrypt_password)
+
+
+class AdminProjectProfileUpdate(BaseModel):
+    full_name: str = Field(..., min_length=3, max_length=180)
+    position: str = Field(..., min_length=2, max_length=120)
+    department: str = Field(..., min_length=2, max_length=120)
+    municipality: str = Field(..., min_length=2, max_length=120)
+    phone: str | None = Field(default=None, max_length=50)
+    admin_password: str = Field(..., min_length=6, max_length=128)
+    _password_fits_bcrypt = field_validator("admin_password")(validate_bcrypt_password)
+
+
+class AdminProjectUserCreated(BaseModel):
+    user: AdminUserRead
+    temporary_password: str
+
+
+class AdminProjectAccessUpdate(BaseModel):
+    role_id: str
+    assignment_status: Literal["active", "suspended"]
+    admin_password: str = Field(..., min_length=6, max_length=128)
+    _password_fits_bcrypt = field_validator("admin_password")(validate_bcrypt_password)
+
+
+class AdminProjectRoleCreate(BaseModel):
+    name: str = Field(..., min_length=3, max_length=120)
+    permissions: list[str] = Field(..., min_length=1)
+    admin_password: str = Field(..., min_length=6, max_length=128)
+    _password_fits_bcrypt = field_validator("admin_password")(validate_bcrypt_password)
 
 
 class AdminEmailUpdate(BaseModel):

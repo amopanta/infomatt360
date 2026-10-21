@@ -1,4 +1,5 @@
 import { authorizationHeader } from '../auth/session';
+import { cachedJson } from '../offline/offlineCache';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api/v1';
 
@@ -101,9 +102,11 @@ export async function setParticipantGroupStatus(projectId: string, groupName: st
 }
 
 export async function fetchParticipantHistory(participantId: string): Promise<ParticipantHistoryItem[]> {
-  const response = await fetch(`${API_BASE_URL}/participants/${participantId}/history`, { headers: headers() });
-  if (!response.ok) throw new Error('No fue posible consultar el historial del participante.');
-  return response.json();
+  return cachedJson(`participant-history:${participantId}`, async () => {
+    const response = await fetch(`${API_BASE_URL}/participants/${participantId}/history`, { headers: headers() });
+    if (!response.ok) throw new Error('No fue posible consultar el historial del participante.');
+    return response.json();
+  });
 }
 
 export async function fetchParticipantActivities(participantId: string): Promise<ParticipantActivity[]> {
@@ -112,7 +115,7 @@ export async function fetchParticipantActivities(participantId: string): Promise
   return response.json();
 }
 
-export type ParticipantCase = { id: string; title: string; status: string; assigned_user_id?: string | null; due_at?: string | null; created_at: string; properties: Record<string, unknown> };
+export type ParticipantCase = { id: string; title: string; case_type: string; parent_case_id?: string | null; status: string; assigned_user_id?: string | null; due_at?: string | null; created_at: string; properties: Record<string, unknown> };
 export type ScheduledCase = ParticipantCase & { participant_id: string; participant_name: string };
 export type CaseEvent = { id: string; event_type: string; note?: string | null; from_user_id: string; to_user_id?: string | null; created_at: string };
 export type CaseAssignee = { id: string; full_name: string };
@@ -128,7 +131,7 @@ export const fetchParticipantCases = (id: string) => jsonRequest<ParticipantCase
 export const fetchProjectSchedule = (projectId: string) => jsonRequest<ScheduledCase[]>(`/cases/project/${projectId}/schedule`);
 export const fetchCaseEvents = (id: string) => jsonRequest<CaseEvent[]>(`/cases/${id}/events`);
 export const fetchCaseAssignees = (projectId: string) => jsonRequest<CaseAssignee[]>(`/cases/project/${projectId}/assignees`);
-export const createParticipantCase = (data: { participant_id: string; title: string; assigned_user_id?: string | null; due_at?: string | null; reminder_channels?: string[] }) => jsonRequest<ParticipantCase>('/cases/', { method: 'POST', body: JSON.stringify(data) });
+export const createParticipantCase = (data: { participant_id: string; title: string; case_type?: string; parent_case_id?: string | null; assigned_user_id?: string | null; due_at?: string | null; reminder_channels?: string[] }) => jsonRequest<ParticipantCase>('/cases/', { method: 'POST', body: JSON.stringify(data) });
 export const updateParticipantCase = (id: string, data: { status?: string; assigned_user_id?: string | null; due_at?: string | null; note?: string }) => jsonRequest<ParticipantCase>(`/cases/${id}`, { method: 'PATCH', body: JSON.stringify(data) });
 export const fetchTerritories = (projectId: string) => jsonRequest<UserTerritory[]>(`/territories/${projectId}`);
 export const assignTerritory = (projectId: string, data: { user_id: string; department: string; municipality: string }) => jsonRequest<UserTerritory>(`/territories/${projectId}`, { method: 'POST', body: JSON.stringify(data) });

@@ -26,7 +26,7 @@ Permiso `organizations.manage` (el mismo que crear proyectos), valida que la org
 
 ### Pantalla `/admin/branding` ("Marca" en el menú)
 
-Protegida por `organizations.branding.manage` o `organizations.manage`. Tres secciones: selector de organización con vista previa y subida del logo; colores y eslogan (el formulario **reenvía el `logo_url` vigente** al guardar, porque `PUT /branding` pisa todos los campos y omitirlo borraría el logo recién subido); y la tabla de proyectos con vincular/desvincular a la organización seleccionada.
+Protegida por `organizations.branding.manage` (en un proyecto de la organización elegida, H11) o `organizations.manage` (plataforma). Tres secciones: selector de organización con vista previa y subida del logo; colores y eslogan (el formulario **reenvía el `logo_url` vigente** al guardar, porque `PUT /branding` pisa todos los campos y omitirlo borraría el logo recién subido); y la tabla de proyectos con vincular/desvincular a la organización seleccionada.
 
 ## Bug real encontrado por la verificación en vivo (y su fix)
 

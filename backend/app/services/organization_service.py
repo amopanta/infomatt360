@@ -56,9 +56,10 @@ def _to_read(row: Organization) -> OrganizationRead:
     return OrganizationRead(id=row.id, name=row.name, slug=row.slug, status=row.status)
 
 
-def _branding_to_read(row: OrganizationBranding) -> OrganizationBrandingRead:
+def _branding_to_read(row: OrganizationBranding, organization_name: str | None = None) -> OrganizationBrandingRead:
     return OrganizationBrandingRead(
         organization_id=row.organization_id,
+        organization_name=organization_name,
         logo_url=row.logo_url,
         primary_color=row.primary_color,
         accent_color=row.accent_color,
@@ -103,9 +104,11 @@ class OrganizationService:
         row.background_color = payload.background_color
         row.slogan = payload.slogan
         row.updated_at = utc_now()
+        if payload.organization_name and payload.organization_name.strip():
+            organization.name = payload.organization_name.strip()
         db.commit()
         db.refresh(row)
-        return _branding_to_read(row)
+        return _branding_to_read(row, organization.name)
 
     def save_logo(self, db: Session, organization_id: str, content: bytes, content_type: str | None, base_url: str) -> OrganizationBrandingRead:
         """Guarda el logo en disco y apunta logo_url al endpoint publico.
@@ -148,7 +151,8 @@ class OrganizationService:
 
     def get_branding(self, db: Session, organization_id: str) -> OrganizationBrandingRead | None:
         row = db.query(OrganizationBranding).filter(OrganizationBranding.organization_id == organization_id).first()
-        return _branding_to_read(row) if row else None
+        organization = db.query(Organization).filter(Organization.id == organization_id).first()
+        return _branding_to_read(row, organization.name if organization else None) if row else None
 
     def get_public_branding_by_slug(self, db: Session, slug: str) -> PublicBrandingRead | None:
         organization = self.get_by_slug(db, slug)

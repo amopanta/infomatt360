@@ -4,3 +4,5 @@
 # (docs/117): esto rompio un build real intentando copiar backend/.pytest_cache.
 # Forzar LF aqui evita que vuelva a pasar en cualquier checkout de Windows.
 .dockerignore text eol=lf
+# Los scripts de Linux deben llegar con fin de línea LF o no se ejecutan (docs/147).
+*.sh text eol=lf

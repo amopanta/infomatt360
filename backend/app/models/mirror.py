@@ -55,3 +55,5 @@ class MirrorRun(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Conciliación por tabla (origen frente a destino) del modo proyecto completo (docs/146).
+    summary_json: Mapped[str | None] = mapped_column(Text, nullable=True)

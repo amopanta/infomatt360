@@ -122,6 +122,18 @@ export async function updateComponentProperties(componentId: string, properties:
   if (!response.ok) { const payload = await response.json().catch(() => null); throw new Error(payload?.detail || 'No fue posible guardar la pregunta.'); }
 }
 
+export async function deleteComponent(componentId: string): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/builder/components/detail/${componentId}`, { method: 'DELETE', headers: authHeaders() });
+  if (!response.ok) { const payload = await response.json().catch(() => null); throw new Error(payload?.detail || 'No fue posible eliminar la pregunta.'); }
+}
+
+export async function reorderComponents(templateId: string, componentIds: string[]): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}/builder/templates/detail/${templateId}/component-order`, {
+    method: 'PUT', headers: authHeaders(), body: JSON.stringify({ component_ids: componentIds }),
+  });
+  if (!response.ok) { const payload = await response.json().catch(() => null); throw new Error(payload?.detail || 'No fue posible guardar el orden de las preguntas.'); }
+}
+
 export async function updateSectionTitle(sectionId: string, title: string): Promise<void> {
   const response = await fetch(`${API_BASE_URL}/builder/sections/detail/${sectionId}/title`, {
     method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ title }),

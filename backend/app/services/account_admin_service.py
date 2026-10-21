@@ -8,7 +8,9 @@ from sqlalchemy.orm import Session
 
 from app.core.security import hash_password, verify_password
 from app.core.time import utc_now
-from app.models.assignment import UserProjectAssignment
+from app.models.assignment import UserOrganizationAssignment, UserProjectAssignment
+from app.api.permissions import get_project_permissions, get_organization_permissions
+from app.core.permissions import IDENTITY_USERS_MANAGE
 from app.models.audit import AuditLog
 from app.models.identity import RefreshToken, User
 from app.schemas.security import AdminEmailUpdate, AdminMfaReset, AdminPasswordReset, AdminPasswordResetResponse, AdminUserRead
@@ -30,6 +32,19 @@ class AccountAdminService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario no asignado al proyecto")
         return row
 
+    def _authorize_account_change(self, db: Session, target: User, admin: User) -> None:
+        # Credentials affect the whole identity, including its other projects.
+        for assignment in db.query(UserProjectAssignment).filter_by(user_id=target.id, status="active").all():
+            _, actor_permissions = get_project_permissions(db, admin.id, assignment.project_id)
+            _, target_permissions = get_project_permissions(db, target.id, assignment.project_id)
+            if IDENTITY_USERS_MANAGE not in actor_permissions or not target_permissions.issubset(actor_permissions):
+                raise HTTPException(status_code=403, detail="La cuenta tiene acceso fuera de tu ámbito administrativo")
+        for assignment in db.query(UserOrganizationAssignment).filter_by(user_id=target.id, status="active").all():
+            actor_permissions = get_organization_permissions(db, admin.id, assignment.organization_id)
+            target_permissions = get_organization_permissions(db, target.id, assignment.organization_id)
+            if IDENTITY_USERS_MANAGE not in actor_permissions or not target_permissions.issubset(actor_permissions):
+                raise HTTPException(status_code=403, detail="La cuenta requiere un administrador de su organización")
+
     def _reauthenticate(self, admin: User, password: str) -> None:
         if not verify_password(password, admin.password_hash):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Contraseña del administrador incorrecta")
@@ -47,6 +62,7 @@ class AccountAdminService:
     def update_email(self, db: Session, project_id: str, user_id: str, payload: AdminEmailUpdate, admin: User) -> AdminUserRead:
         self._reauthenticate(admin, payload.admin_password)
         target = self._target_user(db, project_id, user_id)
+        self._authorize_account_change(db, target, admin)
         next_email = str(payload.email).strip().lower()
         duplicate = db.query(User).filter(func.lower(User.email) == next_email, User.id != target.id).first()
         if duplicate:
@@ -69,6 +85,7 @@ class AccountAdminService:
     def reset_password(self, db: Session, project_id: str, user_id: str, payload: AdminPasswordReset, admin: User) -> AdminPasswordResetResponse:
         self._reauthenticate(admin, payload.admin_password)
         target = self._target_user(db, project_id, user_id)
+        self._authorize_account_change(db, target, admin)
         generated = payload.temporary_password is None
         temporary_password = payload.temporary_password or self._generate_temporary_password()
         target.password_hash = hash_password(temporary_password)
@@ -96,6 +113,7 @@ class AccountAdminService:
     def reset_mfa(self, db: Session, project_id: str, user_id: str, payload: AdminMfaReset, admin: User) -> None:
         self._reauthenticate(admin, payload.admin_password)
         target = self._target_user(db, project_id, user_id)
+        self._authorize_account_change(db, target, admin)
         target.mfa_enabled = False
         target.mfa_secret_encrypted = None
         target.mfa_recovery_hashes = None

@@ -222,6 +222,30 @@ def update_component_properties(component_id: str, payload: BuilderComponentProp
     return builder_service.set_component_properties(db, component_id, payload)
 
 
+@router.delete("/components/detail/{component_id}")
+def delete_component(component_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> dict[str, bool]:
+    """Elimina una pregunta de un formulario que aun no tiene respuestas."""
+    component = db.get(BuilderComponent, component_id)
+    if component is None:
+        raise HTTPException(status_code=404, detail="Pregunta no encontrada")
+    template = require_template_access(db, current_user.id, component.template_id)
+    require_project_permission(db, current_user.id, template.project_id, BUILDER_WRITE)
+    builder_service.delete_component(db, component_id)
+    return {"deleted": True}
+
+
+class ComponentOrderUpdate(BaseModel):
+    component_ids: list[str]
+
+
+@router.put("/templates/detail/{template_id}/component-order", response_model=list[BuilderComponentRead])
+def reorder_components(template_id: str, payload: ComponentOrderUpdate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[BuilderComponentRead]:
+    """Guarda el orden de las preguntas tal como quedo en el constructor."""
+    template = require_template_access(db, current_user.id, template_id)
+    require_project_permission(db, current_user.id, template.project_id, BUILDER_WRITE)
+    return builder_service.reorder_components(db, template_id, payload.component_ids)
+
+
 @router.post("/versions", response_model=BuilderVersionRead)
 def create_version(payload: BuilderVersionCreate, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> BuilderVersionRead:
     """Guarda una version JSON de una plantilla."""

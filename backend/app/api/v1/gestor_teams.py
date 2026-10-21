@@ -41,6 +41,11 @@ class TeamMemberWrite(BaseModel):
     member_id: str
 
 
+class TeamCoordinatorWrite(BaseModel):
+    # Responsable del equipo; None lo quita. El planeador lo hereda (docs/144).
+    coordinator_user_id: str | None = None
+
+
 def _project_user_ids(db: Session, project_id: str) -> set[str]:
     ids = {row[0] for row in db.query(UserProjectAssignment.user_id).join(User, User.id == UserProjectAssignment.user_id).filter(
         UserProjectAssignment.project_id == project_id, UserProjectAssignment.status == "active", User.status == "active").all()}
@@ -75,7 +80,7 @@ def _team(db: Session, actor: User, team_id: str) -> GestorTeam:
 def _read(db: Session, team: GestorTeam) -> dict:
     users = db.query(GestorTeamUser.user_id).filter_by(team_id=team.id).all()
     participants = db.query(GestorTeamParticipant.participant_id).filter_by(team_id=team.id).all()
-    return {"id": team.id, "project_id": team.project_id, "name": team.name,
+    return {"id": team.id, "project_id": team.project_id, "name": team.name, "coordinator_user_id": team.coordinator_user_id,
             "user_ids": [row[0] for row in users], "participant_ids": [row[0] for row in participants]}
 
 
@@ -93,7 +98,7 @@ def team_summaries(project_id: str, db: Session = Depends(get_db), actor: User =
         GestorTeam.project_id == project_id).group_by(GestorTeamUser.team_id).all())
     participant_counts = dict(db.query(GestorTeamParticipant.team_id, func.count()).join(GestorTeam, GestorTeam.id == GestorTeamParticipant.team_id).filter(
         GestorTeam.project_id == project_id).group_by(GestorTeamParticipant.team_id).all())
-    return [{"id": row.id, "project_id": project_id, "name": row.name,
+    return [{"id": row.id, "project_id": project_id, "name": row.name, "coordinator_user_id": row.coordinator_user_id,
              "user_count": user_counts.get(row.id, 0), "participant_count": participant_counts.get(row.id, 0)} for row in rows]
 
 
@@ -303,6 +308,20 @@ def rename_team(team_id: str, payload: TeamWrite, db: Session = Depends(get_db),
     db.add(AuditLog(project_id=team.project_id, user_id=actor.id, module="participants", action="rename_gestor_team",
                     entity_type="gestor_team", entity_id=team.id, before_json=json.dumps({"name": before}),
                     after_json=json.dumps({"name": name})))
+    db.commit()
+    return _read(db, team)
+
+
+@router.put("/{team_id}/coordinator")
+def set_team_coordinator(team_id: str, payload: TeamCoordinatorWrite, db: Session = Depends(get_db), actor: User = Depends(get_current_user)) -> dict:
+    team = _team(db, actor, team_id)
+    if payload.coordinator_user_id and payload.coordinator_user_id not in _project_user_ids(db, team.project_id):
+        raise HTTPException(status_code=422, detail="El coordinador debe ser un usuario activo del proyecto")
+    before = team.coordinator_user_id
+    team.coordinator_user_id = payload.coordinator_user_id
+    db.add(AuditLog(project_id=team.project_id, user_id=actor.id, module="participants", action="set_team_coordinator",
+                    entity_type="gestor_team", entity_id=team.id, before_json=json.dumps({"coordinator_user_id": before}),
+                    after_json=json.dumps({"coordinator_user_id": payload.coordinator_user_id})))
     db.commit()
     return _read(db, team)
 

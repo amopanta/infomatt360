@@ -28,6 +28,11 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(180), unique=True, nullable=False, index=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False, default="CHANGE_ON_FIRST_LOGIN")
     phone: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    # Perfil para informes (docs/145): cargo y municipio de la persona. El
+    # acceso territorial sigue en user_territories.
+    position: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    department: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    municipality: Mapped[str | None] = mapped_column(String(120), nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="active", nullable=False)
     allowed_channels: Mapped[str] = mapped_column(String(120), default="web,android,desktop", nullable=False)
     must_change_password: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

@@ -15,6 +15,7 @@ from app.api.v1.compiler import router as compiler_router
 from app.api.v1.dashboard import router as dashboard_router
 from app.api.v1.device_assignments import router as device_assignments_router
 from app.api.v1.device_verification import router as device_verification_router
+from app.api.v1.field_devices import router as field_devices_router
 from app.api.v1.emergency_access import router as emergency_access_router
 from app.api.v1.enrollment import router as enrollment_router
 from app.api.v1.erp import router as erp_router
@@ -48,6 +49,8 @@ from app.api.v1.reports import router as reports_router
 from app.api.v1.report_catalog import router as report_catalog_router
 from app.api.v1.review import router as review_router
 from app.api.v1.runtime import router as runtime_router
+from app.api.v1.planner import router as planner_router
+from app.api.v1.db_sync import router as db_sync_router
 from app.api.v1.scheduler import router as scheduler_router
 from app.api.v1.security import router as security_router
 from app.api.v1.storage import router as storage_router
@@ -66,6 +69,7 @@ api_v1_router.include_router(api_keys_router, prefix="/api-keys", tags=["api-key
 api_v1_router.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"])
 api_v1_router.include_router(device_assignments_router, prefix="/device-assignments", tags=["device-assignments"])
 api_v1_router.include_router(device_verification_router, prefix="/device-verification", tags=["device-verification"])
+api_v1_router.include_router(field_devices_router, prefix="/field-devices", tags=["field-devices"])
 api_v1_router.include_router(identity_router, prefix="/identity", tags=["identity"])
 api_v1_router.include_router(organizations_router, prefix="/organizations", tags=["organizations"])
 api_v1_router.include_router(backups_router, prefix="/backups", tags=["backups"])
@@ -108,6 +112,8 @@ api_v1_router.include_router(xlsform_router, prefix="/xlsform", tags=["xlsform"]
 api_v1_router.include_router(erp_router, prefix="/erp", tags=["erp"])
 api_v1_router.include_router(whatsapp_router, prefix="/whatsapp", tags=["whatsapp"])
 api_v1_router.include_router(runtime_router, prefix="/runtime", tags=["runtime"])
+api_v1_router.include_router(planner_router, prefix="/planner", tags=["planner"])
+api_v1_router.include_router(db_sync_router, prefix="/db-sync", tags=["db-sync"])
 api_v1_router.include_router(public_forms_router, prefix="/public-forms", tags=["public-forms"])
 api_v1_router.include_router(form_lookups_router, prefix="/form-lookups", tags=["form-lookups"])
 api_v1_router.include_router(compiler_router, prefix="/compiler", tags=["compiler"])

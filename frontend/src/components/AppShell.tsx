@@ -22,61 +22,79 @@ type MenuGroup = {
   items: MenuItem[];
 };
 
+// Menu organizado por lo que la persona quiere hacer (no por modulo tecnico):
+// Inicio → Formularios → Datos → Revision → Configuracion → Avanzado.
+// Cada opcion se filtra por permisos, asi un encuestador de campo solo ve
+// Inicio, Datos y su seguridad; lo tecnico queda en "Avanzado" (cerrado).
 const MENU: MenuGroup[] = [
   {
-    labelKey: 'nav.operation',
+    labelKey: 'ux.nav.home',
     icon: 'gOper',
     items: [
-      { labelKey: 'nav.dashboard', href: '/', icon: 'dash' },
-      { labelKey: 'nav.myForms', href: '/my-forms', icon: 'form', permissions: ['records.write'] },
-      { labelKey: 'nav.forms', href: '/builder', icon: 'form', permissions: ['builder.write'], formsSubmenu: true },
+      { labelKey: 'ux.nav.home', href: '/', icon: 'dash' },
+      { labelKey: 'ux.nav.fill', href: '/my-forms', icon: 'form', permissions: ['records.write'] },
+    ],
+  },
+  {
+    labelKey: 'ux.nav.forms',
+    icon: 'form',
+    items: [
+      { labelKey: 'ux.nav.createEdit', href: '/builder', icon: 'form', permissions: ['builder.write'], formsSubmenu: true },
       { labelKey: 'nav.actas', href: '/acta', icon: 'acta', permissions: ['builder.write'] },
+      { labelKey: 'nav.publicForms', href: '/admin/public-links', icon: 'link', permissions: ['builder.write'] },
+      { labelKey: 'ux.nav.xlsform', href: '/admin/xlsform', icon: 'exchange', permissions: ['builder.write'] },
+    ],
+  },
+  {
+    labelKey: 'ux.nav.data',
+    icon: 'gData',
+    items: [
+      { labelKey: 'nav.records', href: '/records', icon: 'records' },
       { labelKey: 'nav.participants', href: '/participants', icon: 'users' },
       { labelKey: 'nav.appliedActivities', href: '/activities', icon: 'records' },
-      { labelKey: 'nav.teams', href: '/teams', icon: 'users', permissions: ['identity.users.manage'] },
-      { labelKey: 'nav.records', href: '/records', icon: 'records' },
       { labelKey: 'nav.evidence', href: '/evidence', icon: 'photo' },
       { labelKey: 'nav.maps', href: '/maps', icon: 'map' },
     ],
   },
   {
-    labelKey: 'nav.review',
+    labelKey: 'ux.nav.review',
     icon: 'gRev',
     items: [
+      { labelKey: 'ux.nav.fieldDevices', href: '/field-devices', icon: 'tablet', permissions: ['records.review', 'records.coordinate', 'identity.users.manage'] },
       { labelKey: 'nav.approvalFlows', href: '/admin/approval-flows', icon: 'check', permissions: ['records.approve'] },
       { labelKey: 'nav.messages', href: '/messages', icon: 'msg' },
-      { labelKey: 'nav.audit', href: '/audit', icon: 'shield' },
-      { labelKey: 'nav.aiAudit', href: '/admin/ai-audit', icon: 'aiaudit', permissions: ['ai.audit.manage'] },
+      { labelKey: 'ux.nav.planner', href: '/planner', icon: 'metric', permissions: ['planner.manage', 'identity.users.manage', 'records.review', 'records.approve', 'records.coordinate', 'reports.export', 'records.write'] },
       { labelKey: 'nav.reports', href: '/reports', icon: 'report' },
+      { labelKey: 'nav.audit', href: '/audit', icon: 'shield' },
       { labelKey: 'nav.metrics', href: '/admin/metrics', icon: 'metric', permissions: ['identity.users.manage', 'integrations.api_keys.manage', 'records.approve', 'records.write'] },
     ],
   },
   {
-    labelKey: 'nav.dataIntegrations',
-    icon: 'gData',
-    items: [
-      { labelKey: 'nav.excelImport', href: '/admin/excel-import', icon: 'data', permissions: ['identity.users.manage'] },
-      { labelKey: 'nav.xlsformImport', href: '/admin/xlsform', icon: 'exchange', permissions: ['builder.write'] },
-      { labelKey: 'nav.donors', href: '/admin/donor-sync', icon: 'plug', permissions: ['integrations.donor_sync.manage'] },
-      { labelKey: 'nav.apiKeys', href: '/admin/api-keys', icon: 'key', permissions: ['integrations.api_keys.manage'] },
-      { labelKey: 'nav.sync', href: '/admin/bulk-jobs', icon: 'sync', permissions: ['integrations.api_keys.manage', 'records.write'] },
-      { labelKey: 'nav.storage', href: '/admin/storage', icon: 'box', permissions: ['storage.manage'] },
-      { labelKey: 'nav.erp', href: '/admin/erp', icon: 'erp', permissions: ['erp.manage'] },
-      { labelKey: 'nav.publicForms', href: '/admin/public-links', icon: 'link', permissions: ['builder.write'] },
-    ],
-  },
-  {
-    labelKey: 'nav.administration',
+    labelKey: 'ux.nav.settings',
     icon: 'gAdmin',
     items: [
       { labelKey: 'nav.users', href: '/admin/users', icon: 'users', permissions: ['identity.users.manage'] },
-      { labelKey: 'nav.governance', href: '/admin/governance', icon: 'gov', permissions: ['organizations.tenant_clean', 'identity.users.manage', 'support.tickets.manage'] },
+      { labelKey: 'nav.teams', href: '/teams', icon: 'users', permissions: ['identity.users.manage'] },
       { labelKey: 'nav.branding', href: '/admin/branding', icon: 'brand', permissions: ['organizations.branding.manage', 'organizations.manage'] },
       { labelKey: 'nav.mail', href: '/admin/mail-profiles', icon: 'mail', permissions: ['messages.write'] },
       { labelKey: 'nav.whatsapp', href: '/admin/whatsapp', icon: 'msg', permissions: ['messages.read', 'records.review', 'records.approve'] },
-      { labelKey: 'nav.backups', href: '/admin/backups', icon: 'backup', permissions: ['backups.manage'] },
-      { labelKey: 'nav.mirror', href: '/admin/mirror', icon: 'db', permissions: ['mirror.manage'] },
       { labelKey: 'nav.mySecurity', href: '/account/security', icon: 'lock' },
+    ],
+  },
+  {
+    labelKey: 'ux.nav.advanced',
+    icon: 'plug',
+    items: [
+      { labelKey: 'nav.excelImport', href: '/admin/excel-import', icon: 'data', permissions: ['identity.users.manage'] },
+      { labelKey: 'nav.sync', href: '/admin/bulk-jobs', icon: 'sync', permissions: ['integrations.api_keys.manage', 'records.write'] },
+      { labelKey: 'ux.nav.apiKeys', href: '/admin/api-keys', icon: 'key', permissions: ['integrations.api_keys.manage'] },
+      { labelKey: 'nav.donors', href: '/admin/donor-sync', icon: 'plug', permissions: ['integrations.donor_sync.manage'] },
+      { labelKey: 'nav.erp', href: '/admin/erp', icon: 'erp', permissions: ['erp.manage'] },
+      { labelKey: 'nav.storage', href: '/admin/storage', icon: 'box', permissions: ['storage.manage'] },
+      { labelKey: 'nav.aiAudit', href: '/admin/ai-audit', icon: 'aiaudit', permissions: ['ai.audit.manage'] },
+      { labelKey: 'nav.governance', href: '/admin/governance', icon: 'gov', permissions: ['organizations.tenant_clean', 'identity.users.manage', 'support.tickets.manage'] },
+      { labelKey: 'ux.nav.backups', href: '/admin/backups', icon: 'backup', permissions: ['backups.manage'] },
+      { labelKey: 'ux.nav.mirror', href: '/admin/mirror', icon: 'db', permissions: ['mirror.manage'] },
     ],
   },
 ];
@@ -128,13 +146,13 @@ export function AppShell({ title, children }: Props) {
     if (item.formsSubmenu) {
       return (
         <details key={item.labelKey} className="app-nav-group" open={currentPath.startsWith('/builder')}>
-          <summary><Icon name={item.icon} /><span>{t('nav.forms')}</span></summary>
+          <summary><Icon name={item.icon} /><span>{label}</span></summary>
           <div className="app-nav-submenu">
             <a href="/builder" className={currentPath === '/builder' ? 'active' : undefined}>{t('nav.allForms')}</a>
             <a href="/builder/drafts" className={currentPath === '/builder/drafts' || currentPath === '/builder/new' ? 'active' : undefined}>{t('nav.inProgress')}</a>
             <a href="/builder/active" className={currentPath === '/builder/active' ? 'active' : undefined}>{t('nav.activeForms')}</a>
             <a href="/builder/archived" className={currentPath === '/builder/archived' ? 'active' : undefined}>{t('nav.archivedForms')}</a>
-            <a href="/builder/pull" className={currentPath === '/builder/pull' ? 'active' : undefined}>{t('nav.pullGroups')}</a>
+            <a href="/builder/pull" className={currentPath === '/builder/pull' ? 'active' : undefined}>{t('ux.nav.pullGroups')}</a>
           </div>
         </details>
       );
@@ -155,7 +173,7 @@ export function AppShell({ title, children }: Props) {
           {visibleGroups.map((group) => {
             const hasActive = group.items.some((item) => item.formsSubmenu ? currentPath.startsWith('/builder') : isActiveMenuItem(item.href));
             return (
-              <details key={group.labelKey} className="app-nav-section" open={hasActive || group.labelKey === 'nav.operation'}>
+              <details key={group.labelKey} className="app-nav-section" open={hasActive || (group.labelKey !== 'ux.nav.advanced' && group.labelKey !== 'ux.nav.settings')}>
                 <summary>
                   <Icon name={group.icon} className="app-nav-section-icon" />
                   <span>{t(group.labelKey)}</span>

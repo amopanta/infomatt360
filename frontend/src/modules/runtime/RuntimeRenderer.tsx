@@ -15,6 +15,8 @@ type Props = {
   participantSection?: ReactNode;
   showQuestions?: boolean;
   footerContent?: ReactNode;
+  /** Clave del borrador: guarda la página para retomarla (docs/141 §2) */
+  positionKey?: string;
 };
 
 function widthStyle(column: { desktop_width: number; tablet_width: number; mobile_width: number }) {
@@ -39,9 +41,20 @@ export function themeStyle(themeJson?: string | null) {
   }
 }
 
-export function RuntimeRenderer({ template, projectId, values, onValueChange, uploadsDisabled, participantSection, showQuestions = true, footerContent }: Props) {
+export function RuntimeRenderer({ template, projectId, values, onValueChange, uploadsDisabled, participantSection, showQuestions = true, footerContent, positionKey }: Props) {
   const { t } = useI18n();
-  const [activePageIndex, setActivePageIndex] = useState(0);
+  // docs/141 §2: el borrador vuelve a la página donde quedó
+  const [activePageIndex, setActivePageIndex] = useState(() => {
+    if (!positionKey) return 0;
+    try {
+      const saved = Number(localStorage.getItem(`${positionKey}_page`));
+      return Number.isInteger(saved) && saved > 0 && saved < template.pages.length ? saved : 0;
+    } catch { return 0; }
+  });
+  useEffect(() => {
+    if (!positionKey) return;
+    try { localStorage.setItem(`${positionKey}_page`, String(activePageIndex)); } catch { /* sin almacenamiento */ }
+  }, [positionKey, activePageIndex]);
   const [activeSectionIndex, setActiveSectionIndex] = useState(0);
   const activePage = template.pages[activePageIndex];
   const activeSection = activePage?.sections[activeSectionIndex];

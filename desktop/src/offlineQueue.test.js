@@ -189,3 +189,23 @@ test("initQueue persiste en disco y recupera los datos al reabrir", async () => 
 
   fs.unlinkSync(dbPath);
 });
+
+test("cada usuario solo envía sus pendientes y los antiguos sin dueño", async () => {
+  const queue = await initQueue(":memory:");
+  enqueue(queue, { projectId: "p1", templateId: "t1", userId: "u1", values: sampleValues("Ana") });
+  enqueue(queue, { projectId: "p1", templateId: "t1", userId: "u2", values: sampleValues("Beatriz") });
+  enqueue(queue, { projectId: "p1", templateId: "t1", values: sampleValues("Antiguo") });
+  assert.equal(countPending(queue, "u1"), 2);
+  assert.equal(countPending(queue), 3);
+
+  const sent = [];
+  const fetchImpl = async (_url, options) => {
+    const body = JSON.parse(options.body);
+    sent.push(...body.records.map((record) => JSON.parse(record.values[0].field_value_json)));
+    return { ok: true, json: async () => ({ results: body.records.map((_record, index) => ({ index, status: "created" })) }) };
+  };
+  const result = await syncPending(queue, { apiBaseUrl: "http://api.test/api/v1", accessToken: "tok", userId: "u1", fetchImpl });
+  assert.equal(result.synced, 2);
+  assert.deepEqual(sent.sort(), ["Ana", "Antiguo"]);
+  assert.equal(countPending(queue, "u2"), 1);
+});

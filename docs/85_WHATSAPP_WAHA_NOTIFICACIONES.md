@@ -144,13 +144,22 @@ abría el enlace solo podía leer el error y marcar "corregido" sin haber
 corregido nada.
 
 `PATCH /api/v1/runtime/record/{record_id}/correction`
-(`runtime_record_service.correct_field()`, permiso `records.write`) cierra
-esa brecha:
+(`runtime_record_service.correct_field()`) cierra esa brecha.
 
-- Solo se permite mientras el registro esta en estado `"returned"` -- un
-  registro aprobado, rechazado o archivado sigue siendo inmutable, igual
-  que el resto del sistema (ver el ledger inmutable de ERP en
+> **Actualizado 2026-10-18 (docs/141 §4):** `records.write` ya no basta. Se
+> edita un borrador, o un registro `returned`/`corrected` **solo por su
+> destinatario** (`correction_user_id`, o el autor si no se reasignó;
+> `correction_service.ensure_can_edit`). Enviado, en revisión y aprobado son
+> de solo lectura. Las reglas vigentes están en
+> [docs/142](142_VALIDACION_FUNCIONALIDADES_DOCS141.md).
+
+- Se permite en `"draft"`, `"returned"` y `"corrected"` (este último mientras
+  el destinatario sigue ajustando antes de reenviar). Un registro enviado,
+  aprobado, rechazado o archivado es inmutable, igual que el resto del
+  sistema (ver el ledger inmutable de ERP en
   [84_ERP_HEADLESS_INVENTARIO_NOMINA.md](84_ERP_HEADLESS_INVENTARIO_NOMINA.md)).
+- Ademas de `records.write`, se exige acceso territorial al participante y
+  acceso al formulario; un usuario que no es el destinatario recibe `403`.
 - Actualiza o crea el `RuntimeRecordValue` del campo indicado (upsert real,
   el primero en todo el sistema sobre un valor ya existente).
 - **Control de edicion concurrente**: `RuntimeRecord.lock_version`
@@ -209,9 +218,9 @@ WAHA_SESSION=default
 - La correccion via enlace magico solo edita valores simples
   (texto/numero/booleano) desde la tarjeta destacada; fotos, firmas, GPS u
   otros campos complejos deben recapturarse desde el formulario original.
-- Solo se puede corregir un registro en estado `"returned"` -- no hay
-  edicion general de participantes ni de registros en otros estados
-  (aprobado, rechazado, archivado siguen siendo inmutables).
+- Solo se corrige un borrador o un registro devuelto, y solo su
+  destinatario -- no hay edicion general de participantes ni de registros
+  en otros estados (enviado, aprobado, rechazado y archivado son inmutables).
 
 ## Pruebas
 
@@ -219,5 +228,7 @@ WAHA_SESSION=default
 existente e incrementa `lock_version`, crea un valor para un campo que no
 existia todavia, **rechaza una segunda correccion con `expected_lock_version`
 desactualizado (409, control de edicion concurrente)**, rechaza corregir
-un registro que no esta en `"returned"`, exige el permiso `records.write`,
-y responde `404` para un `record_id` inexistente.
+un registro enviado o aprobado (`test_submitted_and_approved_are_read_only`),
+exige el permiso `records.write` y responde `404` para un `record_id`
+inexistente. `test_returns_and_observations.py` cubre que solo el
+destinatario de la devolucion pueda corregir.

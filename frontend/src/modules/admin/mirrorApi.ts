@@ -15,10 +15,15 @@ export type MirrorPlan = {
   id: string;
   target_id: string;
   name: string;
+  scope?: 'project' | 'records';
   schedule_mode: string;
   status: string;
   last_result: string | null;
 };
+
+export type ReconciliationItem = { source: number; destination: number; ok: boolean; form?: string; columns?: number };
+export type MirrorRunSummary = { scope: string; mode: string; written_records: number; written_values: number; reconciled: boolean;
+  tables: Record<string, ReconciliationItem>; form_tables: Record<string, ReconciliationItem> };
 
 export type MirrorRun = {
   id: string;
@@ -30,6 +35,7 @@ export type MirrorRun = {
   error: string | null;
   started_at: string;
   finished_at: string | null;
+  summary?: MirrorRunSummary | null;
 };
 
 export type MirrorTargetCreate = {
@@ -48,6 +54,7 @@ export type MirrorPlanCreate = {
   target_id: string;
   name: string;
   schedule_mode: 'full_mirror' | 'insert_only' | 'incremental';
+  scope?: 'project' | 'records';
 };
 
 export async function fetchMirrorTargets(projectId: string): Promise<MirrorTarget[]> {

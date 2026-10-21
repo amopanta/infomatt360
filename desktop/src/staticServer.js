@@ -25,7 +25,19 @@ const MIME_TYPES = {
  * rompe la carga de assets. Sirviendolo por HTTP en localhost, las mismas
  * rutas absolutas que usa el despliegue web normal funcionan igual aqui.
  */
-function startStaticServer(rootDir) {
+/** Puerto fijo en desarrollo: el origen (y con el la cache del service
+ * worker, la sesion guardada y la copia sin conexion) debe ser el mismo en
+ * cada arranque. Si esta ocupado, se usa uno libre. */
+const DEFAULT_PORT = 47360;
+
+function startStaticServer(rootDir, port = DEFAULT_PORT) {
+  return listenStatic(rootDir, port).catch((error) => {
+    if (error && error.code === "EADDRINUSE" && port !== 0) return listenStatic(rootDir, 0);
+    throw error;
+  });
+}
+
+function listenStatic(rootDir, port) {
   return new Promise((resolve, reject) => {
     const server = http.createServer((request, response) => {
       const urlPath = decodeURIComponent((request.url || "/").split("?")[0]);
@@ -50,7 +62,7 @@ function startStaticServer(rootDir) {
       });
     });
     server.on("error", reject);
-    server.listen(0, "127.0.0.1", () => {
+    server.listen(port, "127.0.0.1", () => {
       const address = server.address();
       resolve({ server, port: typeof address === "object" && address ? address.port : 0 });
     });

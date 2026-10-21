@@ -85,7 +85,8 @@ def setup_client():
     Base.metadata.create_all(bind=engine)
     with sessions() as db:
         project = Project(id="excel-project", name="Excel Project")
-        admin_role = Role(id="excel-admin-role", name="Admin Excel", permissions="identity.users.manage")
+        # Quien aprueba solo entrega roles cuyos permisos tiene (PR #46, docs/145).
+        admin_role = Role(id="excel-admin-role", name="Admin Excel", permissions="identity.users.manage,records.read")
         basic_role = Role(id="excel-basic-role", name="Basico", permissions="records.read")
         admin = User(id="excel-admin", full_name="Admin", document_id="excel-admin-doc", email="excel-admin@example.com", password_hash=hash_password("Admin12345!"))
         basic = User(id="excel-basic", full_name="Basic", document_id="excel-basic-doc", email="excel-basic@example.com", password_hash=hash_password("Basic12345!"))
@@ -430,6 +431,80 @@ def test_excel_import_rejects_unsupported_entity_type():
                 files={"upload": ("archivo.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
             )
             assert response.status_code == 422
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_excel_import_users_creates_profile_access_and_territory():
+    """docs/145: la carga de usuarios exige cargo y municipio, da acceso al
+    proyecto con el rol indicado y respeta la regla de permisos."""
+    from app.models.case_management import UserTerritory
+    with_roles = setup_client()
+    engine, sessions = with_roles
+    with sessions() as db:
+        db.add(Role(id="excel-power-role", name="Poderoso", permissions="records.read,records.approve"))
+        db.commit()
+    try:
+        with TestClient(app) as client:
+            admin_headers = auth(client, "excel-admin@example.com", "Admin12345!")
+            template = client.get("/api/v1/excel-import/template", headers=admin_headers, params={"project_id": "excel-project", "entity_type": "users"})
+            headers = [cell.value for cell in load_workbook(BytesIO(template.content)).active[1]]
+            assert {"Documento", "Nombre completo", "Correo", "Cargo", "Departamento", "Municipio", "Rol", "Limitar acceso"} <= set(headers)
+            content = _build_xlsx(
+                ["Documento", "Nombre completo", "Correo", "Cargo", "Departamento", "Municipio", "Rol", "Limitar acceso"],
+                [
+                    ["1001001", "Ana Gestora", "ana@example.com", "Gestora social", "Antioquia", "Turbo", "Basico", ""],
+                    ["1001002", "Beto Coordinador", "beto@example.com", "Coordinador", "Antioquia", "Apartadó", "Basico", "no"],
+                    ["1001003", "Sin Cargo", "sincargo@example.com", "", "Antioquia", "Turbo", "Basico", ""],
+                    ["1001004", "Con Poder", "poder@example.com", "Revisor", "Antioquia", "Turbo", "Poderoso", ""],
+                    ["excel-basic-doc", "Repetido", "otro@example.com", "Gestor", "Antioquia", "Turbo", "Basico", ""],
+                ],
+            )
+            uploaded = client.post("/api/v1/excel-import/upload", headers=admin_headers, data={"project_id": "excel-project", "entity_type": "users"},
+                                   files={"upload": ("usuarios.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+            assert uploaded.status_code == 200, uploaded.text
+            job = uploaded.json()
+            assert job["column_mapping"]["Rol"] == "role_name" and job["column_mapping"]["Cargo"] == "position"
+            client.patch(f"/api/v1/excel-import/{job['id']}/mapping", headers=admin_headers, json={"column_mapping": job["column_mapping"]})
+            result = client.post(f"/api/v1/excel-import/{job['id']}/approve", headers=admin_headers).json()
+            assert result["imported_rows"] == 2 and result["failed_rows"] == 3
+            errors = " ".join(item["error"].lower() for item in result["error_report"])
+            assert "position" in errors or "obligatorios" in errors
+            assert "no puedes conceder" in errors and "ya está registrado" in errors
+            with sessions() as db:
+                ana = db.query(User).filter_by(email="ana@example.com").one()
+                assert (ana.position, ana.municipality, ana.must_change_password) == ("Gestora social", "Turbo", True)
+                assert db.query(UserProjectAssignment).filter_by(user_id=ana.id, project_id="excel-project", role_id="excel-basic-role").count() == 1
+                assert db.query(UserTerritory).filter_by(user_id=ana.id, municipality="Turbo").count() == 1
+                beto = db.query(User).filter_by(email="beto@example.com").one()
+                assert db.query(UserTerritory).filter_by(user_id=beto.id).count() == 0  # "Limitar acceso: no"
+                assert db.query(User).filter_by(email="poder@example.com").count() == 0
+            # Aparecen en la grilla de usuarios del proyecto con su perfil.
+            grid = client.get("/api/v1/security/admin/projects/excel-project/users", headers=admin_headers).json()
+            row = next(item for item in grid if item["email"] == "ana@example.com")
+            assert row["document_id"] == "1001001" and row["position"] == "Gestora social" and row["created_at"]
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
+def test_excel_import_assignments_respects_grantable_permissions_and_duplicates():
+    engine, sessions = setup_client()
+    with sessions() as db:
+        db.add(Role(id="excel-power-role", name="Poderoso", permissions="records.read,records.approve"))
+        db.commit()
+    try:
+        with TestClient(app) as client:
+            admin_headers = auth(client, "excel-admin@example.com", "Admin12345!")
+            content = _build_xlsx(["Correo", "Rol"], [["excel-newmember@example.com", "Poderoso"], ["excel-basic@example.com", "Basico"]])
+            uploaded = client.post("/api/v1/excel-import/upload", headers=admin_headers, data={"project_id": "excel-project", "entity_type": "assignments"},
+                                   files={"upload": ("asignaciones.xlsx", content, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")}).json()
+            client.patch(f"/api/v1/excel-import/{uploaded['id']}/mapping", headers=admin_headers, json={"column_mapping": uploaded["column_mapping"]})
+            result = client.post(f"/api/v1/excel-import/{uploaded['id']}/approve", headers=admin_headers).json()
+            assert result["imported_rows"] == 0 and result["failed_rows"] == 2
+            errors = " ".join(item["error"].lower() for item in result["error_report"])
+            assert "no puedes conceder" in errors and "ya tiene acceso" in errors
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)

@@ -17,6 +17,8 @@ class GestorTeam(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     project_id: Mapped[str] = mapped_column(String(36), nullable=False, index=True)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
+    # Responsable (coordinador) del equipo: lo hereda el planeador.
+    coordinator_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     created_by: Mapped[str] = mapped_column(String(36), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)
 

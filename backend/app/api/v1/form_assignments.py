@@ -37,6 +37,8 @@ router = APIRouter()
 class AssignmentWrite(BaseModel):
     participant_id: str
     responsible_user_id: str
+    # Motivo del cambio de responsable; queda en la auditoría junto al anterior.
+    reason: str | None = Field(default=None, max_length=500)
 
 
 class AssignmentRead(BaseModel):
@@ -67,6 +69,9 @@ class MyFormAssignmentRead(BaseModel):
     municipality: str | None = None
     assignment_status: str
     record_id: str | None = None
+    # Estado del registro vigente (enviado, devuelto, aprobado...): la vista
+    # del participante lo muestra tal cual, no solo el de la asignación.
+    record_status: str | None = None
 
 
 class BulkAssignmentPreview(BaseModel):
@@ -131,16 +136,16 @@ def my_form_assignments(project_id: str, db: Session = Depends(get_db), user: Us
     territories = [] if IDENTITY_USERS_MANAGE in permissions else db.query(UserTerritory).filter_by(project_id=project_id, user_id=user.id).all()
     rows = [(assignment, template, participant) for assignment, template, participant in rows
             if not territories or _matches_territory(participant, territories)]
-    record_by_pair: dict[tuple[str, str], str] = {}
+    record_by_pair: dict[tuple[str, str], tuple[str, str]] = {}
     if rows:
         participant_ids = {participant.id for _, _, participant in rows}
         template_ids = {template.id for _, template, _ in rows}
-        records = db.query(RuntimeRecord.template_id, RuntimeRecord.participant_id, RuntimeRecord.id).filter(
+        records = db.query(RuntimeRecord.template_id, RuntimeRecord.participant_id, RuntimeRecord.id, RuntimeRecord.status).filter(
             RuntimeRecord.project_id == project_id, RuntimeRecord.template_id.in_(template_ids),
             RuntimeRecord.participant_id.in_(participant_ids),
             RuntimeRecord.status.notin_(["voided", "cancelled"])).order_by(RuntimeRecord.created_at.desc()).all()
-        for template_id, participant_id, record_id in records:
-            record_by_pair.setdefault((template_id, participant_id), record_id)
+        for template_id, participant_id, record_id, record_status in records:
+            record_by_pair.setdefault((template_id, participant_id), (record_id, record_status))
     result: list[MyFormAssignmentRead] = []
     for assignment, template, participant in rows:
         participant_data = participant_to_read(participant)
@@ -153,7 +158,8 @@ def my_form_assignments(project_id: str, db: Session = Depends(get_db), user: Us
             department=participant_data.department,
             municipality=participant_data.municipality,
             assignment_status=assignment.status,
-            record_id=record_by_pair.get((template.id, participant.id)),
+            record_id=(record_by_pair.get((template.id, participant.id)) or (None, None))[0],
+            record_status=(record_by_pair.get((template.id, participant.id)) or (None, None))[1],
         ))
     return result
 
@@ -390,11 +396,18 @@ def assign_participant(template_id: str, payload: AssignmentWrite, db: Session =
     participant = db.get(Participant, payload.participant_id)
     if not participant_visible(db, payload.responsible_user_id, participant):
         raise HTTPException(status_code=422, detail="El responsable no puede acceder al territorio del participante")
+    previous = db.query(ParticipantFormAssignment).filter_by(template_id=template.id, participant_id=payload.participant_id).first()
+    previous_responsible = previous.responsible_user_id if previous else None
     row = upsert_assignment(db, template, payload.participant_id, payload.responsible_user_id, user.id)
-    db.add(AuditLog(project_id=template.project_id, user_id=user.id, module="participants", action="assign_form",
+    reassigned = previous_responsible is not None and previous_responsible != payload.responsible_user_id
+    db.add(AuditLog(project_id=template.project_id, user_id=user.id, module="participants",
+                    action="reassign_form" if reassigned else "assign_form",
                     entity_type="participant_form_assignment", entity_id=row.id,
+                    before_json=json.dumps({"responsible_user_id": previous_responsible}) if previous else None,
                     after_json=json.dumps({"template_id": template_id, "participant_id": payload.participant_id,
-                                           "responsible_user_id": payload.responsible_user_id})))
+                                           "responsible_user_id": payload.responsible_user_id,
+                                           "reason": (payload.reason or "").strip() or None,
+                                           "effective_at": utc_now().isoformat()})))
     db.commit()
     db.refresh(row)
     return _read(db, row)

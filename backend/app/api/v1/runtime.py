@@ -7,6 +7,7 @@ Notas: Este modulo cierra el flujo MVP Builder -> Runtime -> Guardar -> Consulta
 """
 
 import asyncio
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
@@ -20,7 +21,8 @@ from app.db.session import get_db
 from app.models.builder import BuilderTemplate
 from app.models.identity import User
 from app.schemas.api_key import ApiKeyAuthContext
-from app.schemas.runtime import RuntimeTemplate
+from app.schemas.runtime import OfflineManifestItem, RuntimeTemplate
+from app.services.template_availability import availability
 from app.schemas.runtime_record import RuntimeBulkJobDetail, RuntimeBulkJobRead, RuntimeBulkJobSummary, RuntimeBulkSaveRequest, RuntimeBulkSaveResponse, RuntimeRecordCreate, RuntimeRecordFieldCorrection, RuntimeRecordPage, RuntimeRecordRead
 from app.services.runtime_record_service import runtime_record_service
 from app.services.runtime_service import runtime_service
@@ -48,6 +50,24 @@ def get_template_runtime(template_id: str, db: Session = Depends(get_db), curren
     """
     require_template_access(db, current_user.id, template_id)
     return runtime_service.build_template_runtime(db, template_id)
+
+
+@router.get("/offline-manifest/{project_id}", response_model=list[OfflineManifestItem])
+def offline_manifest(project_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> list[OfflineManifestItem]:
+    """Formularios que el usuario puede capturar en el proyecto, con la huella
+    de su versión (H01). La app compara las huellas y descarga solo lo que
+    cambió; lo que ya no aparece aquí deja de ofrecerse para capturas nuevas."""
+    if not assignment_service.user_has_project_access(db, current_user.id, project_id):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Sin acceso al proyecto")
+    templates = db.query(BuilderTemplate).filter(BuilderTemplate.project_id == project_id, BuilderTemplate.status == "published").all()
+    items: list[OfflineManifestItem] = []
+    for template in sorted(templates, key=lambda t: t.name.lower()):
+        if availability(template) != "accepting":
+            continue
+        runtime = runtime_service.build_template_runtime(db, template.id)
+        items.append(OfflineManifestItem(template_id=template.id, name=template.name, version_hash=runtime.version_hash,
+                                         access_mode=runtime.access_mode, updated_at=template.updated_at or template.created_at))
+    return items
 
 
 @router.post("/save", response_model=RuntimeRecordRead)
@@ -330,12 +350,11 @@ def list_runtime_record_children(record_id: str, field_name: str, db: Session = 
 
 @router.patch("/record/{record_id}/correction", response_model=RuntimeRecordRead)
 def correct_runtime_record_field(record_id: str, payload: RuntimeRecordFieldCorrection, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)) -> RuntimeRecordRead:
-    """Corrige el valor de un campo de un registro devuelto (enlace magico).
+    """Corrige el valor de un campo de un borrador o de un registro devuelto.
 
-    Requiere el mismo permiso que capturar registros (`records.write`): es
-    la accion que hoy falta para que un gestor realmente pueda arreglar el
-    campo senalado por un revisor, en vez de solo poder marcar
-    "corregido" sin cambiar ningun valor.
+    Exige `records.write`, territorio y acceso al formulario; ademas, un
+    devuelto solo lo edita su destinatario (docs/141 §4,
+    `correction_service.ensure_can_edit`).
     """
     record = runtime_record_service.get_record(db, record_id)
     if record is None:
@@ -345,6 +364,8 @@ def correct_runtime_record_field(record_id: str, payload: RuntimeRecordFieldCorr
     require_form_participant_access(db, current_user.id, record.template_id, record.participant_id)
     try:
         return runtime_record_service.correct_field(db, record_id, payload, current_user.id)
+    except PermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
     except ValueError as exc:
         detail = str(exc)
         lowered = detail.lower()
@@ -412,4 +433,85 @@ async def export_runtime_records(
         content=content.encode("utf-8"),
         media_type="text/csv; charset=utf-8",
         headers={"Content-Disposition": f'attachment; filename="{safe_name}.csv"'},
+    )
+
+
+@router.get("/template/{template_id}/records/clean-export.csv")
+async def export_clean_answers(
+    template_id: str,
+    status_filter: str = Query(default="approved", alias="status", max_length=30),
+    date_from: datetime | None = None,
+    date_to: datetime | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """Respuestas limpias para informes (docs/141 §8): una fila por registro,
+    sin observaciones, devoluciones ni auditoría. Por defecto solo registros
+    aprobados; status=todos los incluye todos (los demás filtros, explícitos)."""
+    template = require_template_access(db, current_user.id, template_id)
+    require_any_project_permission(db, current_user.id, template.project_id, {"records.read", "reports.export", "records.review", "records.approve"})
+    status_value = None if status_filter in {"todos", "all"} else status_filter
+    content = await asyncio.to_thread(
+        runtime_record_service.export_template_csv, db, template_id, status=status_value,
+        allowed_participant_ids=allowed_form_participant_ids(db, current_user.id, template, review=True),
+        date_from=date_from, date_to=date_to,
+    )
+    return Response(content=content.encode("utf-8"), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="respuestas_limpias.csv"'})
+
+
+@router.get("/template/{template_id}/records/observations.csv")
+async def export_runtime_observations(
+    template_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Response:
+    """Exporta acciones de revisión por separado de las respuestas.
+
+    Usa los mismos límites de acceso por plantilla y participante que la
+    exportación de respuestas; no expone registros ajenos al usuario.
+    """
+    import csv
+    from io import StringIO
+    from app.models.review import ReviewAction
+    from app.models.runtime_record import RuntimeRecord
+
+    template = require_template_access(db, current_user.id, template_id)
+    allowed = allowed_form_participant_ids(db, current_user.id, template, review=True)
+    query = db.query(ReviewAction).join(
+        RuntimeRecord, ReviewAction.record_id == RuntimeRecord.id
+    ).filter(RuntimeRecord.template_id == template_id)
+    if allowed is not None:
+        if not allowed:
+            query = query.filter(False)
+        else:
+            query = query.filter(RuntimeRecord.participant_id.in_(allowed))
+    actions = query.order_by(ReviewAction.created_at, ReviewAction.id).all()
+    # Observaciones estructuradas (docs/141 §6): pregunta, ruta REPEAT y estado
+    from app.models.review import ReviewObservation
+    obs_query = db.query(ReviewObservation).join(RuntimeRecord, ReviewObservation.record_id == RuntimeRecord.id).filter(RuntimeRecord.template_id == template_id)
+    if allowed is not None:
+        obs_query = obs_query.filter(RuntimeRecord.participant_id.in_(allowed)) if allowed else obs_query.filter(False)
+    observations = obs_query.order_by(ReviewObservation.created_at, ReviewObservation.id).all()
+    action_with_observations = {o.review_action_id for o in observations if o.review_action_id}
+    output = StringIO()
+    writer = csv.writer(output, lineterminator="\n")
+    writer.writerow([
+        "origen", "observation_id", "review_action_id", "record_id", "field_name", "repeat_path", "observation",
+        "requested_action", "status", "reviewer_id", "action", "from_status", "to_status", "created_at", "updated_at",
+    ])
+    cell = lambda value: runtime_record_service._safe_csv_cell(str(value or ""))
+    for o in observations:
+        writer.writerow([cell(v) for v in ("observacion", o.id, o.review_action_id, o.record_id, o.field_name, o.repeat_path, o.reason,
+                                            o.requested_action, o.status, o.created_by, "", "", "", o.created_at, o.updated_at)])
+    for action in actions:
+        # Una devolución con observaciones ya aparece arriba, por pregunta
+        if (not action.notes and not action.rejected_field_name) or action.id in action_with_observations:
+            continue
+        writer.writerow([cell(v) for v in ("accion_revision", "", action.id, action.record_id, action.rejected_field_name, "", action.notes,
+                                            "", "", action.user_id, action.action, action.from_status, action.to_status, action.created_at, "")])
+    return Response(
+        content=output.getvalue().encode("utf-8-sig"),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="observaciones.csv"'},
     )

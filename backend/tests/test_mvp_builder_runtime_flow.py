@@ -198,3 +198,40 @@ def test_builder_rejects_column_from_another_template(mvp_context):
     )
 
     assert response.status_code == 422
+
+
+def test_offline_manifest_lists_capturable_forms_with_content_version(mvp_context):
+    """H01: la app baja solo lo que cambió y sabe con qué versión empezó un borrador."""
+    client, _ = mvp_context
+    def build(name: str, status: str):
+        template = client.post("/api/v1/builder/templates", json={"project_id": "project-mvp", "name": name}).json()
+        page = client.post("/api/v1/builder/pages", json={"template_id": template["id"], "title": "P"}).json()
+        section = client.post("/api/v1/builder/sections", json={"page_id": page["id"], "title": "S"}).json()
+        row = client.post("/api/v1/builder/rows", json={"section_id": section["id"]}).json()
+        column = client.post("/api/v1/builder/columns", json={"row_id": row["id"], "desktop_width": 12, "tablet_width": 12, "mobile_width": 12}).json()
+        component = client.post("/api/v1/builder/components", json={"template_id": template["id"], "column_id": column["id"],
+            "component_type": "TEXT", "name": "nombre", "label": "Nombre"}).json()
+        if status != "draft":
+            assert client.patch(f"/api/v1/builder/templates/detail/{template['id']}/status", json={"status": status}).status_code == 200
+        return template["id"], component["id"]
+
+    published, component_id = build("Visita offline", "published")
+    draft, _ = build("Borrador sin publicar", "draft")
+    manifest = client.get("/api/v1/runtime/offline-manifest/project-mvp")
+    assert manifest.status_code == 200, manifest.text
+    by_id = {item["template_id"]: item for item in manifest.json()}
+    assert published in by_id and draft not in by_id
+    first = by_id[published]["version_hash"]
+    assert len(first) == 16
+    assert client.get(f"/api/v1/runtime/template/{published}").json()["version_hash"] == first
+    # Misma plantilla, misma huella (estable entre llamadas)
+    assert client.get(f"/api/v1/runtime/template/{published}").json()["version_hash"] == first
+
+    edited = client.patch(f"/api/v1/builder/components/detail/{component_id}", json={"label": "Nombre completo", "name": "nombre"})
+    assert edited.status_code == 200, edited.text
+    second = {i["template_id"]: i for i in client.get("/api/v1/runtime/offline-manifest/project-mvp").json()}[published]["version_hash"]
+    assert second != first
+
+    assert client.patch(f"/api/v1/builder/templates/detail/{published}/status", json={"status": "paused"}).status_code == 200
+    assert published not in {i["template_id"] for i in client.get("/api/v1/runtime/offline-manifest/project-mvp").json()}
+    assert client.get("/api/v1/runtime/offline-manifest/otro-proyecto").status_code == 403

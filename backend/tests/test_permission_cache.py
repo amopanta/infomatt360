@@ -206,7 +206,7 @@ def test_creating_assignment_invalidates_cache_so_user_gets_access_immediately()
     in_memory_permission_cache.clear()
     try:
         with sessions() as db:
-            admin_role = Role(id="permcache-admin-role", name="Admin", permissions="identity.users.manage")
+            admin_role = Role(id="permcache-admin-role", name="Admin", permissions="identity.users.manage,records.write,records.read")
             admin = User(id="permcache-admin", full_name="Admin", document_id="permcache-admin-doc", email="permcache-admin@example.com", password_hash=hash_password("Admin12345!"))
             db.add_all([
                 admin_role, admin,

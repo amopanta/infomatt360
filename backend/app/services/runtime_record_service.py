@@ -18,13 +18,15 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.core.time import utc_now
+from app.core.time import to_naive_utc, utc_now
 from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.audit import AuditLog
 from app.models.files import FileAsset
+from app.models.identity import User
 from app.models.device_verification import DeviceVerification
 from app.models.bulk_import import BulkImportJob
 from app.models.participants import Participant
+from app.models.identity import User
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
 from app.schemas.external_api import ExternalRecordTabularPage, ExternalRecordTabularRow
 from app.schemas.runtime_record import RuntimeBulkJobDetail, RuntimeBulkJobRead, RuntimeBulkJobSummary, RuntimeBulkSaveItemResult, RuntimeBulkSaveRequest, RuntimeBulkSaveResponse, RuntimeRecordCreate, RuntimeRecordFieldCorrection, RuntimeRecordPage, RuntimeRecordRead, RuntimeValueCreate, RuntimeValueRead
@@ -51,11 +53,22 @@ def value_to_read(row: RuntimeRecordValue) -> RuntimeValueRead:
     )
 
 
-def record_to_read(db: Session, row: RuntimeRecord) -> RuntimeRecordRead:
+def capturer_snapshot(db: Session, user_id: str | None) -> dict:
+    """Datos del perfil de quien captura, copiados al registro (docs/145)."""
+    user = db.get(User, user_id) if user_id else None
+    if user is None:
+        return {}
+    return {"captured_by_name": user.full_name, "captured_by_document": user.document_id, "captured_by_position": user.position,
+            "captured_by_department": user.department, "captured_by_municipality": user.municipality}
+
+
+def record_to_read(db: Session, row: RuntimeRecord, submitter_names: dict[str, str] | None = None) -> RuntimeRecordRead:
     """Convierte la cabecera y sus valores en una respuesta consolidada."""
     values = db.query(RuntimeRecordValue).filter(RuntimeRecordValue.record_id == row.id).all()
     participant = db.get(Participant, row.participant_id) if row.participant_id else None
     participant_metadata = json.loads(participant.metadata_json or "{}") if participant else {}
+    submitter = db.get(User, row.submitted_by) if submitter_names is None and row.submitted_by else None
+    submitter_name = submitter_names.get(row.submitted_by) if submitter_names is not None else (submitter.full_name if submitter else None)
     return RuntimeRecordRead(
         id=row.id,
         project_id=row.project_id,
@@ -65,6 +78,10 @@ def record_to_read(db: Session, row: RuntimeRecord) -> RuntimeRecordRead:
         approval_flow_version=row.approval_flow_version,
         status=row.status,
         submitted_by=row.submitted_by,
+        correction_user_id=(row.correction_user_id or row.submitted_by) if row.status in {"returned", "corrected"} else None,
+        submitted_by_name=submitter_name,
+        captured_by={"name": row.captured_by_name, "document_id": row.captured_by_document, "position": row.captured_by_position,
+                     "department": row.captured_by_department, "municipality": row.captured_by_municipality} if row.captured_by_name else None,
         device_id=row.device_id,
         ip_address=row.ip_address,
         parent_record_id=row.parent_record_id,
@@ -92,6 +109,12 @@ def _compute_content_hash(project_id: str, template_id: str, values) -> str:
     canonical = sorted((item.field_name, item.field_value_json) for item in values)
     raw = json.dumps({"project_id": project_id, "template_id": template_id, "values": canonical}, sort_keys=True)
     return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+def records_to_read(db: Session, rows: list[RuntimeRecord]) -> list[RuntimeRecordRead]:
+    user_ids = {row.submitted_by for row in rows if row.submitted_by}
+    names = dict(db.query(User.id, User.full_name).filter(User.id.in_(user_ids)).all()) if user_ids else {}
+    return [record_to_read(db, row, names) for row in rows]
 
 
 class RuntimeRecordService:
@@ -132,7 +155,12 @@ class RuntimeRecordService:
             RuntimeRecord.content_hash == content_hash,
             RuntimeRecord.created_at >= duplicate_window_start,
         ).first() is not None
+        # Despues de la huella anti-duplicados: estos valores cambian en cada
+        # registro y harian que dos capturas identicas parezcan distintas.
+        record_id = str(uuid4())
+        self._fill_system_fields(db, payload.template_id, payload.values, user_id, record_id)
         record = RuntimeRecord(
+            id=record_id,
             project_id=payload.project_id,
             template_id=payload.template_id,
             version_id=payload.version_id,
@@ -141,6 +169,7 @@ class RuntimeRecordService:
             approval_flow_snapshot_json=approval_flow_snapshot_json,
             status=payload.status,
             submitted_by=user_id,
+            **capturer_snapshot(db, user_id),
             device_id=payload.device_id,
             ip_address=payload.ip_address,
             parent_record_id=payload.parent_record_id,
@@ -266,6 +295,57 @@ class RuntimeRecordService:
             else:
                 values.append(RuntimeValueCreate(field_name=field.name, field_value_json=json.dumps(next_number)))
 
+    SYSTEM_FIELD_TYPES = ("CAPTURED_BY", "UUID", "RESPONSE_ID", "CHANGE_HISTORY")
+
+    def _fill_system_fields(self, db: Session, template_id: str, values: list[RuntimeValueCreate], user_id: str | None, record_id: str) -> None:
+        """Llena los campos que no debe escribir quien captura.
+
+        - CAPTURED_BY: nombre completo del usuario autenticado, tal como se
+          creo en Usuarios; se ignora lo que envie el cliente para que no se
+          pueda suplantar a otro capturador. Sin usuario (carga por API key)
+          se conserva el valor recibido.
+        - RESPONSE_ID: id del registro.
+        - UUID: se respeta si llega con valor; si no, se genera.
+        - CHANGE_HISTORY: primera entrada (creacion) con usuario y fecha.
+        """
+        fields = db.query(BuilderComponent).filter(
+            BuilderComponent.template_id == template_id,
+            BuilderComponent.component_type.in_(self.SYSTEM_FIELD_TYPES),
+        ).all()
+        if not fields:
+            return
+        user = db.get(User, user_id) if user_id else None
+        user_name = (user.full_name or user.email) if user else None
+        by_name = {item.field_name: item for item in values}
+
+        def put(name: str, value: object) -> None:
+            encoded = json.dumps(value, ensure_ascii=False)
+            if name in by_name:
+                by_name[name].field_value_json = encoded
+            else:
+                item = RuntimeValueCreate(field_name=name, field_value_json=encoded)
+                values.append(item)
+                by_name[name] = item
+
+        def current(name: str) -> object:
+            item = by_name.get(name)
+            if item is None:
+                return None
+            try:
+                return json.loads(item.field_value_json)
+            except (json.JSONDecodeError, TypeError):
+                return None
+
+        for field in fields:
+            if field.component_type == "CAPTURED_BY" and user_name:
+                put(field.name, user_name)
+            elif field.component_type == "RESPONSE_ID":
+                put(field.name, record_id)
+            elif field.component_type == "UUID" and current(field.name) in (None, ""):
+                put(field.name, str(uuid4()))
+            elif field.component_type == "CHANGE_HISTORY":
+                put(field.name, [{"accion": "creado", "usuario": user_name or "sistema", "fecha": utc_now().isoformat()}])
+
     def _next_serial_number(self, db: Session, template_id: str, field_name: str) -> int:
         rows = db.query(RuntimeRecordValue.field_value_json).join(
             RuntimeRecord, RuntimeRecord.id == RuntimeRecordValue.record_id
@@ -294,7 +374,7 @@ class RuntimeRecordService:
             RuntimeRecord.parent_record_id == parent_record_id,
             RuntimeRecord.parent_field_name == field_name,
         ).order_by(RuntimeRecord.created_at.asc()).all()
-        return [record_to_read(db, row) for row in rows]
+        return records_to_read(db, rows)
 
     def save_records_bulk(self, db: Session, payload: RuntimeBulkSaveRequest, user_id: str | None) -> RuntimeBulkSaveResponse:
         """Guarda registros por lotes para integraciones de alto volumen.
@@ -303,8 +383,12 @@ class RuntimeRecordService:
         permitir continuar cuando un item del lote tiene errores. Si
         continue_on_error es false, se detiene en el primer error.
         """
+        # La huella se calcula antes de guardar: save_record completa el lote
+        # (consecutivo, quién capturó, id de respuesta...) y una huella
+        # posterior nunca coincidiría con un reenvío idéntico del cliente, que
+        # recibiría 409 en vez de la respuesta original.
+        request_hash = self._bulk_request_hash(payload) if payload.idempotency_key else None
         if payload.idempotency_key:
-            request_hash = self._bulk_request_hash(payload)
             existing = db.query(BulkImportJob).filter(
                 BulkImportJob.project_id == payload.project_id,
                 BulkImportJob.template_id == payload.template_id,
@@ -340,7 +424,7 @@ class RuntimeRecordService:
                 project_id=payload.project_id,
                 template_id=payload.template_id,
                 idempotency_key=payload.idempotency_key,
-                request_hash=self._bulk_request_hash(payload),
+                request_hash=request_hash,
                 payload_json=payload.model_dump_json(),
                 response_json=response.model_dump_json(),
                 status="queued",
@@ -382,7 +466,7 @@ class RuntimeRecordService:
                 project_id=payload.project_id,
                 template_id=payload.template_id,
                 idempotency_key=payload.idempotency_key,
-                request_hash=self._bulk_request_hash(payload),
+                request_hash=request_hash,
                 payload_json=payload.model_dump_json(),
                 response_json=response.model_dump_json(),
                 status="completed",
@@ -789,7 +873,7 @@ class RuntimeRecordService:
         now = utc_now()
         clone = RuntimeRecord(
             project_id=source.project_id, template_id=source.template_id, version_id=source.version_id,
-            participant_id=source.participant_id, status="draft", submitted_by=user_id,
+            participant_id=source.participant_id, status="draft", submitted_by=user_id, **capturer_snapshot(db, user_id),
             approval_flow_id=source.approval_flow_id, approval_flow_version=source.approval_flow_version,
             approval_flow_snapshot_json=source.approval_flow_snapshot_json, duplicate_flag="manual",
             created_at=now, updated_at=now,
@@ -846,9 +930,9 @@ class RuntimeRecordService:
 
         Es el unico camino de escritura sobre un `RuntimeRecordValue` ya
         existente en todo el sistema -- `save_record` siempre crea filas
-        nuevas. Solo se permite mientras el registro esta en `returned`
-        (la revision humana ya marco que necesita correccion); un registro
-        aprobado, rechazado o archivado es inmutable.
+        nuevas. Solo se permite en borrador, o en devuelto/corregido por su
+        destinatario (`ensure_can_edit`); enviado, aprobado, rechazado o
+        archivado son inmutables.
 
         El bloqueo optimista (`RuntimeRecord.lock_version`) evita que dos
         gestores corrigiendo el mismo registro al mismo tiempo se
@@ -859,8 +943,11 @@ class RuntimeRecordService:
         record = db.query(RuntimeRecord).filter(RuntimeRecord.id == record_id).first()
         if record is None:
             raise ValueError("Registro no encontrado")
-        if record.status not in {"draft", "submitted", "returned", "corrected"}:
-            raise ValueError(f"El registro en estado '{record.status}' no admite edición; solicita una devolución para corregirlo")
+        # docs/141: enviado y aprobado son de solo lectura; un devuelto lo
+        # corrige solo su destinatario (antes también se editaba un enviado
+        # y cualquier gestor con records.write podía corregir).
+        from app.services.correction_service import ensure_can_edit
+        ensure_can_edit(record, user_id)
         if record.lock_version != payload.expected_lock_version:
             raise ValueError(
                 "El registro fue modificado por otro usuario despues de que se cargo el formulario de correccion; "
@@ -917,7 +1004,7 @@ class RuntimeRecordService:
         if allowed_participant_ids is not None:
             query = query.filter(RuntimeRecord.participant_id.in_(allowed_participant_ids))
         rows = query.order_by(RuntimeRecord.created_at.desc()).all()
-        return [record_to_read(db, row) for row in rows]
+        return records_to_read(db, rows)
 
     def search_template_records(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, limit: int = 25, offset: int = 0, unlinked_only: bool = False, field_filters: dict[str, str] | None = None, sort_by: str = "created_at", sort_dir: str = "desc", allowed_participant_ids: list[str] | None = None) -> RuntimeRecordPage:
         """Consulta paginada de registros Runtime con filtros seguros para uso operativo.
@@ -957,12 +1044,18 @@ class RuntimeRecordService:
             sort_column = sort_columns.get(sort_by, RuntimeRecord.created_at)
         direction = sort_column.asc() if sort_dir == "asc" else sort_column.desc()
         rows = query.order_by(direction, RuntimeRecord.id.asc()).offset(offset).limit(limit).all()
-        return RuntimeRecordPage(items=[record_to_read(db, row) for row in rows], total=total, limit=limit, offset=offset)
+        return RuntimeRecordPage(items=records_to_read(db, rows), total=total, limit=limit, offset=offset)
 
-    def export_template_csv(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, allowed_participant_ids: list[str] | None = None) -> str:
+    def export_template_csv(self, db: Session, template_id: str, search: str | None = None, status: str | None = None, allowed_participant_ids: list[str] | None = None,
+                            date_from: datetime | None = None, date_to: datetime | None = None) -> str:
         query = self._filtered_records_query(db, template_id, search, status)
         if allowed_participant_ids is not None:
             query = query.filter(RuntimeRecord.participant_id.in_(allowed_participant_ids))
+        # Periodo (docs/141 §8): por fecha de captura
+        if date_from is not None:
+            query = query.filter(RuntimeRecord.created_at >= to_naive_utc(date_from))
+        if date_to is not None:
+            query = query.filter(RuntimeRecord.created_at < to_naive_utc(date_to))
         records = query.order_by(RuntimeRecord.created_at.desc()).all()
         record_ids = [record.id for record in records]
         values = db.query(RuntimeRecordValue).filter(RuntimeRecordValue.record_id.in_(record_ids)).all() if record_ids else []
@@ -976,7 +1069,9 @@ class RuntimeRecordService:
         output = StringIO()
         output.write("\ufeff")
         writer = csv.writer(output, lineterminator="\n")
-        writer.writerow(["record_id", "participante_nombre", "participante_documento", "participante_codigo", "participante_municipio", "fecha", "estado", "capturado_por", *[self._safe_csv_cell(name) for name in field_names]])
+        writer.writerow(["record_id", "participante_nombre", "participante_documento", "participante_codigo", "participante_municipio", "fecha", "estado",
+                         "capturado_por", "capturador_documento", "capturador_cargo", "capturador_municipio",
+                         *[self._safe_csv_cell(name) for name in field_names]])
         for record in records:
             row_values = by_record.get(record.id, {})
             participant = participants.get(record.participant_id)
@@ -989,7 +1084,10 @@ class RuntimeRecordService:
                 self._safe_csv_cell(str(metadata.get("municipality") or metadata.get("municipio") or "")) if isinstance(metadata, dict) else "",
                 record.created_at.isoformat(),
                 record.status,
-                record.submitted_by or "",
+                self._safe_csv_cell(record.captured_by_name or record.submitted_by or ""),
+                self._safe_csv_cell(record.captured_by_document or ""),
+                self._safe_csv_cell(record.captured_by_position or ""),
+                self._safe_csv_cell(record.captured_by_municipality or ""),
                 *[self._safe_csv_cell(row_values.get(name, "")) for name in field_names],
             ])
         return output.getvalue()

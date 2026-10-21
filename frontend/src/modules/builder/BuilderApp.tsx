@@ -4,7 +4,8 @@ import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
 import { BuilderCanvas } from './BuilderCanvas';
 import { BuilderPalette } from './BuilderPalette';
 import type { BuilderPaletteItem, BuilderPreviewField, BuilderPreviewSection } from './types';
-import { createColumn, createComponent, createPage, createRow, createSection, createTemplate, fetchTemplateDetail, previewAiQuestions, previewPdfQuestions, updateComponentProperties, updateSectionTitle, updateTemplateProperties } from './api';
+import { BuilderPreview } from './BuilderPreview';
+import { createColumn, createComponent, createPage, createRow, createSection, createTemplate, deleteComponent, fetchTemplateDetail, previewAiQuestions, previewPdfQuestions, reorderComponents, updateComponentProperties, updateSectionTitle, updateTemplateProperties } from './api';
 import type { PdfQuestionSuggestion } from './api';
 import { createDefaultCharacterizationTemplate } from './createDefaultTemplate';
 import { navigateTo } from '../../routeConfig';
@@ -130,7 +131,14 @@ export function BuilderApp() {
   const [aiProviders, setAiProviders] = useState<AiProvider[]>([]);
   const [selectedAiProvider, setSelectedAiProvider] = useState('');
   const [suggestionSource, setSuggestionSource] = useState<'pdf' | 'ai' | ''>('');
+  const [removedFieldIds, setRemovedFieldIds] = useState<string[]>([]);
+  const [showPreview, setShowPreview] = useState(false);
+  const [startChosen, setStartChosen] = useState(Boolean(editingTemplateId));
+  const [openAssist, setOpenAssist] = useState<'pdf' | 'ai' | ''>('');
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
+  // Mientras no haya respuestas, las preguntas guardadas se pueden borrar y
+  // reordenar igual que las nuevas; con respuestas se protegen.
+  const lockedFieldIds = submissionsCount > 0 ? existingFieldIds : new Set<string>();
 
   useEffect(() => {
     if (!projectId) return;
@@ -180,7 +188,9 @@ export function BuilderApp() {
         type: item.type,
         name,
         label: item.label,
-        placeholder: item.description,
+        // La descripción del catálogo explica el tipo a quien diseña; no debe
+        // aparecer como texto de ayuda a quien llena el formulario.
+        placeholder: '',
         required: false,
         optionsText: defaultOptionsText(item.type),
       };
@@ -266,6 +276,8 @@ export function BuilderApp() {
   }
 
   function removeField(fieldId: string) {
+    if (lockedFieldIds.has(fieldId)) return;
+    if (existingFieldIds.has(fieldId)) setRemovedFieldIds((current) => current.includes(fieldId) ? current : [...current, fieldId]);
     setSections((currentSections) => currentSections.map((section) => ({
       ...section,
       fields: section.fields.filter((field) => field.id !== fieldId),
@@ -301,7 +313,10 @@ export function BuilderApp() {
     try {
       if (editingTemplateId) {
         await updateTemplateProperties(editingTemplateId, { name: templateName.trim(), description: templateDescription || null, themeJson: JSON.stringify(theme) });
+        for (const fieldId of removedFieldIds) await deleteComponent(fieldId);
+        setRemovedFieldIds([]);
         const usedNames = new Set(fields.filter((field) => existingFieldIds.has(field.id)).map((field) => field.name));
+        const finalOrder: string[] = [];
         let order = 1;
         for (const sectionDraft of sections) {
           let sectionId = sectionDraft.id;
@@ -318,6 +333,7 @@ export function BuilderApp() {
               let original: Record<string, unknown> = {};
               try { original = JSON.parse(originalConfigs[field.id] || '{}'); } catch { /* conservar las propiedades editadas */ }
               await updateComponentProperties(field.id, { label: field.label.trim() || field.name, name: field.name.trim(), configJson: JSON.stringify({ ...original, ...config }) });
+              finalOrder.push(field.id);
             } else {
               const row = await createRow({ sectionId, sortOrder: order });
               const column = await createColumn({ rowId: row.id, desktopWidth: 12, sortOrder: 1 });
@@ -326,11 +342,15 @@ export function BuilderApp() {
               let suffix = 2;
               while (usedNames.has(name)) { name = `${base}_${suffix}`; suffix += 1; }
               usedNames.add(name);
-              await createComponent({ templateId: editingTemplateId, columnId: column.id, type: field.type, name, label: field.label.trim() || name, configJson: JSON.stringify(config), sortOrder: order });
+              const created = await createComponent({ templateId: editingTemplateId, columnId: column.id, type: field.type, name, label: field.label.trim() || name, configJson: JSON.stringify(config), sortOrder: order });
+              finalOrder.push(created.id);
             }
             order += 1;
           }
         }
+        // Las filas nuevas y las existentes se numeraron por separado; este
+        // paso deja el orden exactamente como se ve en el constructor.
+        await reorderComponents(editingTemplateId, finalOrder);
         setMessage(t('builder.editor.changesSaved'));
         navigateTo(`/builder/form/${editingTemplateId}`);
         return;
@@ -393,7 +413,22 @@ export function BuilderApp() {
     <AppShell title={t('builder.editor.constructorTitle')}>
       <div className="builder-return"><a href={editingTemplateId ? `/builder/form/${editingTemplateId}` : '/builder'}>{t('builder.editor.backToForm')}</a><span>{editingTemplateId ? t('builder.editor.editingExisting', { count: submissionsCount }) : t('builder.editor.newFormsSavedAsDraft')}</span></div>
       {!loaded && <p role="status">{message || t('builder.editor.loadingExisting')}</p>}
-      {loaded && <>
+      {loaded && !startChosen && sections.every((section) => section.fields.length === 0) && (
+        <section className="builder-start" aria-labelledby="builder-start-title">
+          <h2 id="builder-start-title">{t('ux.builder.startTitle')}</h2>
+          <p>{t('ux.builder.startText')}</p>
+          <div className="builder-start-grid">
+            <button type="button" onClick={() => setStartChosen(true)}><span aria-hidden="true">📄</span><strong>{t('ux.builder.startBlank')}</strong><small>{t('ux.builder.startBlankText')}</small></button>
+            <button type="button" onClick={() => { setStartChosen(true); void createMvpTemplate(); }}><span aria-hidden="true">🧾</span><strong>{t('ux.builder.startTemplate')}</strong><small>{t('ux.builder.startTemplateText')}</small></button>
+            <button type="button" onClick={() => { setStartChosen(true); setOpenAssist('pdf'); }}><span aria-hidden="true">📑</span><strong>{t('ux.builder.startPdf')}</strong><small>{t('ux.builder.startPdfText')}</small></button>
+            <button type="button" onClick={() => { setStartChosen(true); setOpenAssist('ai'); }}><span aria-hidden="true">✨</span><strong>{t('ux.builder.startAi')}</strong><small>{t('ux.builder.startAiText')}</small></button>
+            {hasAnyCurrentProjectPermission(['builder.write']) && <a href="/admin/xlsform"><span aria-hidden="true">📊</span><strong>{t('ux.builder.startXls')}</strong><small>{t('ux.builder.startXlsText')}</small></a>}
+          </div>
+        </section>
+      )}
+      {showPreview && <BuilderPreview title={templateName} description={templateDescription} sections={sections} theme={theme} onClose={() => setShowPreview(false)} />}
+      {removedFieldIds.length > 0 && <p className="builder-pending-delete" role="status">{t('ux.builder.deletedOnSave', { count: removedFieldIds.length })}</p>}
+      {loaded && (startChosen || sections.some((section) => section.fields.length > 0)) && <>
       <div className="builder-layout">
         <aside className="builder-sidebar-stack">
           <div className="builder-connect-panel">
@@ -420,13 +455,13 @@ export function BuilderApp() {
             </details>
             {!editingTemplateId && <button type="button" className="secondary" onClick={resetTemplate}>{t('builder.editor.newBlankTemplate')}</button>}
             {!editingTemplateId && <button onClick={createMvpTemplate}>{t('builder.editor.createCharacterization')}</button>}
-            <details className="builder-theme-panel"><summary>{t('builder.editor.importPdfQuestions')}</summary>
+            <details className="builder-theme-panel" open={openAssist === 'pdf'} onToggle={(event) => { const open = (event.currentTarget as HTMLDetailsElement).open; setOpenAssist((current) => open ? 'pdf' : current === 'pdf' ? '' : current); }}><summary>{t('builder.editor.importPdfQuestions')}</summary>
               <p>{t('builder.editor.importPdfHint')}</p>
               <input type="file" accept=".pdf,application/pdf" onChange={(event) => { setPdfFile(event.target.files?.[0] || null); setPdfQuestions([]); }} />
               <button type="button" disabled={!pdfFile || pdfBusy || !projectId} onClick={() => void analyzePdf()}>{pdfBusy ? t('builder.editor.pdfAnalyzing') : t('builder.editor.analyzePdf')}</button>
               {suggestionSource === 'pdf' && pdfQuestions.length > 0 && <><p>{t('builder.editor.pdfQuestionsFound', { count: pdfQuestions.length })}</p><ol>{pdfQuestions.map((question, index) => <li key={index}>{question.label} ({question.type})</li>)}</ol><button type="button" onClick={addPdfQuestions}>{t('builder.editor.addPdfQuestions')}</button></>}
             </details>
-            <details className="builder-theme-panel"><summary>{t('builder.editor.aiQuestions')}</summary>
+            <details className="builder-theme-panel" open={openAssist === 'ai'} onToggle={(event) => { const open = (event.currentTarget as HTMLDetailsElement).open; setOpenAssist((current) => open ? 'ai' : current === 'ai' ? '' : current); }}><summary>{t('builder.editor.aiQuestions')}</summary>
               <p>{t('builder.editor.aiHint')}</p>
               {aiProviders.filter((provider) => provider.status === 'active').length > 0 && <label>{t('builder.editor.aiProvider')}<select value={selectedAiProvider} onChange={(event) => setSelectedAiProvider(event.target.value)}><option value="">{t('builder.editor.aiSelectProvider')}</option>{aiProviders.filter((provider) => provider.status === 'active').map((provider) => <option key={provider.id} value={provider.id}>{provider.name} · {provider.model}</option>)}</select></label>}
               {hasAnyCurrentProjectPermission(['ai.audit.manage']) && <p><a href="/admin/ai-audit">{t('builder.editor.aiConfigure')}</a></p>}
@@ -474,13 +509,13 @@ export function BuilderApp() {
           onFieldChange={updateField}
           onRemoveField={removeField}
           onMoveField={moveField}
-          onPreview={() => setMessage(t('builder.editor.previewHint'))}
+          onPreview={() => setShowPreview(true)}
           onSave={saveTemplate}
           saving={saving}
-          lockedFieldIds={existingFieldIds}
+          lockedFieldIds={lockedFieldIds}
           lockedSectionIds={existingSectionIds}
           lockTechnicalNames={submissionsCount > 0}
-          disableReorder={Boolean(editingTemplateId)}
+          disableReorder={false}
         />
         <BuilderPalette onAddField={addField} />
       </div>

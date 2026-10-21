@@ -4,6 +4,8 @@ Este servicio centraliza la logica de usuarios, proyectos y roles usando
 SQLAlchemy. Los routers solo deben recibir solicitudes y delegar reglas.
 """
 
+import secrets
+
 from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -31,6 +33,9 @@ def _user_to_read(user: User) -> UserRead:
         document_id=user.document_id,
         email=user.email,
         phone=user.phone,
+        position=user.position,
+        department=user.department,
+        municipality=user.municipality,
         status=user.status,
         allowed_channels=user.allowed_channels.split(",") if user.allowed_channels else [],
     )
@@ -63,8 +68,14 @@ class IdentityService:
             full_name=payload.full_name,
             document_id=payload.document_id,
             email=str(payload.email),
-            password_hash=hash_password("ChangeMe123"),
+            # This legacy endpoint does not deliver credentials. Account
+            # recovery or the scoped admin flow provisions a usable password.
+            password_hash=hash_password(secrets.token_urlsafe(32)),
+            must_change_password=True,
             phone=payload.phone,
+            position=(payload.position or "").strip() or None,
+            department=(payload.department or "").strip() or None,
+            municipality=(payload.municipality or "").strip() or None,
             status=payload.status.value,
             allowed_channels=_channels_to_text(payload.allowed_channels),
         )

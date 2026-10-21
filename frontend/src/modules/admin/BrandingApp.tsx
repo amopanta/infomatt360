@@ -24,6 +24,7 @@ export function BrandingApp() {
   const [accentColor, setAccentColor] = useState('');
   const [backgroundColor, setBackgroundColor] = useState('');
   const [slogan, setSlogan] = useState('');
+  const [companyName, setCompanyName] = useState('');
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [linkingProjectId, setLinkingProjectId] = useState<string | null>(null);
@@ -55,6 +56,7 @@ export function BrandingApp() {
       setAccentColor(row?.accent_color ?? '');
       setBackgroundColor(row?.background_color ?? '');
       setSlogan(row?.slogan ?? '');
+      setCompanyName(row?.organization_name ?? organizations.find((org) => org.id === organizationId)?.name ?? '');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : t('admin.branding.errorLoadBranding'));
     }
@@ -89,8 +91,11 @@ export function BrandingApp() {
         accent_color: accentColor.trim() || null,
         background_color: backgroundColor.trim() || null,
         slogan: slogan.trim() || null,
+        organization_name: companyName.trim() || null,
       });
       setBranding(updated);
+      // El nombre también se ve en el selector de organizaciones.
+      if (updated.organization_name) setOrganizations((current) => current.map((org) => org.id === selectedOrgId ? { ...org, name: updated.organization_name! } : org));
       setMessage(t('admin.branding.brandingSaved'));
     } catch (error) {
       setMessage(error instanceof Error ? error.message : t('admin.branding.errorSaveBranding'));
@@ -167,6 +172,11 @@ export function BrandingApp() {
               <h2>{t('admin.branding.colorsAndSlogan')}</h2>
             </header>
             <form onSubmit={submitBranding}>
+              <label>
+                {t('ux.branding.companyName')}
+                <input value={companyName} minLength={2} maxLength={180} onChange={(event) => setCompanyName(event.target.value)} />
+                <small>{t('ux.branding.companyNameHint')}</small>
+              </label>
               <label>
                 {t('admin.branding.primaryColorLabel')}
                 <input value={primaryColor} onChange={(event) => setPrimaryColor(event.target.value)} placeholder="#0A2540" />

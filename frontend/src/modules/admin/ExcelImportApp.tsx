@@ -11,8 +11,14 @@ import type { ExcelImportJob, ExcelImportTargetField, ExcelImportValidation } fr
 const TARGET_FIELDS: Record<string, string[]> = {
   participants: ['document_id', 'full_name', 'external_code', 'participant_type', 'department', 'municipality'],
   participant_updates: ['document_id', 'full_name', 'external_code', 'participant_type', 'department', 'municipality', 'group_name', 'status'],
-  users: ['document_id', 'full_name', 'email', 'phone'],
+  users: ['document_id', 'full_name', 'email', 'phone', 'position', 'department', 'municipality', 'role_name', 'restrict_to_territory'],
   assignments: ['email', 'role_name', 'status'],
+};
+
+// Etiquetas legibles de los campos destino (docs/145).
+const FIELD_LABELS: Record<string, string> = {
+  document_id: 'Número de documento', full_name: 'Nombre completo', email: 'Correo', phone: 'Teléfono', position: 'Cargo',
+  department: 'Departamento', municipality: 'Municipio', role_name: 'Rol', restrict_to_territory: 'Limitar acceso (sí/no)', status: 'Estado',
 };
 
 function statusClass(status: string) {
@@ -24,7 +30,11 @@ function statusClass(status: string) {
 export function ExcelImportApp() {
   const { t } = useI18n();
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
-  const [entityType, setEntityType] = useState('participants');
+  // ?tipo=users abre la carga con ese tipo elegido (enlace desde Usuarios, docs/145).
+  const [entityType, setEntityType] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get('tipo') ?? '';
+    return ['participants', 'participant_updates', 'users', 'assignments', 'records'].includes(requested) ? requested : 'participants';
+  });
   const [templates, setTemplates] = useState<TemplateSummary[]>([]);
   const [templateId, setTemplateId] = useState('');
   const [groupName, setGroupName] = useState('');
@@ -127,7 +137,7 @@ export function ExcelImportApp() {
   }
 
   const dynamicTargetFields: ExcelImportTargetField[] | null = currentJob?.target_fields ?? null;
-  const targetFieldOptions: ExcelImportTargetField[] = dynamicTargetFields ?? (TARGET_FIELDS[entityType] ?? []).map((name) => ({ name, label: name }));
+  const targetFieldOptions: ExcelImportTargetField[] = dynamicTargetFields ?? (TARGET_FIELDS[entityType] ?? []).map((name) => ({ name, label: FIELD_LABELS[name] ? `${FIELD_LABELS[name]} (${name})` : name }));
 
   return (
     <AppShell title={t('admin.excelImport.title')}>

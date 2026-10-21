@@ -1,6 +1,9 @@
+import hashlib
+
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.api.permissions import form_access_mode
 from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.builder_layout import BuilderColumn, BuilderPage, BuilderRow, BuilderSection
 from app.schemas.runtime import RuntimeColumn, RuntimeComponent, RuntimePage, RuntimeRow, RuntimeSection, RuntimeTemplate
@@ -81,7 +84,10 @@ class RuntimeService:
                 )
             )
 
-        return RuntimeTemplate(template_id=template.id, name=template.name, description=template.description, status=template.status, theme_json=template.theme_json, pages=runtime_pages)
+        runtime = RuntimeTemplate(template_id=template.id, name=template.name, description=template.description, status=template.status, theme_json=template.theme_json, access_mode=form_access_mode(template), pages=runtime_pages)
+        content = runtime.model_dump_json(exclude={"version_hash", "status"})
+        runtime.version_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()[:16]
+        return runtime
 
 
 runtime_service = RuntimeService()

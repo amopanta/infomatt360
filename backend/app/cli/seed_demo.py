@@ -26,6 +26,9 @@ DEMO_TEMPLATE_ID = "demo-template-characterization"
 DEMO_VERSION_ID = "demo-template-version-1"
 DEMO_PASSWORD = "Demo12345!"
 DEMO_EMAIL = "admin@infomatt360.demo"
+# Segundo usuario, de campo: pruebas de tableta compartida (docs/140 §9)
+DEMO_FIELD_USER_ID = "demo-field-user"
+DEMO_FIELD_EMAIL = "gestor@infomatt360.demo"
 
 
 def seed(db: Session) -> dict[str, str]:
@@ -36,7 +39,7 @@ def seed(db: Session) -> dict[str, str]:
         DEMO_ROLE_ID,
         name="Administrador demo",
         description="Rol demo con permisos amplios para validar el MVP.",
-        permissions="projects.read,users.admin,identity.users.manage,records.read,records.write,records.review,records.coordinate,records.approve,records.void,reports.export,gis.read,builder.write,messages.write,messages.read,integrations.api_keys.manage,organizations.manage,organizations.branding.manage,organizations.tenant_clean,backups.manage,erp.manage,integrations.donor_sync.manage,ai.audit.manage,support.tickets.manage,storage.manage,mirror.manage",
+        permissions="projects.read,users.admin,identity.users.manage,records.read,records.write,records.review,records.coordinate,records.approve,records.void,reports.export,gis.read,builder.write,messages.write,messages.read,integrations.api_keys.manage,organizations.manage,organizations.branding.manage,organizations.tenant_clean,backups.manage,erp.manage,integrations.donor_sync.manage,ai.audit.manage,support.tickets.manage,storage.manage,mirror.manage,planner.manage",
     )
     project = upsert(
         db,
@@ -55,11 +58,21 @@ def seed(db: Session) -> dict[str, str]:
         email=DEMO_EMAIL,
         password_hash=hash_password(DEMO_PASSWORD),
         phone="3000000000",
+        position="Administrador del proyecto",
+        department="Bogotá D.C.",
+        municipality="Bogotá",
         status="active",
         must_change_password=False,
         mfa_enabled=False,
     )
     upsert(db, UserProjectAssignment, "demo-admin-assignment", user_id=user.id, project_id=project.id, role_id=role.id, status="active")
+    field_role = upsert(db, Role, "demo-field-role", name="Gestor de campo demo", description="Captura en campo.",
+                        permissions="projects.read,records.read,records.write,participants.create")
+    field_user = upsert(db, User, DEMO_FIELD_USER_ID, full_name="Gestora de Campo Demo", document_id="DEMO-GESTOR",
+                        email=DEMO_FIELD_EMAIL, password_hash=hash_password(DEMO_PASSWORD), status="active",
+                        position="Gestora de campo", department="Antioquia", municipality="Turbo",
+                        must_change_password=False, mfa_enabled=False)
+    upsert(db, UserProjectAssignment, "demo-field-assignment", user_id=field_user.id, project_id=project.id, role_id=field_role.id, status="active")
     template = upsert(
         db,
         BuilderTemplate,

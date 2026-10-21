@@ -39,7 +39,20 @@ export async function fetchSession(token = currentAccessToken()): Promise<AuthSe
   return response.json();
 }
 
-export async function refreshAccessToken(): Promise<string> {
+let refreshInFlight: Promise<string> | null = null;
+
+/** Renueva el access token. El refresh token rota en cada uso, así que dos
+ * renovaciones simultáneas (StrictMode, varias pantallas recibiendo 401 a la
+ * vez) harían que la segunda presente un token ya consumido y el servidor
+ * invalide la sesión; por eso las llamadas concurrentes comparten una sola. */
+export function refreshAccessToken(): Promise<string> {
+  if (!refreshInFlight) {
+    refreshInFlight = performRefresh().finally(() => { refreshInFlight = null; });
+  }
+  return refreshInFlight;
+}
+
+async function performRefresh(): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/auth/refresh`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

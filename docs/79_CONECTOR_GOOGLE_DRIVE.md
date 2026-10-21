@@ -6,14 +6,21 @@ Permitir subir evidencias/backups a Google Drive por proyecto, usando el
 campo `provider="gdrive"` que `StorageProfile` ya soportaba desde antes de
 esta fase (`credentials_json` estaba previsto para esto).
 
-## Estado por defecto: inactivo
+## Configuración
 
-Sin `GOOGLE_OAUTH_CLIENT_ID` / `GOOGLE_OAUTH_CLIENT_SECRET` /
-`GOOGLE_OAUTH_REDIRECT_URI` configurados en el backend, todos los metodos
-que requieren la integracion (`build_authorization_url`,
-`exchange_code_for_tokens`) rechazan con `400 Bad Request` ("El conector de
-Google Drive no esta configurado en este servidor") en vez de fallar de
-forma confusa mas adelante en el flujo OAuth.
+El administrador del proyecto puede ingresar **Client ID**, **Client Secret** y
+**URL de retorno** en el módulo de almacenamiento. Esos datos se guardan
+cifrados y el secreto no vuelve a mostrarse. Como alternativa, el servidor
+admite `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET` y
+`GOOGLE_OAUTH_REDIRECT_URI` como valores generales. El URI de redirección debe
+ser HTTPS, apuntar a `/api/v1/storage/oauth/gdrive/callback` y estar
+autorizado en el cliente OAuth de Google (tipo "Aplicación web", scope
+`drive.file`).
+
+Sin credenciales en el proyecto ni en el servidor, los métodos que requieren
+la integración (`build_authorization_url`, `exchange_code_for_tokens`)
+rechazan con `400 Bad Request` ("El conector de Google Drive no esta
+configurado en este servidor"), sin afectar el resto del sistema.
 
 ## Diseno
 
@@ -50,13 +57,6 @@ pertenencia activa al proyecto (`user_has_project_access`), igual que
 para el detalle del impacto (cualquier miembro del proyecto podia
 conectar su propia cuenta de Drive como destino por defecto).
 
-## Activarlo
-
-Crear credenciales OAuth de un proyecto real en Google Cloud Console (tipo
-"Aplicacion web", scope `drive.file`) y configurar las tres variables de
-entorno mencionadas arriba en `backend/.env`. Sin esto, el conector
-permanece inactivo sin afectar el resto del sistema.
-
 ## Pantalla en el frontend
 
 Pestaña "Google Drive" en `frontend/src/modules/admin/StorageApp.tsx`
@@ -68,12 +68,36 @@ ruta de backend que no vuelve a la SPA. El administrador completa el
 consentimiento en esa pestaña y luego usa "Actualizar lista" en la
 pantalla de InfoMatt360 para confirmar que el destino quedo conectado.
 
+## Uso como destino de evidencias
+
+En **Administración → Almacenamiento → Google Drive**, conectar la cuenta. Al
+terminar la autorización, actualizar la lista y pulsar **Usar para nuevas
+subidas**. Solo un destino por proyecto queda como predeterminado; las
+evidencias anteriores permanecen en su proveedor original y se descargan desde
+él.
+
+Las subidas de hasta 5 MB usan `multipart/related`; las mayores, una sesión
+resumible. El backend registra `gdrive://<perfil>/<archivo>` y recupera el
+archivo por la API de Drive. Si falla Drive, la subida devuelve error: no se
+cambia silenciosamente al disco local.
+
+## Límites de seguridad
+
+Esta integración cubre evidencias generales. **No habilita la captura de
+huellas de participantes**: los datos biométricos siguen el flujo separado de
+[captura de huella](134_CAPTURA_HUELLA_PARTICIPANTE.md) (cifrado previo,
+permisos específicos, consentimiento y auditoría).
+
+## Comprobación
+
+Verificar el destino activo en la tabla, subir una evidencia de prueba y
+descargarla. Confirmar que `storage_provider` es `gdrive` y que los archivos
+previos mantienen su proveedor. Si falla OAuth, revisar el cliente y el URI de
+redirección sin exponer secretos.
+
 ## Limites conocidos
 
-- Solo sube archivos (`upload_file`); no lista ni descarga desde Drive
-  todavia.
 - Una cuenta de Google Drive por proyecto (no por organizacion).
 - El callback OAuth (`GET /oauth/gdrive/callback`) devuelve el
   `StorageProfileRead` como JSON crudo en vez de redirigir a una pantalla
-  de InfoMatt360; por eso el flujo de la UI abre una pestaña aparte en vez
-  de esperar una redireccion de vuelta a la SPA.
+  de InfoMatt360; por eso el flujo de la UI abre una pestaña aparte.

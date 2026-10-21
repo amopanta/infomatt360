@@ -22,7 +22,9 @@ async function resolveStartUrl() {
   const devBuildDir = path.join(__dirname, "..", "..", "frontend", "dist");
   const { server, port } = await startStaticServer(devBuildDir);
   localServer = server;
-  return `http://127.0.0.1:${port}/`;
+  // "localhost" como el backend de desarrollo: mismo sitio, así la cookie
+  // de refresco viaja y la sesión se renueva al volver la conexión.
+  return `http://localhost:${port}/`;
 }
 
 async function createWindow() {
@@ -62,12 +64,12 @@ function registerIpcHandlers() {
     return enqueue(queueDb, record);
   });
 
-  ipcMain.handle("desktop:pending-count", () => {
-    return countPending(queueDb);
+  ipcMain.handle("desktop:pending-count", (_event, userId) => {
+    return countPending(queueDb, userId);
   });
 
-  ipcMain.handle("desktop:sync-now", async (_event, { apiBaseUrl, accessToken }) => {
-    return syncPending(queueDb, { apiBaseUrl, accessToken });
+  ipcMain.handle("desktop:sync-now", async (_event, { apiBaseUrl, accessToken, userId }) => {
+    return syncPending(queueDb, { apiBaseUrl, accessToken, userId });
   });
 
   ipcMain.handle("desktop:purge-old-synced", (_event, retentionDays) => {

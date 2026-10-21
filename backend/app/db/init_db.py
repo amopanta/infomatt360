@@ -1,7 +1,7 @@
 from app.db.base import Base
 from app.db.session import engine
 from app.models import acta, assignment, backup, enrollment, excel_import, identity, installation, organization  # noqa: F401
-from app.models import device_assignment, device_verification, user_mfa  # noqa: F401
+from app.models import device_assignment, device_status, device_verification, user_mfa  # noqa: F401
 from sqlalchemy import inspect, text
 
 
@@ -35,12 +35,26 @@ def _ensure_local_compat_columns() -> None:
         if "approval_flow_version" not in review_columns:
             statements.append("ALTER TABLE review_actions ADD COLUMN approval_flow_version INTEGER")
 
+    if "field_device_status" in table_names:
+        device_columns = {column["name"] for column in inspector.get_columns("field_device_status")}
+        for column, ddl in (("wipe_requested_at", "DATETIME"), ("wipe_requested_by", "VARCHAR(36)"), ("wipe_completed_at", "DATETIME")):
+            if column not in device_columns:
+                statements.append(f"ALTER TABLE field_device_status ADD COLUMN {column} {ddl}")
+
+    if "file_assets" in table_names:
+        file_columns = {column["name"] for column in inspector.get_columns("file_assets")}
+        if "client_ref" not in file_columns:
+            statements.append("ALTER TABLE file_assets ADD COLUMN client_ref VARCHAR(80)")
+
     if "runtime_records" in table_names:
         runtime_columns = {column["name"] for column in inspector.get_columns("runtime_records")}
         if "approval_flow_id" not in runtime_columns:
             statements.append("ALTER TABLE runtime_records ADD COLUMN approval_flow_id VARCHAR(36)")
         if "approval_flow_version" not in runtime_columns:
             statements.append("ALTER TABLE runtime_records ADD COLUMN approval_flow_version VARCHAR(20)")
+        for column, ddl in (("correction_user_id", "VARCHAR(36)"), ("returned_at", "DATETIME")):
+            if column not in runtime_columns:
+                statements.append(f"ALTER TABLE runtime_records ADD COLUMN {column} {ddl}")
         if "approval_flow_snapshot_json" not in runtime_columns:
             statements.append("ALTER TABLE runtime_records ADD COLUMN approval_flow_snapshot_json TEXT")
 

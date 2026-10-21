@@ -1,8 +1,12 @@
+import { formatOperationalDate, operationalStatusLabel } from '../../lib/operationalFormat';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { useI18n } from '../../i18n';
 import { PROJECT_KEY, currentProjectPermissions, hasAnyCurrentProjectPermission } from '../auth/session';
+import { ObservationsPanel } from './ObservationsPanel';
+import { BulkReturnsPanel } from './BulkReturnsPanel';
+import { currentUserId, downloadCleanAnswers, downloadObservations } from './feedbackApi';
 import { applyReviewAction, correctRecordField, downloadRecord, downloadTemplateRecords, duplicateRecord, fetchProjectTemplates, fetchRecord, fetchRecordNeighbors, fetchReviewActions, fetchReviewApprovalProgress, fetchReviewFlowComparison, fetchReviewNextActions, reopenApprovedRecord, searchTemplateRecords } from './api';
 import type { ReviewAction, ReviewApprovalProgress, ReviewFlowComparison, ReviewFlowSnapshot, ReviewNextAction, RuntimeRecord, TemplateSummary } from './api';
 import { fetchActaTemplates, printActaBatch, printActaFromRecord, renderActaBatch, renderActaFromRecord, renderDefaultRecordActa } from '../acta/api';
@@ -297,7 +301,7 @@ function ReviewPanel({
             <article key={`${item.action}-${item.to_status}`}>
               <strong>{t('recordsView.partialApproval', { label: item.label })}</strong>
               <span>{t('recordsView.approvalProgress', { approved: item.approved_count, required: item.required_count, pending: item.pending_count })}</span>
-              <small>{t('recordsView.destination', { status: item.to_status })}</small>
+              <small>{t('recordsView.destination', { status: operationalStatusLabel(item.to_status) })}</small>
             </article>
           ))}
         </div>
@@ -328,7 +332,7 @@ function ReviewPanel({
         {history.length ? (
           history.map((item) => (
             <p key={item.id}>
-              {item.created_at ? new Date(item.created_at).toLocaleString() : ''} · {item.action}: {item.from_status || '—'} → {item.to_status}
+              {item.created_at ? formatOperationalDate(item.created_at) : ''} · {operationalStatusLabel(item.action)}: {operationalStatusLabel(item.from_status)} → {operationalStatusLabel(item.to_status)}
               {item.approval_flow_version ? ` · ${t('recordsView.flowVersion', { version: item.approval_flow_version })}` : ''}
               {item.notes ? ` · ${item.notes}` : ''}
               {item.rejected_field_name ? ` · ${t('recordsView.fieldLabel', { name: item.rejected_field_name })}` : ''}
@@ -345,7 +349,8 @@ function ReviewPanel({
 function CorrectionSubmitPanel({ projectId, record, onRecordUpdated, onMessage }: { projectId: string; record: RuntimeRecord; onRecordUpdated: (record: RuntimeRecord) => void; onMessage: (value: string) => void }) {
   const { t } = useI18n();
   const canWrite = hasAnyCurrentProjectPermission(['records.write']);
-  if (!canWrite || !['returned', 'corrected'].includes(record.status)) return null;
+  // docs/141: solo quien debe corregir (autor o destinatario designado) reenvía
+  if (!canWrite || !['returned', 'corrected'].includes(record.status) || record.correction_user_id !== currentUserId()) return null;
   const toStatus = record.status === 'returned' ? 'corrected' : 'submitted';
   const label = record.status === 'returned' ? t('recordsView.finishedCorrection') : t('recordsView.resendForApproval');
   async function submit() {
@@ -384,7 +389,7 @@ function TemplateList() {
             <a className="record-template-card" key={template.id} href={`/records/${template.id}`}>
               <strong>{template.name}</strong>
               <span>{template.description || t('recordsView.noDescription')}</span>
-              <small>{template.status}</small>
+              <small>{operationalStatusLabel(template.status)}</small>
             </a>
           ))}
         </div>
@@ -426,7 +431,9 @@ function CorrectableField({
     } catch { return ''; }
   });
   const [saving, setSaving] = useState(false);
-  const canEditHere = ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && hasAnyCurrentProjectPermission(['records.write']);
+  // docs/141: enviado y aprobado son de solo lectura; un devuelto lo edita solo su destinatario
+  const canEditHere = ['draft', 'returned', 'corrected'].includes(record.status) && hasAnyCurrentProjectPermission(['records.write'])
+    && (record.status === 'draft' || record.correction_user_id === currentUserId());
 
   function startEditing() {
     let parsed: unknown = null;
@@ -679,18 +686,23 @@ function DeepLinkedRecordCard({
       </div>
       <header>
         <strong>{editMode ? t('recordsView.editResponseTitle') : t('recordsView.fullResponse')}</strong>
-        <span className={`record-status ${record.status}`}>{record.status}</span>
+        <span className={`record-status ${record.status}`}>{operationalStatusLabel(record.status)}</span>
       </header>
       <div className="record-participant-summary">
         <strong>{t('recordsView.associatedParticipant')}</strong>
         {record.participant_id ? <span>{record.participant_name || t('recordsView.nameNotAvailable')} · {t('recordsView.document')}: {record.participant_document_id || '—'} · {t('recordsView.code')}: {record.participant_external_code || '—'} · {t('recordsView.municipality')}: {record.participant_municipality || '—'}</span> : <span>{t('recordsView.noParticipantLinked')}</span>}
       </div>
+      {record.captured_by ? <div className="record-participant-summary">
+        <strong>{t('recordsView.capturedBy')}</strong>
+        <span>{record.captured_by.name || '—'} · {t('recordsView.document')}: {record.captured_by.document_id || '—'} · {t('recordsView.position')}: {record.captured_by.position || '—'} · {t('recordsView.municipality')}: {record.captured_by.municipality || '—'}</span>
+      </div> : null}
       <label className="record-field-search">{t('recordsView.searchQuestion')}<input type="search" value={fieldQuery} onChange={(event) => setFieldQuery(event.target.value)} placeholder={t('recordsView.questionPlaceholder')} /></label>
       <p className="record-field-count">{t('recordsView.fieldCount', { visible: visibleValues.length, total: record.values.length })}</p>
       <dl className="record-detail">
         {visibleValues.map((value) => (
           <div
             key={value.id}
+            id={`field-${value.field_name}`}
             ref={(node) => { fieldRefs.current[value.field_name] = node; }}
             className={value.field_name === highlightField ? 'record-field-highlighted' : undefined}
           >
@@ -702,6 +714,7 @@ function DeepLinkedRecordCard({
       {!visibleValues.length && <p>{t('recordsView.noQuestionsFound')}</p>}
       <LinkedSubformSection projectId={projectId} record={record} onMessage={onMessage} />
       <CorrectionSubmitPanel projectId={projectId} record={record} onMessage={onMessage} onRecordUpdated={onRecordUpdated} />
+      <ObservationsPanel projectId={projectId} record={record} onMessage={onMessage} onChanged={() => void fetchRecord(record.id).then(onRecordUpdated)} />
       <ReviewPanel projectId={projectId} record={record} onMessage={onMessage} onRecordUpdated={onRecordUpdated} />
       <GenerateActaPanel projectId={projectId} record={record} onMessage={onMessage} />
     </section>
@@ -836,6 +849,10 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
   const pageIds = useMemo(() => records.map((record) => record.id), [records]);
   const pageFullySelected = isPageFullySelected(selectedIds, pageIds);
 
+  const [exportFrom, setExportFrom] = useState('');
+  const [exportTo, setExportTo] = useState('');
+  const [exportAllStatuses, setExportAllStatuses] = useState(false);
+
   async function exportCsv() {
     try {
       await downloadTemplateRecords(templateId, { search: query.trim(), status });
@@ -893,6 +910,18 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
             <button onClick={() => void exportCsv()}>{t('recordsView.exportCsv')}</button>
           </div>
         </div>
+        <details className="records-clean-exports">
+          <summary>{t('feedback.exportsTitle')}</summary>
+          <div className="participants-group-toolbar">
+            <label>{t('feedback.exportFrom')}<input type="date" value={exportFrom} onChange={(event) => setExportFrom(event.target.value)} /></label>
+            <label>{t('feedback.exportTo')}<input type="date" value={exportTo} onChange={(event) => setExportTo(event.target.value)} /></label>
+            <label><input type="checkbox" checked={exportAllStatuses} onChange={(event) => setExportAllStatuses(event.target.checked)} /> {t('feedback.exportAllStatuses')}</label>
+            <button type="button" onClick={() => void downloadCleanAnswers(templateId, { status: exportAllStatuses ? 'todos' : 'approved', dateFrom: exportFrom, dateTo: exportTo }).catch((error: Error) => setMessage(error.message))}>{t('feedback.exportClean')}</button>
+            <button type="button" onClick={() => void downloadObservations(templateId).catch((error: Error) => setMessage(error.message))}>{t('feedback.exportObservations')}</button>
+          </div>
+          <p className="devices-note">{t('feedback.exportsHint')}</p>
+        </details>
+        {hasAnyCurrentProjectPermission(['records.review', 'records.approve']) && <details><summary>{t('feedback.bulkTitle')}</summary><BulkReturnsPanel projectId={projectId} /></details>}
         <div className="records-pagination" aria-live="polite">
           <span>{t('recordsView.paginationRange', { start: pageStart, end: pageEnd, total })}</span>
           <button className="secondary" disabled={total === 0 || selectAllMatchingFilter} onClick={activateSelectAllMatchingFilter}>
@@ -956,9 +985,9 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
                     <td>{record.participant_document_id || '—'}</td>
                     <td>{record.participant_external_code || '—'}</td>
                     <td>{record.participant_municipality || '—'}</td>
-                    <td>{new Date(record.created_at).toLocaleString()}</td>
-                    <td><span className={`record-status ${record.status}`}>{record.status}</span></td>
-                    <td title={record.submitted_by ?? ''}>{record.submitted_by || '—'}</td>
+                    <td>{formatOperationalDate(record.created_at)}</td>
+                    <td><span className={`record-status ${record.status}`}>{operationalStatusLabel(record.status)}</span></td>
+                    <td title={record.submitted_by ?? ''}>{record.submitted_by_name || record.submitted_by || '—'}</td>
                     {fields.map((field) => {
                       const value = formatValue(record.values.find((item) => item.field_name === field.name)?.field_value_json, true, t);
                       return <td key={field.name} title={value}>{value}</td>;
@@ -987,7 +1016,7 @@ function formatValue(raw?: string, detailed = false, t?: (key: string, params?: 
     if (typeof value === 'string' || typeof value === 'number') return String(value);
     if (value && typeof value === 'object' && value.method === 'device_user_verification') {
       const label = t ? t('recordsView.deviceVerified') : 'Dispositivo verificado';
-      return `${label}${value.verified_at ? ` · ${new Date(value.verified_at).toLocaleString()}` : ''}`;
+      return `${label}${value.verified_at ? ` · ${formatOperationalDate(value.verified_at)}` : ''}`;
     }
     // GPS coordinates: { lat, lng, accuracy } or { latitude, longitude, ... }
     if (value && typeof value === 'object' && !Array.isArray(value) && (('lat' in value && 'lng' in value) || ('latitude' in value && 'longitude' in value))) {

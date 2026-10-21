@@ -31,7 +31,7 @@ def security_context():
         outsider = User(id="outsider", full_name="Otro Proyecto", document_id="other-doc", email="other@example.com", password_hash=hash_password("OtherPassword123"))
         project = Project(id="project", name="Proyecto", status="active")
         other_project = Project(id="other-project", name="Otro", status="active")
-        role = Role(id="admin-role", name="Administrador", permissions="identity.users.manage")
+        role = Role(id="admin-role", name="Administrador", permissions="identity.users.manage,records.read")
         no_permission = Role(id="basic-role", name="Basico", permissions="records.read")
         db.add_all([
             admin, target, outsider, project, other_project, role, no_permission,

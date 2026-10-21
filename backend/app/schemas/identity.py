@@ -42,6 +42,9 @@ class UserCreate(BaseModel):
     document_id: str = Field(..., min_length=5)
     email: EmailStr
     phone: str | None = None
+    position: str | None = Field(default=None, max_length=120)
+    department: str | None = Field(default=None, max_length=120)
+    municipality: str | None = Field(default=None, max_length=120)
     status: UserStatus = UserStatus.active
     allowed_channels: list[Channel] = [Channel.web, Channel.android, Channel.desktop]
 

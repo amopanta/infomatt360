@@ -1,5 +1,6 @@
 """Base Espejo real: replicacion de RuntimeRecord/RuntimeRecordValue hacia una
-base de datos externa (Postgres o SQLite por ahora, ver docs/102).
+base de datos externa (Postgres, MySQL/MariaDB, SQL Server o SQLite; ver docs/102).
+El plan «Proyecto completo» copia todo el proyecto (docs/146, project_export_service).
 
 Las credenciales de conexion nunca se guardan en texto plano -- se cifran con
 app.core.security.encrypt_text, mismo mecanismo usado para credenciales S3
@@ -32,7 +33,15 @@ def target_to_read(row: MirrorTarget) -> MirrorTargetRead:
 
 
 def plan_to_read(row: MirrorPlan) -> MirrorPlanRead:
-    return MirrorPlanRead(id=row.id, target_id=row.target_id, name=row.name, schedule_mode=row.schedule_mode, status=row.status, last_result=row.last_result)
+    return MirrorPlanRead(id=row.id, target_id=row.target_id, name=row.name, scope=plan_scope(row), schedule_mode=row.schedule_mode,
+                          status=row.status, last_result=row.last_result)
+
+
+def plan_scope(row: MirrorPlan) -> str:
+    try:
+        return "project" if "project" in json.loads(row.tables_json or "[]") else "records"
+    except ValueError:
+        return "records"
 
 
 def run_to_read(row: MirrorRun) -> MirrorRunRead:
@@ -46,6 +55,7 @@ def run_to_read(row: MirrorRun) -> MirrorRunRead:
         error=row.error,
         started_at=row.started_at,
         finished_at=row.finished_at,
+        summary=json.loads(row.summary_json) if row.summary_json else None,
     )
 
 
@@ -207,10 +217,9 @@ class MirrorService:
         row = MirrorPlan(
             target_id=payload.target_id,
             name=payload.name,
-            # Version inicial: siempre espeja runtime_records +
-            # runtime_record_values completos, no hay seleccion de tablas
-            # todavia (ver docs/102, "que sigue sin resolver").
-            tables_json='["runtime_records", "runtime_record_values"]',
+            # "project" copia todo el proyecto (docs/146); "records", el
+            # espejo clave-valor original (docs/102).
+            tables_json='["project"]' if payload.scope == "project" else '["runtime_records", "runtime_record_values"]',
             schedule_mode=payload.schedule_mode,
             status=payload.status,
         )
@@ -241,6 +250,8 @@ class MirrorService:
         db.refresh(run)
 
         engine = None
+        if plan_scope(plan) == "project":
+            return self._run_project_plan(db, plan, target, run)
         try:
             engine = self._engine_for_target(target)
             metadata, records_table, values_table = _mirror_tables()
@@ -336,6 +347,35 @@ class MirrorService:
         db.refresh(run)
         return run_to_read(run)
 
+
+    def _run_project_plan(self, db: Session, plan: MirrorPlan, target: MirrorTarget, run: MirrorRun) -> MirrorRunRead:
+        from app.services.project_export_service import export_project
+        last_success = (db.query(MirrorRun).filter(MirrorRun.plan_id == plan.id, MirrorRun.status == "completed", MirrorRun.id != run.id)
+                        .order_by(MirrorRun.started_at.desc()).first())
+        # Se toma el inicio de la corrida anterior: lo que cambió mientras corría vuelve a ir.
+        watermark = last_success.started_at if last_success else None
+        engine = None
+        try:
+            engine = self._engine_for_target(target)
+            summary = export_project(db, engine, target.project_id, plan.schedule_mode, watermark)
+            run.status = "completed" if summary["reconciled"] or plan.schedule_mode == "insert_only" else "completed_with_differences"
+            run.records_synced = summary["written_records"]
+            run.values_synced = summary["written_values"]
+            run.summary_json = json.dumps(summary, ensure_ascii=False, default=str)
+            differences = [name for name, item in {**summary["tables"], **summary["form_tables"]}.items() if not item["ok"]]
+            plan.last_result = (f"{run.status}: {summary['written_records']} registros, {len(summary['form_tables'])} formularios"
+                                + (f"; diferencias en {', '.join(differences[:5])}" if differences else "; origen y destino cuadran"))
+        except Exception as exc:  # noqa: BLE001 - se registra para el historial
+            run.status = "failed"
+            run.error = str(exc)[:4000]
+            plan.last_result = f"failed: {run.error}"
+        finally:
+            if engine is not None:
+                engine.dispose()
+        run.finished_at = utc_now()
+        db.commit()
+        db.refresh(run)
+        return run_to_read(run)
 
     def bi_connection_info(self, db: Session, target_id: str) -> dict:
         """Genera informacion de conexion para herramientas BI (Looker, Metabase, Superset).

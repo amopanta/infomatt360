@@ -10,7 +10,10 @@ disparaba con el boton manual de `POST /backups/run`. El worker CLI
 ciclo, igual que `process_bulk_jobs.py` hace con los lotes bulk.
 """
 
-from datetime import timedelta
+import json
+import re
+from datetime import datetime, timedelta
+from datetime import timezone as dt_timezone
 
 from sqlalchemy.orm import Session
 
@@ -31,6 +34,35 @@ from app.services.whatsapp_service import whatsapp_service
 # Frecuencias recurrentes soportadas por el worker. "manual" (el default del
 # modelo) deliberadamente no aparece aqui: una tarea manual nunca es "due",
 # solo se dispara desde el boton de la web.
+def task_schedule(task: ScheduledTask) -> tuple[str | None, str]:
+    """Hora fija opcional en config_json: {"run_time": "02:00", "timezone": "America/Bogota"}."""
+    try:
+        config = json.loads(task.config_json or "{}")
+    except ValueError:
+        config = {}
+    run_time = config.get("run_time") if isinstance(config, dict) else None
+    timezone_name = (config.get("timezone") if isinstance(config, dict) else None) or "America/Bogota"
+    return (run_time if isinstance(run_time, str) and re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", run_time) else None), timezone_name
+
+
+def next_run_at(task: ScheduledTask, now: datetime, first: bool = False) -> datetime:
+    """Próxima corrida en UTC sin zona. Diario/semanal con hora fija: la
+    próxima vez que sea esa hora en la zona del proyecto; si no, el intervalo."""
+    run_time, timezone_name = task_schedule(task)
+    if not run_time or task.frequency not in {"daily", "weekly"}:
+        return now if first else now + RECURRING_INTERVALS[task.frequency]
+    from app.services.planner_service import resolve_timezone
+    tz = resolve_timezone(timezone_name)
+    local_now = now.replace(tzinfo=dt_timezone.utc).astimezone(tz)
+    hour, minute = (int(part) for part in run_time.split(":"))
+    candidate = local_now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    if candidate <= local_now:
+        candidate += timedelta(days=1)
+    if task.frequency == "weekly" and not first:
+        candidate += timedelta(days=6)
+    return candidate.astimezone(dt_timezone.utc).replace(tzinfo=None)
+
+
 RECURRING_INTERVALS: dict[str, timedelta] = {
     "hourly": timedelta(hours=1),
     "daily": timedelta(days=1),
@@ -62,9 +94,9 @@ class SchedulerService:
     def create_task(self, db: Session, payload: ScheduledTaskCreate) -> ScheduledTaskRead:
         row = ScheduledTask(**payload.model_dump())
         if row.frequency in RECURRING_INTERVALS and row.next_run_at is None:
-            # Primera ejecucion pronto (el proximo ciclo del worker), no
-            # despues de esperar un intervalo completo desde la creacion.
-            row.next_run_at = utc_now()
+            # Con hora fija (docs/146), la primera corrida es la próxima a esa
+            # hora local; sin ella, el próximo ciclo del worker.
+            row.next_run_at = next_run_at(row, utc_now(), first=True)
         db.add(row)
         db.commit()
         db.refresh(row)
@@ -120,7 +152,7 @@ class SchedulerService:
                 task.status = "completed" if status_value == "success" else "failed"
                 task.next_run_at = None
             else:
-                task.next_run_at = now + RECURRING_INTERVALS[task.frequency]
+                task.next_run_at = next_run_at(task, now)
             task.last_result = result_text
             db.commit()
 
@@ -186,10 +218,29 @@ class SchedulerService:
                 run = mirror_service.run_plan(db, plan.id, triggered_by=f"scheduler:{task.id}")
                 if run.status == "completed":
                     return "success", f"Espejo completado: {run.records_synced} registros, {run.values_synced} valores"
+                if run.status == "completed_with_differences":
+                    return "failed", f"Espejo completado con diferencias entre origen y destino: {plan.last_result}"
                 return "failed", run.error or "El espejo fallo sin detalle de error"
             except Exception as exc:
                 db.rollback()
                 return "failed", str(exc)
+
+        if task.task_type == "db_import":
+            from app.models.db_import import DbImport
+            from app.services.db_import_service import execute
+            job = db.get(DbImport, task.target_id) if task.target_id else None
+            if job is None:
+                return "failed", "La importación referenciada ya no existe"
+            if job.status != "active":
+                return "failed", "La importación está en pausa"
+            try:
+                result = execute(db, job, triggered_by=f"scheduler:{task.id}")
+                text_result = (f"{result['rows_read']} leídas, {result['created']} creadas, {result['updated']} actualizadas, "
+                               f"{result['unchanged']} sin cambios, {result['failed']} con error")
+                return ("success" if not result["failed"] else "failed"), text_result
+            except Exception as exc:  # noqa: BLE001 - se registra en el historial de la tarea
+                db.rollback()
+                return "failed", str(getattr(exc, "detail", exc))
         return "failed", f"task_type '{task.task_type}' no esta soportado por el worker de tareas programadas"
 
 

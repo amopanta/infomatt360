@@ -23,6 +23,9 @@ type Props = {
   uploadsDisabled?: boolean;
 };
 
+/** Campos que llena el sistema; se muestran sin control editable. */
+const AUTOMATIC_FIELD_TYPES = new Set(['UUID', 'RESPONSE_ID', 'SERIAL_NUMBER', 'CAPTURED_BY', 'CHANGE_HISTORY', 'INTERVIEW_DURATION']);
+
 function isEmptyValue(value: RuntimeFormValue | undefined) {
   return value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0);
 }
@@ -116,16 +119,27 @@ export function RuntimeField(props: Props) {
   if (!isFieldVisible(component, values)) return null;
 
   if (type === 'REPEAT') {
+    // Con count_field/count el número de filas lo fija el formulario; sin
+    // ellos, la persona agrega y quita filas (repeat de XLSForm sin repeat_count).
     const configuredCount = config.count_field ? values[config.count_field] : config.count;
-    const count = typeof configuredCount === 'number' ? configuredCount : Number(configuredCount ?? 0);
+    const fixedCount = configuredCount === undefined || configuredCount === null || configuredCount === ''
+      ? null
+      : Number.isFinite(Number(configuredCount)) ? Number(configuredCount) : 0;
     const items = Array.isArray(value) ? value as RepeatItem[] : [];
+    const rawConfig = config as Record<string, unknown>;
     return (
       <RuntimeRepeat
         name={component.name}
         label={component.label}
-        count={count}
+        fields={rawConfig.fields}
+        fixedCount={fixedCount}
+        minRows={typeof rawConfig.min_repeats === 'number' ? rawConfig.min_repeats : config.required ? 1 : 0}
+        maxRows={typeof rawConfig.max_repeats === 'number' ? rawConfig.max_repeats : undefined}
         items={items}
         onChange={(nextItems) => onChange(component.name, nextItems)}
+        templateId={templateId}
+        projectId={projectId}
+        uploadsDisabled={uploadsDisabled}
       />
     );
   }
@@ -133,6 +147,17 @@ export function RuntimeField(props: Props) {
   if (type === 'HIDDEN') return null;
 
   if (config.calculation) return <label className="runtime-field-group" htmlFor={fieldId}><RuntimeQuestionLabel label={component.label} config={config} /><input id={fieldId} className="runtime-field" value={String(value ?? '')} readOnly /><small>{t('runtime.autoCalculated')}</small></label>;
+
+  // Los llena el servidor (o el envío, en INTERVIEW_DURATION): quien captura
+  // no debe poder escribirlos, p. ej. poner otro nombre en "Quién lo llenó".
+  if (AUTOMATIC_FIELD_TYPES.has(type)) {
+    return (
+      <div className="runtime-field-group runtime-field-automatic">
+        <RuntimeQuestionLabel label={component.label} config={config} />
+        <small>{isEmptyValue(value) || typeof value === 'object' ? t('ux.runtime.automatic') : String(value)}</small>
+      </div>
+    );
+  }
 
   if (type === 'LINKED_SUBFORM') {
     return (
@@ -261,6 +286,102 @@ export function RuntimeField(props: Props) {
     : normalizeOptions(config);
   if (type === 'LIKERT_5' && options.length === 0) options = Array.from({ length: 5 }, (_, index) => ({ label: String(index + 1), value: String(index + 1) }));
   if (type === 'LIKERT_7' && options.length === 0) options = Array.from({ length: 7 }, (_, index) => ({ label: String(index + 1), value: String(index + 1) }));
+
+  if (type === 'RATING' || type === 'NPS') {
+    // Escala de botones: RATING 1..5 (o sus opciones), NPS 0..10. Se guarda el número.
+    const scale = options.length
+      ? options.map((option) => Number(option.value)).filter(Number.isFinite)
+      : type === 'NPS' ? Array.from({ length: 11 }, (_, index) => index) : [1, 2, 3, 4, 5];
+    const current = typeof value === 'number' ? value : value === '' || value === null ? null : Number(value);
+    const max = Math.max(...scale);
+    return (
+      <div className="runtime-field-group" role="group" aria-labelledby={`${fieldId}-label`}>
+        <span id={`${fieldId}-label`}><RuntimeQuestionLabel label={component.label} config={config} /></span>
+        <div className={`runtime-scale ${type === 'RATING' ? 'stars' : ''}`}>
+          {scale.map((point) => (
+            <button
+              key={point}
+              type="button"
+              aria-pressed={current === point}
+              aria-label={t('ux.runtime.ratingLabel', { value: point, max })}
+              className={current !== null && (type === 'RATING' ? point <= current : point === current) ? 'active' : ''}
+              onClick={() => onChange(component.name, current === point ? null : point)}
+            >
+              {type === 'RATING' ? '★' : point}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'RANKING') {
+    // Se guarda la lista de valores en el orden elegido (primero = más importante).
+    const order = Array.isArray(value) && value.length ? (value as string[]) : options.map((option) => option.value);
+    const byValue = new Map(options.map((option) => [option.value, option.label]));
+    const move = (from: number, to: number) => {
+      const next = [...order];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      onChange(component.name, next);
+    };
+    return (
+      <div className="runtime-field-group">
+        <RuntimeQuestionLabel label={component.label} config={config} />
+        <small>{t('ux.runtime.rankHint')}</small>
+        <ol className="runtime-ranking">
+          {order.map((item, index) => (
+            <li key={item}>
+              <span>{byValue.get(item) ?? item}</span>
+              <button type="button" aria-label={t('ux.runtime.moveUp')} disabled={index === 0} onClick={() => move(index, index - 1)}>↑</button>
+              <button type="button" aria-label={t('ux.runtime.moveDown')} disabled={index === order.length - 1} onClick={() => move(index, index + 1)}>↓</button>
+            </li>
+          ))}
+        </ol>
+      </div>
+    );
+  }
+
+  if (type === 'MATRIX') {
+    // Filas en config.rows y escala en config.options; valor { fila: opción }.
+    const rows = normalizeOptions({ options: (config as Record<string, unknown>).rows } as Parameters<typeof normalizeOptions>[0]);
+    const scaleOptions = options.length ? options : [1, 2, 3, 4, 5].map((point) => ({ value: String(point), label: String(point) }));
+    if (rows.length === 0) {
+      return (
+        <div className="runtime-field-group">
+          <RuntimeQuestionLabel label={component.label} config={config} />
+          <small className="runtime-field-unavailable">{t('ux.runtime.matrixWithoutRows')}</small>
+        </div>
+      );
+    }
+    const answers = value && typeof value === 'object' && !Array.isArray(value) ? value as unknown as Record<string, string> : {};
+    return (
+      <fieldset className="runtime-field-group runtime-matrix">
+        <legend><RuntimeQuestionLabel label={component.label} config={config} /></legend>
+        <table>
+          <thead><tr><th />{scaleOptions.map((option) => <th key={option.value}>{option.label}</th>)}</tr></thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.value}>
+                <th scope="row">{row.label}</th>
+                {scaleOptions.map((option) => (
+                  <td key={option.value}>
+                    <input
+                      type="radio"
+                      name={`${fieldId}-${row.value}`}
+                      aria-label={`${row.label}: ${option.label}`}
+                      checked={answers[row.value] === option.value}
+                      onChange={() => onChange(component.name, { ...answers, [row.value]: option.value } as unknown as RuntimeFormValue)}
+                    />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </fieldset>
+    );
+  }
   if (type === 'SELECT' || type === 'DROPDOWN' || type === 'REFERENCE' || type === 'LOOKUP' || type.startsWith('LIKERT_')) {
     return (
       <label className="runtime-field-group" htmlFor={fieldId}>

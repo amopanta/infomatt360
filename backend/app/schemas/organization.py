@@ -24,6 +24,9 @@ class OrganizationBrandingUpdate(BaseModel):
     accent_color: str | None = None
     background_color: str | None = None
     slogan: str | None = None
+    # Nombre de la empresa que ve el personal de campo (login web y app).
+    # Opcional: si no llega, se conserva el actual.
+    organization_name: str | None = Field(default=None, min_length=2, max_length=180)
 
 
 class OrganizationBrandingRead(OrganizationBrandingUpdate):

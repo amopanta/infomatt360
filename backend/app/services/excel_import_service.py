@@ -22,7 +22,10 @@ from sqlalchemy.orm import Session
 from app.core.time import utc_now
 from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.excel_import import ExcelImportJob
-from app.models.identity import Role
+from app.models.assignment import UserProjectAssignment
+from app.models.audit import AuditLog
+from app.models.case_management import UserTerritory
+from app.models.identity import Role, User
 from app.models.participants import Participant
 from app.models.runtime_record import RuntimeRecord
 from app.schemas.assignment import AssignmentCreate
@@ -95,7 +98,22 @@ ENTITY_ALIASES: dict[str, dict[str, str]] = {
         "email": "email",
         "correo electronico": "email",
         "telefono": "phone",
+        "teléfono": "phone",
         "celular": "phone",
+        "correo del usuario": "email",
+        "número de documento": "document_id",
+        "numero de documento": "document_id",
+        "rol": "role_name",
+        "nombre del rol": "role_name",
+        "role": "role_name",
+        "limitar acceso": "restrict_to_territory",
+        "limitar_acceso": "restrict_to_territory",
+        "cargo": "position",
+        "position": "position",
+        "departamento": "department",
+        "department": "department",
+        "municipio": "municipality",
+        "municipality": "municipality",
     },
     "assignments": {
         "correo": "email",
@@ -112,13 +130,13 @@ ENTITY_ALIASES: dict[str, dict[str, str]] = {
 
 PARTICIPANT_TARGET_FIELDS = {"document_id", "full_name", "external_code", "participant_type", "department", "municipality"}
 PARTICIPANT_UPDATE_FIELDS = PARTICIPANT_TARGET_FIELDS | {"group_name", "status"}
-USER_TARGET_FIELDS = {"document_id", "full_name", "email", "phone"}
+USER_TARGET_FIELDS = {"document_id", "full_name", "email", "phone", "position", "department", "municipality", "role_name", "restrict_to_territory"}
 ASSIGNMENT_TARGET_FIELDS = {"email", "role_name", "status"}
 
 REQUIRED_FIELDS = {
     "participants": {"full_name"},
     "participant_updates": {"document_id"},
-    "users": {"full_name", "document_id", "email"},
+    "users": {"full_name", "document_id", "email", "position", "department", "municipality", "role_name"},
     "assignments": {"email", "role_name"},
 }
 
@@ -184,7 +202,7 @@ class ExcelImportService:
             columns = [(row.name, bool(json.loads(row.config_json or "{}").get("required")), row.component_type) for row in components]
             columns += [(META_STATUS_FIELD, False, "STATUS"), (META_CREATED_AT_FIELD, False, "DATE")]
         else:
-            names = {"participants": ["Documento", "Nombre completo", "Código externo", "Tipo", "Departamento", "Municipio"], "participant_updates": ["Documento", "Nombre completo", "Código externo", "Tipo", "Departamento", "Municipio", "Grupo", "Estado"], "users": ["document_id", "full_name", "email", "phone"], "assignments": ["email", "role_name", "status"]}[entity_type]
+            names = {"participants": ["Documento", "Nombre completo", "Código externo", "Tipo", "Departamento", "Municipio"], "participant_updates": ["Documento", "Nombre completo", "Código externo", "Tipo", "Departamento", "Municipio", "Grupo", "Estado"], "users": ["Documento", "Nombre completo", "Correo", "Teléfono", "Cargo", "Departamento", "Municipio", "Rol", "Limitar acceso"], "assignments": ["email", "role_name", "status"]}[entity_type]
             aliases = ENTITY_ALIASES[entity_type]
             columns = [(name, aliases.get(name.lower(), name) in REQUIRED_FIELDS[entity_type], "TEXT") for name in names]
         examples = {"document_id": "123456789", "full_name": "Persona de ejemplo", "external_code": "COD-001", "participant_type": "beneficiario", "Documento": "123456789", "Nombre completo": "Persona de ejemplo", "Código externo": "COD-001", "Tipo": "beneficiario", "Departamento": "Cundinamarca", "Municipio": "Soacha", "Grupo": "Familias de Soacha", "Estado": "active", "email": "persona@ejemplo.com", "phone": "3001234567", "role_name": "Encuestador", "status": "active", META_STATUS_FIELD: "submitted", META_CREATED_AT_FIELD: "2026-01-01"}
@@ -316,6 +334,7 @@ class ExcelImportService:
 
     def approve_and_import(self, db: Session, job_id: str, approved_by: str) -> ExcelImportJobRead:
         row = self._get_or_404(db, job_id)
+        approver = db.get(User, approved_by)
         if row.status != "mapped":
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El lote debe estar mapeado antes de aprobarse")
 
@@ -348,11 +367,11 @@ class ExcelImportService:
                 elif row.entity_type == "participant_updates":
                     self._update_participant_row(db, row.project_id, mapped)
                 elif row.entity_type == "assignments":
-                    self._import_assignment_row(db, row.project_id, mapped)
+                    self._import_assignment_row(db, row.project_id, mapped, approver)
                 elif row.entity_type == "records":
                     self._import_record_row(db, row.project_id, row.template_id, mapped, approved_by)
                 else:
-                    identity_service.create_user(db, UserCreate(**mapped))
+                    self._import_user_row(db, row.project_id, mapped, approver)
                 imported += 1
             except HTTPException as exc:
                 db.rollback()
@@ -478,26 +497,61 @@ class ExcelImportService:
         except ValueError as exc:
             raise ValueError(f"Fecha historica '{raw_value}' no reconocida (use AAAA-MM-DD)") from exc
 
-    def _import_assignment_row(self, db: Session, project_id: str, mapped: dict[str, str | None]) -> None:
+    def _grantable_role(self, db: Session, project_id: str, role_name: str | None, approver: User | None) -> Role:
+        """Rol por nombre, solo si quien aprueba tiene todos sus permisos en el
+        proyecto (misma regla que la creación individual, PR #46)."""
+        from app.services.project_user_admin_service import project_user_admin_service
+        name = (role_name or "").strip()
+        role = db.query(Role).filter(func.lower(Role.name) == name.lower()).first() if name else None
+        if role is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No existe un rol llamado '{name}'")
+        if approver is None:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No se pudo identificar a quien aprueba")
+        project_user_admin_service._role(db, project_id, role.id, approver)
+        return role
+
+    def _import_user_row(self, db: Session, project_id: str, mapped: dict[str, str | None], approver: User | None) -> None:
+        """Crea la cuenta con su perfil (docs/145), le da acceso al proyecto con
+        el rol indicado y, salvo que la fila diga lo contrario, limita su acceso
+        a su municipio. La contraseña es aleatoria y debe cambiarse: se entrega
+        con «Reiniciar contraseña» o el QR de enrolamiento."""
+        role = self._grantable_role(db, project_id, mapped.get("role_name"), approver)
+        email = (mapped.get("email") or "").strip().lower()
+        document = (mapped.get("document_id") or "").strip()
+        if len(document) < 5:
+            raise HTTPException(status_code=422, detail="El documento debe tener al menos 5 caracteres")
+        if db.query(User.id).filter((func.lower(User.email) == email) | (User.document_id == document)).first():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El correo o documento ya está registrado")
+        restrict = (mapped.get("restrict_to_territory") or "si").strip().casefold() not in {"no", "n", "false", "0"}
+        created = identity_service.create_user(db, UserCreate(
+            full_name=mapped["full_name"], document_id=document, email=email, phone=mapped.get("phone") or None,
+            position=mapped["position"], department=mapped["department"], municipality=mapped["municipality"]))
+        db.add(UserProjectAssignment(user_id=created.id, project_id=project_id, role_id=role.id, status="active"))
+        if restrict:
+            db.add(UserTerritory(project_id=project_id, user_id=created.id, department=mapped["department"].strip(),
+                                 municipality=mapped["municipality"].strip()))
+        db.add(AuditLog(project_id=project_id, user_id=approver.id if approver else None, module="identity", action="project_user_imported",
+                        entity_type="user", entity_id=created.id,
+                        after_json=json.dumps({"role_id": role.id, "position": mapped["position"], "department": mapped["department"],
+                                               "municipality": mapped["municipality"], "restrict_to_territory": restrict}, ensure_ascii=False)))
+        db.commit()
+        from app.services.permission_cache_service import invalidate_permissions_for_user
+        invalidate_permissions_for_user(created.id)
+
+    def _import_assignment_row(self, db: Session, project_id: str, mapped: dict[str, str | None], approver: User | None = None) -> None:
         """Asigna un usuario ya existente a `project_id` con el rol indicado.
 
-        A diferencia de entity_type="users" (que crea usuarios nuevos), esto
-        asume que el usuario y el rol ya existen -- carga masiva de
-        asignaciones, no de identidades (ver docs/103). No hay deduplicacion:
-        si la fila se importa dos veces, o el usuario ya tenia una asignacion
-        activa en el proyecto, queda una fila UserProjectAssignment mas --
-        mismo comportamiento que crear una asignacion individual hoy.
+        Asume que el usuario y el rol ya existen (ver docs/103). Quien aprueba
+        solo entrega roles cuyos permisos tiene en el proyecto, y una persona
+        que ya tiene asignación no recibe una segunda (docs/145).
         """
         email = mapped["email"]
         user = identity_service.get_user_by_email(db, email)
         if user is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No existe un usuario con el correo '{email}'")
-
-        role_name = mapped["role_name"]
-        role = db.query(Role).filter(func.lower(Role.name) == role_name.strip().lower()).first()
-        if role is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No existe un rol llamado '{role_name}'")
-
+        role = self._grantable_role(db, project_id, mapped.get("role_name"), approver)
+        if db.query(UserProjectAssignment.id).filter_by(user_id=user.id, project_id=project_id).first():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="La persona ya tiene acceso a este proyecto; cambia su rol desde Usuarios")
         assignment_service.create_assignment(db, AssignmentCreate(
             user_id=user.id,
             project_id=project_id,

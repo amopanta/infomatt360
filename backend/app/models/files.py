@@ -29,4 +29,7 @@ class FileAsset(Base):
     ocr_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_by: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    # Identificador que asigna la app de campo a la evidencia: un reenvío
+    # (respuesta perdida) devuelve el mismo archivo en vez de duplicarlo.
+    client_ref: Mapped[str | None] = mapped_column(String(80), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utc_now, nullable=False)

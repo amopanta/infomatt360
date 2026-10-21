@@ -1,3 +1,4 @@
+import { formatOperationalDate, operationalStatusLabel } from '../../lib/operationalFormat';
 import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
@@ -17,7 +18,7 @@ import type { ErpInventoryItem, ErpInventoryMovement, ErpPayrollEntry, ErpTempla
 type Tab = 'inventory' | 'payroll' | 'config';
 
 function formatDate(value?: string | null) {
-  return value ? new Date(value).toLocaleString() : '—';
+  return formatOperationalDate(value);
 }
 
 export function ErpApp() {
@@ -176,7 +177,7 @@ export function ErpApp() {
                   {movements.length ? movements.map((movement) => (
                     <article className="erp-movement-card" key={movement.id}>
                       <strong>{Number(movement.quantity_delta) > 0 ? '+' : ''}{movement.quantity_delta}</strong>
-                      <span>{movement.reason}</span>
+                      <span>{operationalStatusLabel(movement.reason)}</span>
                       <small>{formatDate(movement.created_at)}{movement.reference_record_id ? ` · ${t('admin.erp.recordRef', { id: movement.reference_record_id })}` : ''}</small>
                     </article>
                   )) : <p>{t('admin.erp.noMovementsYet')}</p>}
@@ -200,10 +201,10 @@ export function ErpApp() {
                 <article className={`erp-payroll-card ${entry.status}`} key={entry.id}>
                   <div>
                     <strong>${entry.amount}</strong>
-                    <span>{t('admin.erp.gestorLabel', { id: entry.gestor_user_id })}</span>
+                    <span>{t('admin.erp.gestorLabel', { id: entry.gestor_name || entry.gestor_user_id })}</span>
                     <small>{formatDate(entry.created_at)}{entry.reference_record_id ? ` · ${t('admin.erp.recordRefPayroll', { id: entry.reference_record_id })}` : ''}</small>
                   </div>
-                  {entry.status === 'accrued' ? <button onClick={() => void markPaid(entry.id)}>{t('admin.erp.markPaid')}</button> : <span className="erp-paid-badge">{t('admin.erp.paidBadge', { date: formatDate(entry.paid_at) })}</span>}
+                  {entry.status === 'accrued' ? <button onClick={() => void markPaid(entry.id)}>{t('admin.erp.markPaid')}</button> : <span className="erp-paid-badge">{entry.status === 'paid' ? t('admin.erp.paidBadge', { date: formatDate(entry.paid_at) }) : operationalStatusLabel(entry.status)}</span>}
                 </article>
               )) : <p>{t('admin.erp.noPayrollYet')}</p>}
             </div>

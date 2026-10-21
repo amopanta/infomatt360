@@ -214,6 +214,60 @@ class BuilderService:
         db.refresh(row)
         return component_to_read(row)
 
+    def delete_component(self, db: Session, component_id: str) -> None:
+        """Elimina una pregunta mientras el formulario no tenga respuestas.
+
+        Con respuestas guardadas se rechaza: borrarla dejaria valores
+        huerfanos en RuntimeRecordValue y reportes incompletos. La fila y la
+        columna que la contenian se eliminan si quedan vacias, para que el
+        Runtime no pinte huecos.
+        """
+        row = db.get(BuilderComponent, component_id)
+        if row is None:
+            raise HTTPException(status_code=404, detail="Pregunta no encontrada")
+        if db.query(RuntimeRecord.id).filter(RuntimeRecord.template_id == row.template_id).first():
+            raise HTTPException(status_code=422, detail="La pregunta no se puede eliminar porque el formulario ya tiene respuestas; puedes ocultarla o archivar el formulario")
+        column_id = row.column_id
+        template = db.get(BuilderTemplate, row.template_id)
+        db.delete(row)
+        db.flush()
+        if column_id and not db.query(BuilderComponent.id).filter(BuilderComponent.column_id == column_id).first():
+            column = db.get(BuilderColumn, column_id)
+            if column is not None:
+                row_id = column.row_id
+                db.delete(column)
+                db.flush()
+                if not db.query(BuilderColumn.id).filter(BuilderColumn.row_id == row_id).first():
+                    layout_row = db.get(BuilderRow, row_id)
+                    if layout_row is not None:
+                        db.delete(layout_row)
+        if template:
+            template.updated_at = utc_now()
+        db.commit()
+
+    def reorder_components(self, db: Session, template_id: str, component_ids: list[str]) -> list[BuilderComponentRead]:
+        """Aplica el orden indicado a las preguntas (y a sus filas de layout).
+
+        Solo cambia la presentacion, no los nombres ni los valores, asi que
+        se permite tambien con respuestas guardadas.
+        """
+        components = {item.id: item for item in db.query(BuilderComponent).filter(BuilderComponent.template_id == template_id).all()}
+        if len(set(component_ids)) != len(component_ids) or any(item not in components for item in component_ids):
+            raise HTTPException(status_code=422, detail="El orden incluye preguntas que no pertenecen al formulario")
+        for position, component_id in enumerate(component_ids, start=1):
+            component = components[component_id]
+            component.sort_order = position
+            if component.column_id:
+                column = db.get(BuilderColumn, component.column_id)
+                layout_row = db.get(BuilderRow, column.row_id) if column else None
+                if layout_row is not None:
+                    layout_row.sort_order = position
+        template = db.get(BuilderTemplate, template_id)
+        if template:
+            template.updated_at = utc_now()
+        db.commit()
+        return self.list_components(db, template_id)
+
     def list_components(self, db: Session, template_id: str, column_id: str | None = None) -> list[BuilderComponentRead]:
         """Lista componentes de una plantilla, opcionalmente filtrados por columna."""
         query = db.query(BuilderComponent).filter(BuilderComponent.template_id == template_id)

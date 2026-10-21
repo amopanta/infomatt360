@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { BuilderPreviewSection } from './types';
 import type { TemplateSummary } from '../records/api';
 import { useI18n } from '../../i18n';
+import { fieldTypeInfo } from './fieldCatalog';
 
 const optionTypes = new Set(['SELECT', 'MULTISELECT', 'DROPDOWN', 'LIKERT_5', 'LIKERT_7', 'RATING', 'RANKING']);
 const numericTypes = new Set(['NUMBER', 'INTEGER', 'DECIMAL', 'PERCENTAGE', 'CURRENCY', 'NPS', 'YEAR', 'RANGE']);
@@ -73,7 +74,8 @@ export function BuilderCanvas({
       <div className="builder-theme-preview" aria-label={t('builder.canvas.themePreviewAria')}>
         <span>{t('builder.canvas.themePreviewLabel')}</span>
         <strong style={{ color: theme.primaryColor }}>{t('builder.canvas.sectionTitlePreview')}</strong>
-        <button type="button">{t('builder.canvas.mainButtonPreview')}</button>
+        {/* Solo muestra el color del botón principal; no ejecuta ninguna acción. */}
+        <button type="button" tabIndex={-1} aria-hidden="true" style={{ pointerEvents: 'none' }}>{t('builder.canvas.mainButtonPreview')}</button>
       </div>
       <div className="builder-flow-legend">
         <span>{t('builder.canvas.stepGroup')}</span>
@@ -126,7 +128,7 @@ export function BuilderCanvas({
                   <span
                     className="builder-drag-handle"
                     title={t('builder.canvas.dragHint')}
-                    draggable={!disableReorder && !lockedFieldIds.has(field.id)}
+                    draggable={!disableReorder}
                     onDragStart={(event) => {
                       event.dataTransfer.effectAllowed = 'move';
                       event.dataTransfer.setData('text/plain', field.id);
@@ -140,17 +142,21 @@ export function BuilderCanvas({
                     ⋮⋮
                   </span>
                   <strong>{field.label || t('builder.canvas.untitledQuestion')}</strong>
-                  <small>{field.type}</small>
-                  <button type="button" className="secondary" disabled={lockedFieldIds.has(field.id)} onClick={() => onRemoveField(field.id)}>{t('builder.canvas.delete')}</button>
+                  <small className="builder-field-type" title={`${t('ux.builder.typeLabel')}: ${fieldTypeInfo(field.type).label}`}>
+                    <span aria-hidden="true">{fieldTypeInfo(field.type).icon}</span> {fieldTypeInfo(field.type).label}
+                  </small>
+                  {!disableReorder ? (
+                    <span className="builder-move-buttons">
+                      <button type="button" className="secondary" disabled={fieldIndex === 0} aria-label={t('ux.builder.moveUp')} title={t('ux.builder.moveUp')} onClick={() => onMoveField(section.id, fieldIndex, fieldIndex - 1)}>↑</button>
+                      <button type="button" className="secondary" disabled={fieldIndex === section.fields.length - 1} aria-label={t('ux.builder.moveDown')} title={t('ux.builder.moveDown')} onClick={() => onMoveField(section.id, fieldIndex, fieldIndex + 1)}>↓</button>
+                    </span>
+                  ) : null}
+                  <button type="button" className="secondary" disabled={lockedFieldIds.has(field.id)} title={lockedFieldIds.has(field.id) ? t('ux.builder.deleteLockedHint') : undefined} onClick={() => onRemoveField(field.id)}>{t('builder.canvas.delete')}</button>
                 </div>
                 <div className="builder-field-row">
                   <label>
                     <span>{t('builder.canvas.visibleLabel')}</span>
                     <input value={field.label} onChange={(event) => onFieldChange(field.id, { label: event.target.value })} />
-                  </label>
-                  <label>
-                    <span>{t('builder.canvas.technicalName')}</span>
-                    <input value={field.name} disabled={lockTechnicalNames && lockedFieldIds.has(field.id)} onChange={(event) => onFieldChange(field.id, { name: event.target.value })} />
                   </label>
                   <label>
                     <span>{t('builder.canvas.helpPlaceholder')}</span>
@@ -316,6 +322,20 @@ export function BuilderCanvas({
                     </label>
                   </div>
                   <p>{t('builder.canvas.conditionHint')}</p>
+                </details>
+                <details className="builder-advanced-panel">
+                  <summary>{t('ux.builder.advanced')}</summary>
+                  <div className="builder-field-row">
+                    <label>
+                      <span>{t('builder.canvas.technicalName')}</span>
+                      <input value={field.name} disabled={lockTechnicalNames && lockedFieldIds.has(field.id)} onChange={(event) => onFieldChange(field.id, { name: event.target.value })} />
+                    </label>
+                    <label>
+                      <span>{t('ux.builder.typeLabel')}</span>
+                      <input value={field.type} readOnly />
+                    </label>
+                  </div>
+                  <p>{t('ux.builder.advancedHint')}</p>
                 </details>
                 <details className="builder-visual-panel">
                   <summary>{t('builder.canvas.visualDecoration')}</summary>

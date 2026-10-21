@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.core.time import utc_now
 from app.models.erp import ErpInventoryItem, ErpInventoryMovement, ErpPayrollEntry, ErpTemplateConfig
 from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
+from app.models.identity import User
 from app.schemas.erp import (
     ErpInventoryItemCreate,
     ErpInventoryItemRead,
@@ -49,9 +50,9 @@ def _movement_to_read(row: ErpInventoryMovement) -> ErpInventoryMovementRead:
     )
 
 
-def _payroll_to_read(row: ErpPayrollEntry) -> ErpPayrollEntryRead:
+def _payroll_to_read(row: ErpPayrollEntry, gestor_name: str | None = None) -> ErpPayrollEntryRead:
     return ErpPayrollEntryRead(
-        id=row.id, project_id=row.project_id, gestor_user_id=row.gestor_user_id, amount=row.amount,
+        id=row.id, project_id=row.project_id, gestor_user_id=row.gestor_user_id, gestor_name=gestor_name, amount=row.amount,
         reference_record_id=row.reference_record_id, status=row.status, created_at=row.created_at, paid_at=row.paid_at,
     )
 
@@ -215,19 +216,21 @@ class ErpService:
         if gestor_user_id:
             query = query.filter(ErpPayrollEntry.gestor_user_id == gestor_user_id)
         rows = query.order_by(ErpPayrollEntry.created_at.desc()).all()
-        return [_payroll_to_read(row) for row in rows]
+        names = dict(db.query(User.id, User.full_name).filter(User.id.in_({row.gestor_user_id for row in rows})).all()) if rows else {}
+        return [_payroll_to_read(row, names.get(row.gestor_user_id)) for row in rows]
 
     def mark_payroll_entry_paid(self, db: Session, entry_id: str) -> ErpPayrollEntryRead:
         row = db.query(ErpPayrollEntry).filter(ErpPayrollEntry.id == entry_id).first()
         if row is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Honorario no encontrado")
-        if row.status == "paid":
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="El honorario ya esta marcado como pagado")
+        if row.status != "accrued":
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Solo un honorario causado y vigente puede marcarse como pagado")
         row.status = "paid"
         row.paid_at = utc_now()
         db.commit()
         db.refresh(row)
-        return _payroll_to_read(row)
+        gestor = db.get(User, row.gestor_user_id)
+        return _payroll_to_read(row, gestor.full_name if gestor else None)
 
 
 erp_service = ErpService()

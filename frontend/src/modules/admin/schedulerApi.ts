@@ -42,7 +42,7 @@ export async function createScheduledBackupTask(projectId: string, frequency: st
   return parseOrThrow(response, 'No fue posible programar el respaldo automatico.');
 }
 
-export async function createScheduledTask(payload: { project_id: string; name: string; task_type: string; target_id: string; frequency: string }): Promise<ScheduledTask> {
+export async function createScheduledTask(payload: { project_id: string; name: string; task_type: string; target_id: string; frequency: string; config_json?: string | null }): Promise<ScheduledTask> {
   const response = await fetch(`${API_BASE_URL}/scheduler/tasks`, {
     method: 'POST',
     headers: headers(),

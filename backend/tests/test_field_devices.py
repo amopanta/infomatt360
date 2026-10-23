@@ -144,3 +144,48 @@ def test_remote_wipe_is_admin_only_reaches_device_and_is_confirmed():
     finally:
         app.dependency_overrides.clear()
         Base.metadata.drop_all(bind=engine)
+
+
+def test_route_days_and_visits_with_participant_and_gps():
+    """Trazabilidad de visitas (docs/150): el supervisor ve qué días hay
+    recorrido y, por día, a quién visitó cada gestor y dónde."""
+    from app.models.builder import BuilderComponent
+    from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
+
+    engine, sessions = setup_client()
+    try:
+        with TestClient(app) as client:
+            admin = auth(client, "assign-admin@example.com", "Admin12345!")
+            gestor = auth(client, "assign-owner@example.com", "Owner12345!")
+            now = utc_now()
+            client.post("/api/v1/field-devices/heartbeat", headers=gestor, json={
+                "device_id": "tablet-0002", "project_id": PROJECT,
+                "route_points": [{"latitude": 4.61, "longitude": -74.08, "accuracy_m": 5, "recorded_at": _iso(now - timedelta(minutes=20))}]})
+            with sessions() as db:
+                db.add(BuilderComponent(template_id="closed-form", component_type="GPS", name="ubicacion", label="Ubicación", sort_order=1))
+                db.add_all([
+                    RuntimeRecord(id="visit-1", project_id=PROJECT, template_id="closed-form", participant_id="assign-p1",
+                                  submitted_by="assign-owner", status="submitted", created_at=now - timedelta(minutes=15)),
+                    RuntimeRecord(id="visit-2", project_id=PROJECT, template_id="closed-form", participant_id="assign-p2",
+                                  submitted_by="assign-owner", status="submitted", created_at=now - timedelta(minutes=5)),
+                ])
+                db.add(RuntimeRecordValue(record_id="visit-1", field_name="ubicacion", field_value_json='{"lat": 4.6123, "lng": -74.0811}'))
+                db.commit()
+
+            days = client.get(f"/api/v1/field-devices/project/{PROJECT}/route-days", headers=admin, params={"tz_offset_minutes": 0})
+            assert days.status_code == 200, days.text
+            assert days.json()[0] == {"day": (now - timedelta(minutes=20)).date().isoformat(), "user_count": 1, "point_count": 1, "visit_count": 2}
+            assert client.get(f"/api/v1/field-devices/project/{PROJECT}/route-days", headers=gestor).status_code == 403
+
+            period = {"date_from": _iso(now - timedelta(hours=1)), "date_to": _iso(now + timedelta(minutes=1)), "user_id": "assign-owner"}
+            visits = client.get(f"/api/v1/field-devices/project/{PROJECT}/visits", headers=admin, params=period)
+            assert visits.status_code == 200, visits.text
+            first, second = visits.json()
+            assert first["participant_name"] == "Primera" and first["participant_document"] == "1001"
+            assert (first["latitude"], first["longitude"]) == (4.6123, -74.0811)
+            # Sin campo GPS diligenciado: se lista la visita, sin punto en el mapa
+            assert second["participant_name"] == "Segunda" and second["latitude"] is None
+            assert client.get(f"/api/v1/field-devices/project/{PROJECT}/visits", headers=gestor, params=period).status_code == 403
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)

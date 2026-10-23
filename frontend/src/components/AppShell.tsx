@@ -26,6 +26,8 @@ type MenuGroup = {
 // Inicio → Formularios → Datos → Revision → Configuracion → Avanzado.
 // Cada opcion se filtra por permisos, asi un encuestador de campo solo ve
 // Inicio, Datos y su seguridad; lo tecnico queda en "Avanzado" (cerrado).
+// Bases de datos externas va en Datos: es un uso diario de coordinacion, no
+// una opcion tecnica (docs/150).
 const MENU: MenuGroup[] = [
   {
     labelKey: 'ux.nav.home',
@@ -54,6 +56,7 @@ const MENU: MenuGroup[] = [
       { labelKey: 'nav.appliedActivities', href: '/activities', icon: 'records' },
       { labelKey: 'nav.evidence', href: '/evidence', icon: 'photo' },
       { labelKey: 'nav.maps', href: '/maps', icon: 'map' },
+      { labelKey: 'ux.nav.mirror', href: '/admin/mirror', icon: 'db', permissions: ['mirror.manage'] },
     ],
   },
   {
@@ -61,6 +64,7 @@ const MENU: MenuGroup[] = [
     icon: 'gRev',
     items: [
       { labelKey: 'ux.nav.fieldDevices', href: '/field-devices', icon: 'tablet', permissions: ['records.review', 'records.coordinate', 'identity.users.manage'] },
+      { labelKey: 'ux.nav.routes', href: '/field-devices/routes', icon: 'route', permissions: ['records.review', 'records.coordinate', 'identity.users.manage'] },
       { labelKey: 'nav.approvalFlows', href: '/admin/approval-flows', icon: 'check', permissions: ['records.approve'] },
       { labelKey: 'nav.messages', href: '/messages', icon: 'msg' },
       { labelKey: 'ux.nav.planner', href: '/planner', icon: 'metric', permissions: ['planner.manage', 'identity.users.manage', 'records.review', 'records.approve', 'records.coordinate', 'reports.export', 'records.write'] },
@@ -94,7 +98,6 @@ const MENU: MenuGroup[] = [
       { labelKey: 'nav.aiAudit', href: '/admin/ai-audit', icon: 'aiaudit', permissions: ['ai.audit.manage'] },
       { labelKey: 'nav.governance', href: '/admin/governance', icon: 'gov', permissions: ['organizations.tenant_clean', 'identity.users.manage', 'support.tickets.manage'] },
       { labelKey: 'ux.nav.backups', href: '/admin/backups', icon: 'backup', permissions: ['backups.manage'] },
-      { labelKey: 'ux.nav.mirror', href: '/admin/mirror', icon: 'db', permissions: ['mirror.manage'] },
     ],
   },
 ];
@@ -119,6 +122,7 @@ export function AppShell({ title, children }: Props) {
 
   function isActiveMenuItem(href: string) {
     if (href === '/') return currentPath === '/';
+    if (href === '/field-devices' && currentPath.startsWith('/field-devices/routes')) return false;
     return currentPath === href || currentPath.startsWith(`${href}/`);
   }
 

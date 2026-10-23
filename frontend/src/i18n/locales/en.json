@@ -255,7 +255,7 @@
       "showErrors": "Show errors ({count})",
       "hideErrors": "Hide errors",
       "viewRoute": "View route",
-      "routeTitle": "Field worker routes",
+      "routeTitle": "Field staff routes and visits",
       "day": "Day",
       "routePrivacy": "The route is recorded only while the field worker has the app open, after a notice. Only supervisors and administrators can see it.",
       "noRoutes": "No routes recorded that day.",
@@ -272,7 +272,18 @@
       "wipeConfirm": "Wipe {user}'s data on device {device}? Use it when a tablet is lost or reassigned. The device will try to send pending data first; anything it cannot send will be lost.",
       "wipeRequested": "Wipe requested. It will run when the device connects.",
       "wipePending": "Wipe requested {when}; it will run when the device connects.",
-      "wipeDone": "Device data wiped on {when}."
+      "wipeDone": "Device data wiped on {when}.",
+      "routesNav": "Routes and visits",
+      "daysWithRoutes": "Days with activity",
+      "noRoutesYet": "No routes yet. They show up once a field worker uses the app with location turned on.",
+      "legendRoute": "Route",
+      "legendVisit": "Visit (form with GPS)",
+      "visitsTitle": "Visits that day ({count})",
+      "noParticipant": "No participant",
+      "noGps": "No GPS",
+      "openRecord": "View records",
+      "noVisits": "No forms were captured that day.",
+      "dayCounts": "{users} worker(s) · {visits} forms"
     },
     "branding": {
       "companyName": "Company name",
@@ -307,11 +318,12 @@
       "system": "System",
       "apiKeys": "API keys",
       "backups": "Backups",
-      "mirror": "Mirror database",
+      "mirror": "External databases",
       "pullGroups": "Preloaded data",
       "xlsform": "Import from Excel (XLSForm)",
       "fieldDevices": "Field devices",
-      "planner": "Monthly planner"
+      "planner": "Monthly planner",
+      "routes": "Routes and visits"
     },
     "home": {
       "greeting": "What would you like to do today?",
@@ -2206,7 +2218,7 @@
       "statusSkipped": "Skipped (no provider configured)"
     },
     "mirror": {
-      "title": "Mirror Database",
+      "title": "External databases",
       "targets": "Replication targets",
       "newTarget": "New target",
       "targetName": "Target name",
@@ -2248,7 +2260,27 @@
       "biConnectionTitle": "BI Tool Connection Info",
       "biTables": "Available tables",
       "biToolSetup": "Per-tool setup",
-      "biPasswordNote": "Password is not shown for security. Enter it manually in the BI tool."
+      "biPasswordNote": "Password is not shown for security. Enter it manually in the BI tool.",
+      "intro": "Copy all project data to another database (PostgreSQL, MySQL, SQL Server or SQLite) for Power BI, Tableau or other systems, or bring participants and responses in from it. No per-form setup needed.",
+      "step1": "Connect the database",
+      "step1Text": "Access details and connection test.",
+      "step2": "Copy the project",
+      "step2Text": "Participants, assignments and one table per form, now or on a schedule.",
+      "step3": "Bring data in",
+      "step3Text": "Import participants or responses without duplicates.",
+      "targetsHelp": "Databases InfoMatt360 connects to. Pick one to copy to or import from.",
+      "targetNameExample": "e.g. State government database",
+      "selected": "Selected",
+      "plansFor": "Copies to “{name}”",
+      "plansHelp": "Each copy defines what is sent and how. Run it now or schedule it.",
+      "scope": "What it copies",
+      "scopeProject": "Whole project: participants, assignments, responses and one table per form (recommended)",
+      "scopeRecords": "Records only, key-value format (legacy)",
+      "scopeProjectShort": "Whole project",
+      "scopeRecordsShort": "Key-value records",
+      "frequency": "Frequency",
+      "time": "Time",
+      "timezone": "Time zone"
     },
     "storage": {
       "defaultChanged": "Default destination changed to {provider}. New evidence will be stored there.",
@@ -2405,16 +2437,16 @@
     "exportError": "Could not export the report.",
     "saveBoardError": "Could not save the board.",
     "moduleSubtitle": "· Reports module",
-    "description": "Project indicators and results",
-    "indicatorConfig": "Indicator configuration",
-    "myReportsLink": "My reports and indicators",
-    "customize": "⚙ Customize and manage",
+    "description": "How project capture is going: records by status, forms and latest submissions. Export it or build your own reports with targets.",
+    "indicatorConfig": "Indicators and targets",
+    "myReportsLink": "Reports with targets",
+    "customize": "Customize board",
     "sectionsAria": "Report sections",
-    "tabOperational": "▤ Operational",
-    "tabIndicators": "▥ Indicators",
-    "tabAnalytic": "⌁ Analytical",
-    "tabDonors": "▣ Donors",
-    "tabGeographic": "⌖ Geographic",
+    "tabOperational": "Summary",
+    "tabIndicators": "Indicators",
+    "tabAnalytic": "Charts and tables",
+    "tabDonors": "Donors",
+    "tabGeographic": "Map",
     "operationalSummary": "Operational summary",
     "formsSent": "Forms submitted",
     "projectRecords": "Project records",
@@ -2424,7 +2456,7 @@
     "ofTotalRecords": "Of total records",
     "forms": "Forms",
     "inThisProject": "In this project",
-    "latestSubmissions": "☷ Latest submissions",
+    "latestSubmissions": "Latest submissions",
     "noRecentSubmissions": "No recent submissions yet.",
     "addBlocksHint": "Add blocks from \"Customize and manage\".",
     "donors": "Donors",
@@ -2433,9 +2465,9 @@
     "geographicView": "Geographic view",
     "geographicDescription": "View records with location on the project map.",
     "openMaps": "Open maps",
-    "exportExcel": "▤ Excel",
-    "exportCsv": "▤ CSV",
-    "exportPdf": "▤ PDF / Print",
+    "exportExcel": "Excel",
+    "exportCsv": "CSV",
+    "exportPdf": "Print or PDF",
     "formHeader": "Form",
     "formStatusHeader": "Form status",
     "recordsHeader": "Records",
@@ -2448,7 +2480,7 @@
     "catalog": {
       "title": "Custom reports",
       "description": "Link forms, variables, goals, and municipalities.",
-      "backToBoard": "← Board",
+      "backToBoard": "Board",
       "createReport": "+ Create report",
       "createCommittee": "+ Committee report",
       "myReports": "My reports",
@@ -2514,11 +2546,25 @@
       "linkError": "Could not create the link.",
       "revokeError": "Could not revoke.",
       "indicatorExample": "E.g. Beneficiaries reached",
-      "goalPrefix": "Goal {goal}"
+      "goalPrefix": "Goal {goal}",
+      "modelsTitle": "Start from a model",
+      "modelsIntro": "Pick one and adjust it: indicators come ready with your forms; you only set the targets.",
+      "modelProgress": "Progress by form",
+      "modelProgressText": "One indicator per published form: responses received against the target.",
+      "modelTerritory": "Coverage by municipality",
+      "modelTerritoryText": "Responses per municipality for a form, to see where you still need to reach.",
+      "modelCommittee": "Committee report",
+      "modelCommitteeText": "Activities, alerts, budget and agreements for the follow-up meeting.",
+      "modelBlank": "Blank",
+      "modelBlankText": "Build the report one indicator at a time.",
+      "modelUse": "Use this model",
+      "modelProgressName": "Capture progress by form",
+      "modelTerritoryName": "Coverage by municipality",
+      "modelResponses": "responses"
     },
     "form": {
       "loading": "Loading form report...",
-      "backToForm": "← Back to form",
+      "backToForm": "Back to form",
       "individualReport": "Individual report · {status}",
       "defaultDescription": "Aggregated results from this form.",
       "viewResponseTable": "View response table",
@@ -2536,10 +2582,10 @@
     "indicators": {
       "title": "Indicator configuration",
       "description": "Create a single definition per indicator and use it across multiple reports. Goals are edited here; automatic progress is calculated from the associated forms.",
-      "backToReports": "← Reports",
+      "backToReports": "Reports",
       "newIndicator": "+ New indicator",
       "importFromExcel": "Import indicators from Excel",
-      "downloadTemplate": "⬇ Download template",
+      "downloadTemplate": "Download template",
       "fileAria": "Indicator file",
       "validateFile": "Validate file",
       "validAndErrors": "{valid} valid · {errors} errors",
@@ -2607,7 +2653,7 @@
     },
     "public": {
       "loading": "Loading report...",
-      "brand": "▦ InfoMatt360 · Reports"
+      "brand": "InfoMatt360 · Reports"
     },
     "board": {
       "availableBlocks": "Available blocks",
@@ -2792,7 +2838,11 @@
       "filesError": "Could not retrieve files.",
       "downloadError": "Could not download the file.",
       "operationError": "Could not complete the operation."
-    }
+    },
+    "exportLabel": "Download this summary",
+    "pendingHint": "Submitted, under review or corrected",
+    "approvedHint": "{count} of {total} records",
+    "formsHint": "{published} published"
   },
   "runtime": {
     "loadingForm": "Loading form...",
@@ -3166,6 +3216,7 @@
     "actions": "Actions",
     "cancel": "Cancel",
     "name": "Name",
-    "status": "Status"
+    "status": "Status",
+    "close": "Close"
   }
 }

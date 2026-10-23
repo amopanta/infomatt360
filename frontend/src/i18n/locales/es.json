@@ -255,7 +255,7 @@
       "showErrors": "Ver errores ({count})",
       "hideErrors": "Ocultar errores",
       "viewRoute": "Ver recorrido",
-      "routeTitle": "Recorrido de los gestores",
+      "routeTitle": "Recorridos y visitas de los gestores",
       "day": "Día",
       "routePrivacy": "El recorrido se registra solo mientras el gestor tiene la app abierta, con aviso previo. Solo lo ven supervisión y administración.",
       "noRoutes": "No hay recorridos registrados ese día.",
@@ -272,7 +272,18 @@
       "wipeConfirm": "¿Borrar los datos de {user} en el equipo {device}? Se usa cuando una tablet se pierde o se reasigna. El equipo intentará enviar lo pendiente antes de borrar; lo que no pueda enviar se perderá.",
       "wipeRequested": "Borrado solicitado. Se hará cuando el equipo se conecte.",
       "wipePending": "Borrado solicitado {when}; se hará cuando el equipo se conecte.",
-      "wipeDone": "Datos borrados del equipo el {when}."
+      "wipeDone": "Datos borrados del equipo el {when}.",
+      "routesNav": "Recorridos y visitas",
+      "daysWithRoutes": "Días con actividad",
+      "noRoutesYet": "Todavía no hay recorridos. Aparecen cuando un gestor usa la app con la ubicación activada.",
+      "legendRoute": "Recorrido",
+      "legendVisit": "Visita (formulario con GPS)",
+      "visitsTitle": "Visitas del día ({count})",
+      "noParticipant": "Sin participante",
+      "noGps": "Sin GPS",
+      "openRecord": "Ver registros",
+      "noVisits": "Ese día no se capturaron formularios.",
+      "dayCounts": "{users} gestor(es) · {visits} formularios"
     },
     "branding": {
       "companyName": "Nombre de la empresa",
@@ -307,11 +318,12 @@
       "system": "Sistema",
       "apiKeys": "Claves de API",
       "backups": "Copias de seguridad",
-      "mirror": "Base espejo",
+      "mirror": "Bases de datos externas",
       "pullGroups": "Datos precargados",
       "xlsform": "Importar desde Excel (XLSForm)",
       "fieldDevices": "Equipos de campo",
-      "planner": "Planeador mensual"
+      "planner": "Planeador mensual",
+      "routes": "Recorridos y visitas"
     },
     "home": {
       "greeting": "¿Qué quieres hacer hoy?",
@@ -2206,7 +2218,7 @@
       "statusSkipped": "Omitido (sin proveedor configurado)"
     },
     "mirror": {
-      "title": "Base Espejo",
+      "title": "Bases de datos externas",
       "targets": "Destinos de replicación",
       "newTarget": "Nuevo destino",
       "targetName": "Nombre del destino",
@@ -2248,7 +2260,27 @@
       "biConnectionTitle": "Conexión para herramientas BI",
       "biTables": "Tablas disponibles",
       "biToolSetup": "Configuración por herramienta",
-      "biPasswordNote": "La contraseña no se muestra por seguridad. Ingrésela manualmente en la herramienta BI."
+      "biPasswordNote": "La contraseña no se muestra por seguridad. Ingrésela manualmente en la herramienta BI.",
+      "intro": "Copia toda la información del proyecto a otra base de datos (PostgreSQL, MySQL, SQL Server o SQLite) para Power BI, Tableau u otros sistemas, o trae participantes y respuestas desde ella. No hay que configurar formulario por formulario.",
+      "step1": "Conecta la base",
+      "step1Text": "Datos de acceso y prueba de conexión.",
+      "step2": "Copia el proyecto",
+      "step2Text": "Participantes, asignaciones y una tabla por formulario, ahora o programado.",
+      "step3": "Trae datos",
+      "step3Text": "Importa participantes o respuestas sin duplicar.",
+      "targetsHelp": "Bases a las que InfoMatt360 se conecta. Elige una para copiar o importar.",
+      "targetNameExample": "Ej. Base de la Gobernación",
+      "selected": "Seleccionada",
+      "plansFor": "Copias hacia «{name}»",
+      "plansHelp": "Cada copia define qué se envía y cómo. Ejecútala ahora o prográmala.",
+      "scope": "Qué copia",
+      "scopeProject": "Proyecto completo: participantes, asignaciones, respuestas y una tabla por formulario (recomendado)",
+      "scopeRecords": "Solo registros en formato clave-valor (modo anterior)",
+      "scopeProjectShort": "Proyecto completo",
+      "scopeRecordsShort": "Registros clave-valor",
+      "frequency": "Frecuencia",
+      "time": "Hora",
+      "timezone": "Zona horaria"
     },
     "storage": {
       "defaultChanged": "Destino predeterminado cambiado a {provider}. Las evidencias nuevas se guardarán allí.",
@@ -2405,16 +2437,16 @@
     "exportError": "No fue posible exportar el reporte.",
     "saveBoardError": "No fue posible guardar el tablero.",
     "moduleSubtitle": "· Módulo de reportes",
-    "description": "Indicadores y resultados del proyecto",
-    "indicatorConfig": "Configuración de indicadores",
-    "myReportsLink": "Mis reportes e indicadores",
-    "customize": "⚙ Personalizar y gestionar",
+    "description": "Cómo avanza la captura del proyecto: registros por estado, formularios y últimos envíos. Exporta o arma tus propios reportes con metas.",
+    "indicatorConfig": "Indicadores y metas",
+    "myReportsLink": "Reportes con metas",
+    "customize": "Personalizar tablero",
     "sectionsAria": "Secciones de reportes",
-    "tabOperational": "▤ Operativo",
-    "tabIndicators": "▥ Indicadores",
-    "tabAnalytic": "⌁ Analítico",
-    "tabDonors": "▣ Donantes",
-    "tabGeographic": "⌖ Geográfico",
+    "tabOperational": "Resumen",
+    "tabIndicators": "Indicadores",
+    "tabAnalytic": "Gráficos y tablas",
+    "tabDonors": "Donantes",
+    "tabGeographic": "Mapa",
     "operationalSummary": "Resumen operativo",
     "formsSent": "Formularios enviados",
     "projectRecords": "Registros del proyecto",
@@ -2424,7 +2456,7 @@
     "ofTotalRecords": "Del total de registros",
     "forms": "Formularios",
     "inThisProject": "En este proyecto",
-    "latestSubmissions": "☷ Últimos envíos",
+    "latestSubmissions": "Últimos envíos",
     "noRecentSubmissions": "Aún no hay envíos recientes.",
     "addBlocksHint": "Agrega bloques desde \"Personalizar y gestionar\".",
     "donors": "Donantes",
@@ -2433,9 +2465,9 @@
     "geographicView": "Vista geográfica",
     "geographicDescription": "Consulta los registros con ubicación en el mapa del proyecto.",
     "openMaps": "Abrir mapas",
-    "exportExcel": "▤ Excel",
-    "exportCsv": "▤ CSV",
-    "exportPdf": "▤ PDF / Imprimir",
+    "exportExcel": "Excel",
+    "exportCsv": "CSV",
+    "exportPdf": "Imprimir o PDF",
     "formHeader": "Formulario",
     "formStatusHeader": "Estado formulario",
     "recordsHeader": "Registros",
@@ -2448,7 +2480,7 @@
     "catalog": {
       "title": "Reportes personalizados",
       "description": "Vincula formularios, variables, metas y municipios.",
-      "backToBoard": "← Tablero",
+      "backToBoard": "Tablero",
       "createReport": "+ Crear reporte",
       "createCommittee": "+ Informe de comité",
       "myReports": "Mis reportes",
@@ -2514,11 +2546,25 @@
       "linkError": "No fue posible crear el enlace.",
       "revokeError": "No fue posible revocar.",
       "indicatorExample": "Ej. Beneficiarios alcanzados",
-      "goalPrefix": "Meta {goal}"
+      "goalPrefix": "Meta {goal}",
+      "modelsTitle": "Empieza con un modelo",
+      "modelsIntro": "Elige uno y ajústalo: los indicadores quedan listos con tus formularios y solo pones las metas.",
+      "modelProgress": "Avance por formulario",
+      "modelProgressText": "Un indicador por formulario publicado: respuestas recibidas frente a la meta.",
+      "modelTerritory": "Cobertura por municipio",
+      "modelTerritoryText": "Respuestas por municipio de un formulario, para ver dónde falta llegar.",
+      "modelCommittee": "Informe de comité",
+      "modelCommitteeText": "Actividades, alertas, presupuesto y acuerdos para la reunión de seguimiento.",
+      "modelBlank": "En blanco",
+      "modelBlankText": "Arma el reporte indicador por indicador.",
+      "modelUse": "Usar este modelo",
+      "modelProgressName": "Avance de la captura por formulario",
+      "modelTerritoryName": "Cobertura por municipio",
+      "modelResponses": "respuestas"
     },
     "form": {
       "loading": "Cargando informe del formulario…",
-      "backToForm": "← Volver al formulario",
+      "backToForm": "Volver al formulario",
       "individualReport": "Informe individual · {status}",
       "defaultDescription": "Resultados agregados de este formulario.",
       "viewResponseTable": "Ver tabla de respuestas",
@@ -2536,10 +2582,10 @@
     "indicators": {
       "title": "Configuración de indicadores",
       "description": "Crea una sola definición por indicador y úsala en varios reportes. Las metas se editan aquí; el avance automático se calcula con los formularios asociados.",
-      "backToReports": "← Reportes",
+      "backToReports": "Reportes",
       "newIndicator": "+ Nuevo indicador",
       "importFromExcel": "Importar indicadores desde Excel",
-      "downloadTemplate": "⬇ Descargar plantilla",
+      "downloadTemplate": "Descargar plantilla",
       "fileAria": "Archivo de indicadores",
       "validateFile": "Validar archivo",
       "validAndErrors": "{valid} válidos · {errors} errores",
@@ -2607,7 +2653,7 @@
     },
     "public": {
       "loading": "Cargando reporte…",
-      "brand": "▦ InfoMatt360 · Reportes"
+      "brand": "InfoMatt360 · Reportes"
     },
     "board": {
       "availableBlocks": "Bloques disponibles",
@@ -2792,7 +2838,11 @@
       "filesError": "No fue posible consultar los archivos.",
       "downloadError": "No fue posible descargar el archivo.",
       "operationError": "No fue posible completar la operación."
-    }
+    },
+    "exportLabel": "Descargar este resumen",
+    "pendingHint": "Enviados, en revisión o corregidos",
+    "approvedHint": "{count} de {total} registros",
+    "formsHint": "{published} publicados"
   },
   "runtime": {
     "loadingForm": "Cargando formulario...",
@@ -3166,6 +3216,7 @@
     "actions": "Acciones",
     "cancel": "Cancelar",
     "name": "Nombre",
-    "status": "Estado"
+    "status": "Estado",
+    "close": "Cerrar"
   }
 }

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { MapContainer, Marker, Polygon, Polyline, Popup, TileLayer, useMapEvents } from 'react-leaflet';
+import { MapContainer, Marker, Polygon, Polyline, Popup, TileLayer, useMap, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
@@ -18,6 +18,12 @@ delete (L.Icon.Default.prototype as { _getIconUrl?: unknown })._getIconUrl;
 L.Icon.Default.mergeOptions({ iconRetinaUrl: markerIcon2x, iconUrl: markerIcon, shadowUrl: markerShadow });
 
 const DEFAULT_CENTER: [number, number] = [4.711, -74.0721];
+const TYPE_LABELS: Record<string, string> = { Point: 'Punto', LineString: 'Trazado', Polygon: 'Área' };
+
+/** El backend nombra los elementos con el tipo en inglés («Elemento GIS Point»). */
+function featureLabel(feature: MapFeature): string {
+  return feature.label.replace(/\b(Point|LineString|Polygon)\b/, (type) => TYPE_LABELS[type] ?? type);
+}
 
 type GeoJsonGeometry =
   | { type: 'Point'; coordinates: [number, number] }
@@ -111,12 +117,13 @@ export function MapsApp() {
               <button type="button" onClick={searchNearby}>{t('maps.searchNearby')}</button>
               {filtered ? <button type="button" onClick={clearFilter}>{t('maps.clearFilter')}</button> : null}
               <span className="maps-nearby-hint">
-                {clickedCenter ? t('maps.centerChosen') : selected ? t('maps.centerLabel', { label: selected.label }) : t('maps.tapMapForCenter')}
+                {clickedCenter ? t('maps.centerChosen') : selected ? t('maps.centerLabel', { label: featureLabel(selected) }) : t('maps.tapMapForCenter')}
               </span>
             </div>
             <MapContainer center={center} zoom={13} className="maps-leaflet-container">
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution="&copy; OpenStreetMap contributors" />
               <MapClickHandler onClick={(lat, lng) => setClickedCenter([lat, lng])} />
+              <FitToFeatures features={displayedFeatures} />
               {displayedFeatures.map((feature) => {
                 const geometry = parseGeometry(feature);
                 if (geometry?.type === 'LineString') {
@@ -127,7 +134,7 @@ export function MapsApp() {
                 }
                 return (
                   <Marker key={feature.id} position={[feature.latitude, feature.longitude]} eventHandlers={{ click: () => setSelectedId(feature.id) }}>
-                    <Popup>{feature.label}</Popup>
+                    <Popup>{featureLabel(feature)}</Popup>
                   </Marker>
                 );
               })}
@@ -137,10 +144,10 @@ export function MapsApp() {
             <h2>{t('maps.detail')}</h2>
             {selected ? (
               <>
-                <strong>{selected.label}</strong>
+                <strong>{featureLabel(selected)}</strong>
                 <span className={`maps-source ${selected.source}`}>{selected.source === 'runtime' ? t('maps.sourceRuntime') : t('maps.sourceGis')}</span>
                 <dl>
-                  <div><dt>{t('maps.typeLabel')}</dt><dd>{selected.feature_type}</dd></div>
+                  <div><dt>{t('maps.typeLabel')}</dt><dd>{TYPE_LABELS[selected.feature_type] ?? selected.feature_type}</dd></div>
                   <div><dt>{t('maps.latitudeLabel')}</dt><dd>{selected.latitude.toFixed(6)}</dd></div>
                   <div><dt>{t('maps.longitudeLabel')}</dt><dd>{selected.longitude.toFixed(6)}</dd></div>
                   <div><dt>{t('maps.formLabel')}</dt><dd>{selected.template_name || t('maps.notApplicable')}</dd></div>
@@ -158,5 +165,23 @@ export function MapsApp() {
 
 function MapClickHandler({ onClick }: { onClick: (lat: number, lng: number) => void }) {
   useMapEvents({ click: (event) => onClick(event.latlng.lat, event.latlng.lng) });
+  return null;
+}
+
+/** Encuadra todos los elementos visibles: antes el mapa se centraba en el
+ * primero y los demás quedaban fuera de la vista (docs/150). */
+function FitToFeatures({ features }: { features: MapFeature[] }) {
+  const map = useMap();
+  useEffect(() => {
+    const points: [number, number][] = [];
+    for (const feature of features) {
+      const geometry = parseGeometry(feature);
+      if (geometry?.type === 'LineString') points.push(...geometry.coordinates.map(toLatLng));
+      else if (geometry?.type === 'Polygon') points.push(...(geometry.coordinates[0] ?? []).map(toLatLng));
+      else points.push([feature.latitude, feature.longitude]);
+    }
+    if (points.length > 1) map.fitBounds(points, { padding: [40, 40], maxZoom: 16 });
+    else if (points.length === 1) map.setView(points[0], 15);
+  }, [features, map]);
   return null;
 }

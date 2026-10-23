@@ -323,7 +323,9 @@
       "xlsform": "Importar desde Excel (XLSForm)",
       "fieldDevices": "Equipos de campo",
       "planner": "Planeador mensual",
-      "routes": "Recorridos y visitas"
+      "routes": "Recorridos y visitas",
+      "menu": "Menú",
+      "closeMenu": "Cerrar"
     },
     "home": {
       "greeting": "¿Qué quieres hacer hoy?",
@@ -1469,7 +1471,8 @@
     "emptyValue": "—",
     "listIntro": "Elige un formulario para ver, filtrar y exportar sus respuestas.",
     "responsesLabel": "respuestas",
-    "updatedOn": "Actualizado el {date}"
+    "updatedOn": "Actualizado el {date}",
+    "detailSummary": "{total} registros"
   },
   "format": {
     "bytes": "{value} B",

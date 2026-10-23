@@ -323,7 +323,9 @@
       "xlsform": "Import from Excel (XLSForm)",
       "fieldDevices": "Field devices",
       "planner": "Monthly planner",
-      "routes": "Routes and visits"
+      "routes": "Routes and visits",
+      "menu": "Menu",
+      "closeMenu": "Close"
     },
     "home": {
       "greeting": "What would you like to do today?",
@@ -1469,7 +1471,8 @@
     "emptyValue": "—",
     "listIntro": "Pick a form to view, filter and export its responses.",
     "responsesLabel": "responses",
-    "updatedOn": "Updated {date}"
+    "updatedOn": "Updated {date}",
+    "detailSummary": "{total} records"
   },
   "format": {
     "bytes": "{value} B",

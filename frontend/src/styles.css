@@ -1845,3 +1845,83 @@ svg.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor
   .route-people { flex-direction: row; overflow-x: auto; }
   .route-map-column .devices-map { height: 340px; }
 }
+
+/* ============================================================================
+   Segunda tanda del rediseño (docs/150).
+   ========================================================================= */
+
+/* Estilo base para controles sin clase propia. :where() deja la
+   especificidad en cero: cualquier estilo de módulo sigue mandando. Antes
+   varios módulos mostraban botones y campos del navegador. */
+:where(.app-main) :where(button:not([class])), :where(.app-main) :where(button.secondary, button.danger) { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); font: inherit; font-size: var(--font-size-base); font-weight: 600; line-height: 1.25; cursor: pointer; }
+:where(.app-main) :where(button:not([class]), button.secondary):hover { background: var(--surface-muted); border-color: var(--text-muted); }
+:where(.app-main) :where(button.danger) { color: var(--danger); border-color: #f3b4b4; }
+:where(.app-main) :where(button.danger):hover { background: var(--danger-soft); }
+:where(.app-main) :where(button:disabled) { opacity: .5; cursor: not-allowed; }
+:where(.app-main) :where(input:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="color"]), select, textarea) { box-sizing: border-box; max-width: 100%; padding: 7px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--text); background: var(--surface); font: inherit; font-size: var(--font-size-base); font-weight: 400; }
+:where(.app-main) :where(input, select, textarea, button):focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 1px; }
+:where(.app-main) :where(a:not([class])) { color: var(--brand-primary-strong); font-weight: 600; }
+:where(.app-main) :where(input[type="checkbox"], input[type="radio"]) { accent-color: var(--brand-primary); width: 16px; height: 16px; }
+:where(.app-main) :where(details > summary) { cursor: pointer; font-weight: 700; }
+
+/* Menú en celular: barra con la marca y un botón; el menú se abre encima. */
+.app-sidebar-top { display: contents; }
+.app-menu-toggle { display: none; }
+@media (max-width: 900px) {
+  .app-sidebar { position: sticky; top: 0; z-index: 50; min-height: 0; max-height: 100vh; padding: var(--space-2) var(--space-4); gap: 0; }
+  .app-sidebar-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+  .app-sidebar-top .brand-logo { padding: 0; border: 0; }
+  .app-menu-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border: 1px solid rgba(255, 255, 255, .25); border-radius: var(--radius-sm); color: #ffffff; background: transparent; font: inherit; font-weight: 700; cursor: pointer; }
+  .app-menu-toggle svg { width: 20px; height: 20px; }
+  .app-sidebar > :not(.app-sidebar-top) { display: none; }
+  .app-sidebar.menu-open { overflow-y: auto; }
+  .app-sidebar.menu-open > :not(.app-sidebar-top) { display: flex; }
+  .app-sidebar.menu-open > .app-nav { flex-direction: column; margin-top: var(--space-3); }
+  .app-sidebar.menu-open > small { display: block; }
+  .app-sidebar a.active::before { left: -4px; }
+}
+
+/* Planeador: márgenes de página y botones que no se salgan. */
+.planner-page { box-sizing: border-box; max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--space-6) 48px; }
+.planner-head h1 { font-size: var(--font-size-3xl); letter-spacing: -0.02em; }
+.planner-head p { font-size: var(--font-size-lg); }
+.planner-actions { justify-content: flex-end; }
+.planner-filters { padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.planner-filters input, .planner-filters select, .planner-grid input, .planner-grid select { width: 100%; }
+.planner-page .teams-card { margin: 0; overflow-x: auto; border-color: var(--border); }
+.planner-totals strong { font-variant-numeric: tabular-nums; }
+
+/* Registros de un formulario: título con el nombre y barra ordenada. */
+.records-detail-head { margin: 0 0 var(--space-4); }
+.records-detail-head > a { color: var(--brand-primary-strong); font-size: var(--font-size-sm); font-weight: 700; }
+.records-detail-head h2 { margin: 4px 0 0; overflow: hidden; font-size: var(--font-size-2xl); text-overflow: ellipsis; white-space: nowrap; }
+.records-detail-head p { display: flex; align-items: center; gap: var(--space-3); margin: 4px 0 0; color: var(--text-muted); }
+.records-detail-head .record-status { font-style: normal; font-size: var(--font-size-sm); padding: 2px 10px; }
+.records-shell .records-toolbar { justify-content: flex-start; flex-wrap: wrap; margin-bottom: var(--space-3); }
+.records-shell .records-toolbar-actions { flex-wrap: wrap; justify-content: flex-start; align-items: center; }
+.records-shell .records-toolbar-actions input[type="search"] { flex: 1 1 280px; padding: 8px 12px; }
+.records-shell .records-toolbar-actions .forms-primary-link { padding: 9px 15px; border-radius: var(--radius-sm); background: var(--brand-primary); color: #ffffff; font-weight: 700; text-decoration: none; }
+.records-shell .records-toolbar-actions .forms-primary-link:hover { background: var(--brand-primary-strong); }
+.records-shell .records-toolbar-actions button.secondary { color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); padding: 8px 14px; border-radius: var(--radius-sm); font-weight: 600; }
+.records-shell .records-pagination { justify-content: flex-start; margin: 0 0 var(--space-3); }
+.records-shell .records-pagination span { margin-right: auto; }
+.records-shell .records-pagination button { border-radius: var(--radius-sm); padding: 6px 12px; color: var(--text); font-weight: 600; }
+.records-shell > details, .records-clean-exports { margin: 0 0 var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.records-table button.record-icon-action { display: inline-grid; place-items: center; width: 30px; height: 30px; padding: 0; border-radius: var(--radius-sm); color: var(--brand-primary-strong); }
+.records-table button.record-icon-action svg { width: 18px; height: 18px; }
+
+/* Participantes: tabla con desplazamiento en vez de cortarse. */
+.participants-shell { box-sizing: border-box; max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--space-6) 48px; }
+.participants-shell > * { min-width: 0; }
+.participants-shell table { min-width: 100%; }
+.participants-shell :is(.records-table-wrap, .participants-table-wrap) { overflow-x: auto; }
+
+/* Equipos de campo: tarjetas con los colores del sistema. */
+.devices-page { box-sizing: border-box; max-width: 1240px; }
+.devices-page h1 { font-size: var(--font-size-3xl); letter-spacing: -0.02em; }
+.devices-page .teams-card { border-color: var(--border); }
+.device-card { border-color: var(--border); }
+.device-card .teams-inline button { font-size: var(--font-size-sm); }
+
+/* Mapas */
+.maps-shell { box-sizing: border-box; max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--space-6) 48px; }

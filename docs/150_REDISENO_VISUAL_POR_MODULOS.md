@@ -80,17 +80,40 @@ Servidor (nuevo, solo supervisión y administración):
 Capturas: `09-bases-externas-antes.png`, `10-bases-externas-despues.png`,
 `11-recorridos-y-visitas.png`.
 
-## 6. Pruebas
+## 6. Segunda tanda: celular, Planeador, detalle de Registros, Participantes, Mapas y Equipos
+
+- **Menú en celular:** arriba queda una barra con la marca y el botón
+  «Menú». El menú se abre encima del contenido; antes ocupaba toda la
+  pantalla antes de mostrar algo.
+- **Estilo base de controles:** botones, campos, listas y enlaces sin estilo
+  propio toman el del sistema (reglas con `:where()`, que no le ganan a
+  ningún estilo de módulo). Esto arregla botones del navegador en
+  Planeador, Participantes, Equipos y Llenar formularios.
+- **Planeador:** márgenes de página, filtros en un recuadro y botones de
+  arriba que ya no se salen de la pantalla.
+- **Registros de un formulario:**
+  - título con el nombre del formulario, número de registros y estado;
+  - barra de herramientas ordenada;
+  - iconos claros para «ver» y «editar» (antes ◉ y ✎);
+  - estados con su color.
+- **Participantes:** tipo y estado en español («Persona», «Activo»). La
+  tabla se desplaza dentro de su recuadro en vez de cortarse.
+- **Mapas:** encuadra todos los elementos (antes se centraba en el primero
+  y los demás quedaban fuera de la vista). Los tipos salen en español
+  (Punto, Trazado, Área).
+
+Capturas: `12`–`20` (antes y después de Planeador, detalle de Registros,
+Mapas y celular).
+
+## 7. Pruebas
 
 - Backend: 559 pruebas.
 - Web: 131 pruebas, incluida la de textos (`keys.test.ts`).
 - Se revisó que no haya desborde horizontal en computador (1440 px) ni en
   celular (390 px).
 
-## 7. Lo que sigue
+## 8. Lo que sigue
 
-- Menú en celular: hoy aparece completo antes del contenido. Se cambiará
-  por un botón que lo abre.
-- Siguientes módulos: Llenar formularios, detalle de Registros,
-  Participantes, Planeador, Mapas y Equipos de campo.
+- Pantallas de captura (formulario en el celular y en la web) y constructor
+  de formularios.
 - Manual de usuario con capturas del diseño nuevo.

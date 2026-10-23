@@ -257,3 +257,24 @@ apuntan al VPS, así que el certificado que ve el visitante es el del VPS. El
   nuevo es igual a la del principal (webroot), que ya se renueva solo.
   Conviene revisar la renovación en diciembre, cuando le toque al
   principal.
+
+### Paso 9 — Rediseño visual en producción (2026-10-23)
+
+- Se unieron a `main` los PR #54 (rediseño, docs/150) y #53 (textos
+  faltantes, docs/149), que iba incluido. Versión `3952f4a`.
+- **Inconveniente 12:** mientras se preparaba el despliegue, el servidor dejó
+  de responder ping, SSH y web durante unos 20 minutos. `last -x` muestra un
+  arranque a las 15:43 sin apagado ordenado antes, es decir, un reinicio
+  abrupto, no causado por InfoMatt360. Todos los contenedores volvieron solos
+  y sanos (`restart: unless-stopped`). Si se repite, revisar en el panel del
+  proveedor.
+- Se ejecutó `./scripts/infomatt360-upgrade.sh`, con copia previa en
+  `backups/upgrade-20261023-155305`. Migración sin cambios: sigue en
+  `0086_db_sync`, porque esta versión no trae migraciones.
+- **Verificación desde fuera:**
+  - los dos dominios responden 200;
+  - la hoja de estilos servida trae la letra nueva y las piezas de Inicio y
+    Recorridos;
+  - `GET /api/v1/field-devices/project/{id}/route-days` responde 401 (existe
+    y pide sesión).
+- El pendiente 7 (cerrar los PR incluidos) queda resuelto.

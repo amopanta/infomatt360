@@ -8,6 +8,7 @@ import { DashboardApp } from './modules/dashboard/DashboardApp';
 import { APP_NAVIGATION_EVENT, navigateTo, resolveAppRoute } from './routeConfig';
 import type { AppRoute } from './routeConfig';
 import { I18nProvider, useI18n } from './i18n';
+import '@fontsource-variable/atkinson-hyperlegible-next';
 import './styles.css';
 
 // Cada pantalla se descarga solo cuando se abre (antes todo iba en un solo

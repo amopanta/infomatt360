@@ -495,7 +495,13 @@
     "noActivity": "No activity recorded yet.",
     "noCaptures": "No captures",
     "participantsAssigned": "participant(s) assigned",
-    "noDocument": "No document"
+    "noDocument": "No document",
+    "pipelineTitle": "Record status",
+    "pipelineEmpty": "No records yet. Progress shows up here once the team submits the first one.",
+    "factsTitle": "Project at a glance",
+    "formsPublished": "{published} of {total} published",
+    "templates": "Forms",
+    "by": "by {name}"
   },
   "offline": {
     "synced": "Synced",
@@ -1448,7 +1454,10 @@
     "fileAttachment": "File",
     "filesCount": "{count} file(s)",
     "signaturePresent": "Signature captured",
-    "emptyValue": "—"
+    "emptyValue": "—",
+    "listIntro": "Pick a form to view, filter and export its responses.",
+    "responsesLabel": "responses",
+    "updatedOn": "Updated {date}"
   },
   "format": {
     "bytes": "{value} B",

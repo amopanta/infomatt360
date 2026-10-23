@@ -13,7 +13,7 @@ const labels: Record<string, string> = {
   tech_approved: 'Aprobado técnico', coordinator_approved: 'Aprobado coordinación',
   returned: 'Devuelto', corrected: 'Corregido', approved: 'Aprobado', rejected: 'Rechazado',
   cancelled: 'Cancelado', archived: 'Archivado', synced: 'Sincronizado', voided: 'Anulado',
-  reversed: 'Revertido', published: 'Publicado', accrued: 'Causado', paid: 'Pagado', open: 'Abierto',
+  reversed: 'Revertido', published: 'Publicado', paused: 'Pausado', accrued: 'Causado', paid: 'Pagado', open: 'Abierto',
   in_progress: 'En seguimiento', referred: 'Remitido', closed: 'Cerrado',
   start_review: 'Iniciar revisión', approve: 'Aprobar', return: 'Devolver', reject: 'Rechazar',
   entrega_aprobada: 'Entrega aprobada', alta_inicial: 'Inventario inicial',

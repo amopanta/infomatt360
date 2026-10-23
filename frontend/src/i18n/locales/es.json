@@ -495,7 +495,13 @@
     "noActivity": "Todavía no hay actividad registrada.",
     "noCaptures": "Sin capturas",
     "participantsAssigned": "participante(s) asignado(s)",
-    "noDocument": "Sin documento"
+    "noDocument": "Sin documento",
+    "pipelineTitle": "Estado de los registros",
+    "pipelineEmpty": "Aún no hay registros. Cuando el equipo envíe el primero, aparecerá aquí su avance.",
+    "factsTitle": "El proyecto en cifras",
+    "formsPublished": "{published} de {total} publicados",
+    "templates": "Formularios",
+    "by": "por {name}"
   },
   "offline": {
     "synced": "Sincronizado",
@@ -1448,7 +1454,10 @@
     "fileAttachment": "Archivo",
     "filesCount": "{count} archivo(s)",
     "signaturePresent": "Firma capturada",
-    "emptyValue": "—"
+    "emptyValue": "—",
+    "listIntro": "Elige un formulario para ver, filtrar y exportar sus respuestas.",
+    "responsesLabel": "respuestas",
+    "updatedOn": "Actualizado el {date}"
   },
   "format": {
     "bytes": "{value} B",

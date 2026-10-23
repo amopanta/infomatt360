@@ -201,7 +201,8 @@ y 600 (5,6 MB), y en el equipo de trabajo en `D:\Claude\_respaldo_vps_20261020`
 | `infomatt360.tecnomatt.com` | **En línea**, HTTPS con Let's Encrypt, web y API |
 | `chat.tecnomatt.com` y `n8.tecnomatt.org` | Sin servicio (n8n retirado). Quitar o redirigir el registro DNS |
 | `crm.tecnomatt.org` | Sin servicio (Chatwoot retirado). Quitar o redirigir el registro DNS. Su certificado sigue en el panel |
-| `mobile-infomatt360.tecnomatt.com` y `mobile.infomatt360.tecnomatt.com` | Sin servicio (API móvil Express retirada). Quitar del DNS |
+| `mobile-infomatt360.tecnomatt.com` | **En línea** (paso 8), con certificado propio y el mismo InfoMatt360 |
+| `mobile.infomatt360.tecnomatt.com` | Sin DNS; su sitio en nginx se reemplazó en el paso 8 |
 | `wt.tecnomatt.org` y `api-wt.tecnomatt.org` | Otro sistema; sin cambios |
 
 Pendiente: el **subdominio nuevo** que pidió el responsable (nombre y para
@@ -216,6 +217,43 @@ qué).
 4. Cerrar en el firewall MariaDB (3306), PostgreSQL del sistema (5432) y FTP
    (21), si no se usan desde fuera.
 5. Rotar la llave SSH usada (inconveniente 3).
-6. Limpiar los registros DNS de los dominios retirados y agregar el
-   subdominio nuevo.
+6. Limpiar en Hostinger los registros DNS de `chat.tecnomatt.com` (n8n retirado). `crm.tecnomatt.org` y `n8.tecnomatt.org` ya no tienen DNS.
 7. Cerrar los PR incluidos.
+
+### Paso 8 — Segundo dominio con su propio certificado (2026-10-23)
+
+Los dominios se registran y su DNS se administra en **Hostinger**. Los
+registros A de `infomatt360.tecnomatt.com` y `mobile-infomatt360.tecnomatt.com`
+apuntan al VPS, así que el certificado que ve el visitante es el del VPS. El
+«Lifetime SSL» del panel de Hostinger no se usa para estos dominios.
+
+- **Inconveniente 10:** `mobile-infomatt360.tecnomatt.com` llegaba al VPS sin
+  sitio propio. Mostraba el certificado de `infomatt360.tecnomatt.com`, y el
+  navegador daba aviso de seguridad. Además, el sitio
+  `mobile.infomatt360.tecnomatt.com`, que no tiene DNS, seguía apuntando a la
+  API Express retirada.
+- **Solución autorizada (opción 1):**
+  1. Se reemplazó `/etc/nginx/sites-available/infomatt360-mobile` por la
+     configuración de `mobile-infomatt360.tecnomatt.com`. Hay copias en
+     `/root/respaldos-20261020/nginx-infomatt360-mobile.*`.
+  2. Certificado Let's Encrypt propio, por webroot, igual que el principal.
+     Vence el 21-ene-2027 y lo renueva el `certbot.timer` (activo).
+  3. Mismo destino que el principal: `/api/` → `127.0.0.1:18000` y `/` →
+     `127.0.0.1:18080`.
+  4. `nginx -t` antes de cada recarga; la recarga no corta conexiones.
+- **Verificación externa:**
+
+| Dominio | Certificado | HTTP → HTTPS | Web | API |
+|---|---|---|---|---|
+| `infomatt360.tecnomatt.com` | válido, vence el 20-dic-2026 | 301 | InfoMatt360 | 200 |
+| `mobile-infomatt360.tecnomatt.com` | válido (propio), vence el 21-ene-2027 | 301 | InfoMatt360 | 200 |
+
+- No se tocaron los otros sistemas. `wt.tecnomatt.org` y
+  `api-wt.tecnomatt.org` ya no respondían antes del cambio: **no tienen
+  registro DNS**, y su configuración en aaPanel no la carga el nginx del
+  sistema. Siguen sin cambios.
+- **Inconveniente 11:** la prueba `certbot renew --dry-run` superó el tiempo
+  de espera de la sesión. La configuración de renovación del certificado
+  nuevo es igual a la del principal (webroot), que ya se renueva solo.
+  Conviene revisar la renovación en diciembre, cuando le toque al
+  principal.

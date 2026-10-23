@@ -383,16 +383,23 @@ function TemplateList() {
   return (
     <AppShell title={t('recordsView.registros')}>
       <main className="records-shell">
+        <p className="record-template-intro">{t('recordsView.listIntro')}</p>
         {message ? <p role="status">{message}</p> : null}
-        <div className="record-template-grid">
+        <ul className="record-template-list">
           {templates.map((template) => (
-            <a className="record-template-card" key={template.id} href={`/records/${template.id}`}>
-              <strong>{template.name}</strong>
-              <span>{template.description || t('recordsView.noDescription')}</span>
-              <small>{operationalStatusLabel(template.status)}</small>
-            </a>
+            <li key={template.id}>
+              <a href={`/records/${template.id}`}>
+                <span className="record-template-name">
+                  <strong title={template.name}>{template.name}</strong>
+                  <small>{template.description || t('recordsView.noDescription')}</small>
+                </span>
+                <span className="record-template-count"><strong>{(template.submissions_count ?? 0).toLocaleString()}</strong> {t('recordsView.responsesLabel')}</span>
+                <span className="record-template-date">{template.updated_at ? t('recordsView.updatedOn', { date: formatOperationalDate(template.updated_at).split(',')[0] }) : ''}</span>
+                <em className={`record-status template-${template.status}`}>{operationalStatusLabel(template.status)}</em>
+              </a>
+            </li>
           ))}
-        </div>
+        </ul>
       </main>
     </AppShell>
   );

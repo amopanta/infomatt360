@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
 import { useI18n } from '../../i18n';
@@ -22,6 +22,7 @@ import type { ScheduledTask } from './schedulerApi';
 const ENGINE_LABELS: Record<string, string> = { postgres: 'PostgreSQL', mysql: 'MySQL', mssql: 'SQL Server', sqlite: 'SQLite' };
 const MODE_KEYS: Record<string, string> = { full_mirror: 'admin.mirror.modeFull', insert_only: 'admin.mirror.modeInsert', incremental: 'admin.mirror.modeIncremental' };
 const DEFAULT_PORTS: Record<string, number> = { postgres: 5432, mysql: 3306, mssql: 1433 };
+const STATUS_LABELS: Record<string, string> = { active: 'Conectada', inactive: 'Inactiva', completed: 'Completada', running: 'En curso', failed: 'Falló', connection_error: 'Sin conexión', pending: 'Pendiente' };
 
 export function MirrorApp() {
   const { t } = useI18n();
@@ -81,6 +82,10 @@ export function MirrorApp() {
   }
 
   useEffect(() => { if (projectId) { loadTargets(); loadSchedule(); } }, [projectId]);
+  // Con una sola base conectada se abre directamente: antes habia que descubrir
+  // que el nombre era un boton para ver la copia y la importacion (docs/150).
+  useEffect(() => { if (!selectedTarget && targets.length === 1) void handleSelectTarget(targets[0]); }, [targets]);
+  useEffect(() => { if (selectedTarget && !selectedPlan && plans.length === 1) void handleSelectPlan(plans[0]); }, [plans]);
 
   async function handleCreateTarget() {
     setLoading(true);
@@ -170,133 +175,62 @@ export function MirrorApp() {
 
   function statusBadge(status: string) {
     const cls = status === 'active' || status === 'completed' ? 'sent' : status === 'failed' || status === 'connection_error' ? 'failed' : 'skipped';
-    return <span className={`approval-badge ${cls}`}>{status}</span>;
+    return <span className={`approval-badge ${cls}`}>{STATUS_LABELS[status] ?? status}</span>;
   }
 
   return (
     <AppShell title={t('admin.mirror.title')}>
-      <h2>{t('admin.mirror.title')}</h2>
-      {message && <p className="form-message" onClick={() => setMessage('')}>{message}</p>}
+      <main className="module-page">
+        <header className="module-intro">
+          <h2>{t('admin.mirror.title')}</h2>
+          <p>{t('admin.mirror.intro')}</p>
+          <ol className="module-steps">
+            <li className={targets.length ? 'done' : 'current'}><strong>{t('admin.mirror.step1')}</strong><span>{t('admin.mirror.step1Text')}</span></li>
+            <li className={plans.length ? 'done' : targets.length ? 'current' : ''}><strong>{t('admin.mirror.step2')}</strong><span>{t('admin.mirror.step2Text')}</span></li>
+            <li className={targets.length ? 'current' : ''}><strong>{t('admin.mirror.step3')}</strong><span>{t('admin.mirror.step3Text')}</span></li>
+          </ol>
+        </header>
+        {message && <p className="form-message" role="status" onClick={() => setMessage('')}>{message}</p>}
 
-      {/* Targets Section */}
-      <section style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <h3>{t('admin.mirror.targets')}</h3>
-          <button className="btn btn-primary" onClick={() => setShowNewTarget(!showNewTarget)}>{showNewTarget ? t('common.cancel') : t('admin.mirror.newTarget')}</button>
-        </div>
+        <section className="panel">
+          <header className="panel-head">
+            <div><h3>{t('admin.mirror.targets')}</h3><p>{t('admin.mirror.targetsHelp')}</p></div>
+            <button className={showNewTarget ? 'btn' : 'btn btn-primary'} onClick={() => setShowNewTarget(!showNewTarget)}>{showNewTarget ? t('common.cancel') : t('admin.mirror.newTarget')}</button>
+          </header>
 
-        {showNewTarget && (
-          <div className="card" style={{ padding: 16, marginBottom: 16 }}>
-            <div style={{ display: 'grid', gap: 12 }}>
-              <input placeholder={t('admin.mirror.targetName')} value={tName} onChange={(e) => setTName(e.target.value)} />
-              <select value={tEngine} onChange={(e) => { const eng = e.target.value as any; setTEngine(eng); setTPort(DEFAULT_PORTS[eng] ?? 5432); }}>
+          {showNewTarget && (
+            <div className="form-grid module-form">
+              <label>{t('admin.mirror.targetName')}<input value={tName} onChange={(e) => setTName(e.target.value)} placeholder={t('admin.mirror.targetNameExample')} /></label>
+              <label>{t('admin.mirror.engine')}<select value={tEngine} onChange={(e) => { const eng = e.target.value as typeof tEngine; setTEngine(eng); setTPort(DEFAULT_PORTS[eng] ?? 5432); }}>
                 {Object.entries(ENGINE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-              </select>
+              </select></label>
               {tEngine !== 'sqlite' ? (
                 <>
-                  <input placeholder={t('admin.mirror.host')} value={tHost} onChange={(e) => setTHost(e.target.value)} />
-                  <input type="number" placeholder={t('admin.mirror.port')} value={tPort} onChange={(e) => setTPort(Number(e.target.value))} />
-                  <input placeholder={t('admin.mirror.database')} value={tDatabase} onChange={(e) => setTDatabase(e.target.value)} />
-                  <input placeholder={t('admin.mirror.username')} value={tUsername} onChange={(e) => setTUsername(e.target.value)} />
-                  <input type="password" placeholder={t('admin.mirror.password')} value={tPassword} onChange={(e) => setTPassword(e.target.value)} />
+                  <label>{t('admin.mirror.host')}<input value={tHost} onChange={(e) => setTHost(e.target.value)} /></label>
+                  <label>{t('admin.mirror.port')}<input type="number" value={tPort} onChange={(e) => setTPort(Number(e.target.value))} /></label>
+                  <label>{t('admin.mirror.database')}<input value={tDatabase} onChange={(e) => setTDatabase(e.target.value)} /></label>
+                  <label>{t('admin.mirror.username')}<input value={tUsername} onChange={(e) => setTUsername(e.target.value)} autoComplete="off" /></label>
+                  <label>{t('admin.mirror.password')}<input type="password" value={tPassword} onChange={(e) => setTPassword(e.target.value)} autoComplete="new-password" /></label>
                 </>
               ) : (
-                <input placeholder={t('admin.mirror.filePath')} value={tFilePath} onChange={(e) => setTFilePath(e.target.value)} />
+                <label className="form-wide">{t('admin.mirror.filePath')}<input value={tFilePath} onChange={(e) => setTFilePath(e.target.value)} /></label>
               )}
-              <button className="btn btn-primary" disabled={loading || !tName} onClick={handleCreateTarget}>{t('admin.mirror.createTarget')}</button>
-            </div>
-          </div>
-        )}
-
-        {targets.length === 0 ? <p style={{ color: 'var(--text-muted)' }}>{t('admin.mirror.noTargets')}</p> : (
-          <table className="data-table">
-            <thead><tr><th>{t('common.name')}</th><th>{t('admin.mirror.engine')}</th><th>{t('common.status')}</th><th>{t('common.actions')}</th></tr></thead>
-            <tbody>
-              {targets.map((target) => (
-                <tr key={target.id} className={selectedTarget?.id === target.id ? 'selected-row' : ''}>
-                  <td><button className="btn-link" onClick={() => handleSelectTarget(target)}>{target.name}</button></td>
-                  <td>{ENGINE_LABELS[target.engine] ?? target.engine}</td>
-                  <td>{statusBadge(target.status)}</td>
-                  <td style={{ display: 'flex', gap: 4 }}>
-                    <button className="btn btn-sm" onClick={() => handleTestConnection(target.id)} disabled={loading}>{t('admin.mirror.testConnection')}</button>
-                    {target.engine !== 'sqlite' && <button className="btn btn-sm" onClick={() => handleShowBI(target.id)} disabled={loading}>{t('admin.mirror.biConnect')}</button>}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </section>
-
-      {/* BI Connection Info Panel */}
-      {biInfo && biTargetId && (
-        <section style={{ marginBottom: 24 }}>
-          <div className="card" style={{ padding: 16 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={{ margin: 0 }}>{t('admin.mirror.biConnectionTitle')}</h3>
-              <button className="btn btn-sm" onClick={() => { setBiInfo(null); setBiTargetId(null); }}>✕</button>
-            </div>
-            <div style={{ display: 'grid', gap: 8, fontSize: '0.9em' }}>
-              <div><strong>{t('admin.mirror.engine')}:</strong> {ENGINE_LABELS[biInfo.engine] ?? biInfo.engine}</div>
-              <div><strong>{t('admin.mirror.host')}:</strong> {biInfo.host}:{biInfo.port}</div>
-              <div><strong>{t('admin.mirror.database')}:</strong> {biInfo.database}</div>
-              <div><strong>{t('admin.mirror.username')}:</strong> {biInfo.username}</div>
-              <div><strong>JDBC:</strong> <code style={{ wordBreak: 'break-all' }}>{biInfo.jdbc_url}</code></div>
-              <div><strong>{t('admin.mirror.biTables')}:</strong> {biInfo.tables.length > 0 ? biInfo.tables.join(', ') : '—'}</div>
-              <hr style={{ margin: '8px 0' }} />
-              <h4 style={{ margin: 0 }}>{t('admin.mirror.biToolSetup')}</h4>
-              {Object.entries(biInfo.tools).map(([tool, params]) => (
-                <details key={tool} style={{ marginBottom: 4 }}>
-                  <summary style={{ cursor: 'pointer', fontWeight: 600 }}>{tool}</summary>
-                  <div style={{ paddingLeft: 16, paddingTop: 4 }}>
-                    {Object.entries(params).map(([k, v]) => (
-                      <div key={k}><strong>{k}:</strong> <code style={{ wordBreak: 'break-all' }}>{v}</code></div>
-                    ))}
-                  </div>
-                </details>
-              ))}
-              <p style={{ color: 'var(--text-muted)', fontSize: '0.85em', margin: '8px 0 0' }}>{t('admin.mirror.biPasswordNote')}</p>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Plans Section */}
-      {selectedTarget && (
-        <section style={{ marginBottom: 24 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <h3>{t('admin.mirror.plans')} — {selectedTarget.name}</h3>
-            <button className="btn btn-primary" onClick={() => setShowNewPlan(!showNewPlan)}>{showNewPlan ? t('common.cancel') : t('admin.mirror.newPlan')}</button>
-          </div>
-
-          {showNewPlan && (
-            <div className="card" style={{ padding: 16, marginBottom: 16 }}>
-              <div style={{ display: 'grid', gap: 12 }}>
-                <input placeholder={t('admin.mirror.planName')} value={pName} onChange={(e) => setPName(e.target.value)} />
-                <label>Qué copiar<select value={pScope} onChange={(e) => setPScope(e.target.value as 'project' | 'records')}>
-                  <option value="project">Proyecto completo: participantes, asignaciones, respuestas y una tabla por formulario (recomendado)</option>
-                  <option value="records">Solo registros en formato clave-valor (modo anterior)</option>
-                </select></label>
-                <select value={pMode} onChange={(e) => setPMode(e.target.value as any)}>
-                  {Object.entries(MODE_KEYS).map(([k, tk]) => <option key={k} value={k}>{t(tk)}</option>)}
-                </select>
-                <button className="btn btn-primary" disabled={loading || !pName} onClick={handleCreatePlan}>{t('admin.mirror.createPlan')}</button>
-              </div>
+              <div className="form-wide"><button className="btn btn-primary" disabled={loading || !tName} onClick={handleCreateTarget}>{t('admin.mirror.createTarget')}</button></div>
             </div>
           )}
 
-          {plans.length === 0 ? <p style={{ color: 'var(--text-muted)' }}>{t('admin.mirror.noPlans')}</p> : (
+          {targets.length === 0 ? <p className="empty-note">{t('admin.mirror.noTargets')}</p> : (
             <table className="data-table">
-              <thead><tr><th>{t('common.name')}</th><th>Qué copia</th><th>{t('admin.mirror.mode')}</th><th>{t('admin.mirror.lastResult')}</th><th>{t('common.actions')}</th></tr></thead>
+              <thead><tr><th>{t('common.name')}</th><th>{t('admin.mirror.engine')}</th><th>{t('common.status')}</th><th>{t('common.actions')}</th></tr></thead>
               <tbody>
-                {plans.map((plan) => (
-                  <tr key={plan.id} className={selectedPlan?.id === plan.id ? 'selected-row' : ''}>
-                    <td><button className="btn-link" onClick={() => handleSelectPlan(plan)}>{plan.name}</button></td>
-                    <td>{plan.scope === 'project' ? 'Proyecto completo' : 'Registros clave-valor'}</td>
-                    <td>{t(MODE_KEYS[plan.schedule_mode] ?? 'admin.mirror.modeFull')}</td>
-                    <td style={{ fontSize: '0.85em' }}>{plan.last_result ?? '—'}</td>
-                    <td>
-                      <button className="btn btn-sm" onClick={() => handleRunPlan(plan.id)} disabled={loading}>{t('admin.mirror.runNow')}</button>
+                {targets.map((target) => (
+                  <tr key={target.id} className={selectedTarget?.id === target.id ? 'selected-row' : ''}>
+                    <td><button className="btn-link" onClick={() => handleSelectTarget(target)}>{target.name}</button>{selectedTarget?.id === target.id ? <small className="row-note">{t('admin.mirror.selected')}</small> : null}</td>
+                    <td>{ENGINE_LABELS[target.engine] ?? target.engine}</td>
+                    <td>{statusBadge(target.status)}</td>
+                    <td className="row-actions">
+                      <button className="btn btn-sm" onClick={() => handleTestConnection(target.id)} disabled={loading}>{t('admin.mirror.testConnection')}</button>
+                      {target.engine !== 'sqlite' && <button className="btn btn-sm" onClick={() => handleShowBI(target.id)} disabled={loading}>{t('admin.mirror.biConnect')}</button>}
                     </td>
                   </tr>
                 ))}
@@ -304,55 +238,118 @@ export function MirrorApp() {
             </table>
           )}
         </section>
-      )}
 
-      {/* Schedule Section */}
-      {selectedPlan && (
-        <section style={{ marginBottom: 24 }}>
-          <h3>{t('admin.mirror.schedule')}</h3>
-          {scheduledTask ? (
-            <p>{t('admin.mirror.scheduledAs')}: <strong>{scheduledTask.name}</strong> ({scheduledTask.frequency}) — {scheduledTask.status}</p>
-          ) : (
-            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-              <select value={schedFreq} onChange={(e) => setSchedFreq(e.target.value)}>
-                <option value="hourly">{t('admin.backups.frequencyHourly')}</option>
-                <option value="daily">{t('admin.backups.frequencyDaily')}</option>
-                <option value="weekly">{t('admin.backups.frequencyWeekly')}</option>
-              </select>
-              {schedFreq !== 'hourly' ? <>
-                <label>Hora<input type="time" value={schedTime} onChange={(e) => setSchedTime(e.target.value)} /></label>
-                <label>Zona horaria<input value={schedTz} onChange={(e) => setSchedTz(e.target.value)} /></label>
-              </> : null}
-              <button className="btn btn-primary" onClick={handleSchedule} disabled={scheduling}>{t('admin.mirror.scheduleBtn')}</button>
-            </div>
-          )}
-        </section>
-      )}
+        {biInfo && biTargetId && (
+          <section className="panel">
+            <header className="panel-head">
+              <h3>{t('admin.mirror.biConnectionTitle')}</h3>
+              <button className="btn btn-sm" aria-label={t('common.close')} onClick={() => { setBiInfo(null); setBiTargetId(null); }}>✕</button>
+            </header>
+            <dl className="detail-list">
+              <dt>{t('admin.mirror.engine')}</dt><dd>{ENGINE_LABELS[biInfo.engine] ?? biInfo.engine}</dd>
+              <dt>{t('admin.mirror.host')}</dt><dd>{biInfo.host}:{biInfo.port}</dd>
+              <dt>{t('admin.mirror.database')}</dt><dd>{biInfo.database}</dd>
+              <dt>{t('admin.mirror.username')}</dt><dd>{biInfo.username}</dd>
+              <dt>JDBC</dt><dd><code>{biInfo.jdbc_url}</code></dd>
+              <dt>{t('admin.mirror.biTables')}</dt><dd>{biInfo.tables.length > 0 ? biInfo.tables.join(', ') : '—'}</dd>
+            </dl>
+            <h4>{t('admin.mirror.biToolSetup')}</h4>
+            {Object.entries(biInfo.tools).map(([tool, params]) => (
+              <details key={tool} className="detail-toggle">
+                <summary>{tool}</summary>
+                <dl className="detail-list">{Object.entries(params).map(([k, v]) => <Fragment key={k}><dt>{k}</dt><dd><code>{v}</code></dd></Fragment>)}</dl>
+              </details>
+            ))}
+            <p className="empty-note">{t('admin.mirror.biPasswordNote')}</p>
+          </section>
+        )}
 
-      {selectedPlan && runs[0]?.summary ? <Reconciliation summary={runs[0].summary} /> : null}
+        {selectedTarget && (
+          <section className="panel">
+            <header className="panel-head">
+              <div><h3>{t('admin.mirror.plansFor', { name: selectedTarget.name })}</h3><p>{t('admin.mirror.plansHelp')}</p></div>
+              <button className={showNewPlan ? 'btn' : 'btn btn-primary'} onClick={() => setShowNewPlan(!showNewPlan)}>{showNewPlan ? t('common.cancel') : t('admin.mirror.newPlan')}</button>
+            </header>
 
-      {selectedTarget && <DbImportPanel projectId={projectId} source={selectedTarget} />}
+            {showNewPlan && (
+              <div className="form-grid module-form">
+                <label>{t('admin.mirror.planName')}<input value={pName} onChange={(e) => setPName(e.target.value)} /></label>
+                <label>{t('admin.mirror.mode')}<select value={pMode} onChange={(e) => setPMode(e.target.value as typeof pMode)}>
+                  {Object.entries(MODE_KEYS).map(([k, tk]) => <option key={k} value={k}>{t(tk)}</option>)}
+                </select></label>
+                <label className="form-wide">{t('admin.mirror.scope')}<select value={pScope} onChange={(e) => setPScope(e.target.value as 'project' | 'records')}>
+                  <option value="project">{t('admin.mirror.scopeProject')}</option>
+                  <option value="records">{t('admin.mirror.scopeRecords')}</option>
+                </select></label>
+                <div className="form-wide"><button className="btn btn-primary" disabled={loading || !pName} onClick={handleCreatePlan}>{t('admin.mirror.createPlan')}</button></div>
+              </div>
+            )}
 
-      {/* Runs Section */}
-      {selectedPlan && runs.length > 0 && (
-        <section>
-          <h3>{t('admin.mirror.runs')}</h3>
-          <table className="data-table">
-            <thead><tr><th>{t('common.status')}</th><th>{t('admin.mirror.records')}</th><th>{t('admin.mirror.values')}</th><th>{t('admin.mirror.startedAt')}</th><th>{t('admin.mirror.finishedAt')}</th></tr></thead>
-            <tbody>
-              {runs.map((run) => (
-                <tr key={run.id}>
-                  <td>{statusBadge(run.status)}</td>
-                  <td>{run.records_synced}</td>
-                  <td>{run.values_synced}</td>
-                  <td style={{ fontSize: '0.85em' }}>{new Date(run.started_at).toLocaleString()}</td>
-                  <td style={{ fontSize: '0.85em' }}>{run.finished_at ? new Date(run.finished_at).toLocaleString() : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-      )}
+            {plans.length === 0 ? <p className="empty-note">{t('admin.mirror.noPlans')}</p> : (
+              <table className="data-table">
+                <thead><tr><th>{t('common.name')}</th><th>{t('admin.mirror.scope')}</th><th>{t('admin.mirror.mode')}</th><th>{t('admin.mirror.lastResult')}</th><th>{t('common.actions')}</th></tr></thead>
+                <tbody>
+                  {plans.map((plan) => (
+                    <tr key={plan.id} className={selectedPlan?.id === plan.id ? 'selected-row' : ''}>
+                      <td><button className="btn-link" onClick={() => handleSelectPlan(plan)}>{plan.name}</button></td>
+                      <td>{plan.scope === 'project' ? t('admin.mirror.scopeProjectShort') : t('admin.mirror.scopeRecordsShort')}</td>
+                      <td>{t(MODE_KEYS[plan.schedule_mode] ?? 'admin.mirror.modeFull')}</td>
+                      <td className="cell-muted">{plan.last_result ?? '—'}</td>
+                      <td className="row-actions"><button className="btn btn-sm btn-primary" onClick={() => handleRunPlan(plan.id)} disabled={loading}>{t('admin.mirror.runNow')}</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+
+            {selectedPlan && (
+              <div className="schedule-row">
+                <h4>{t('admin.mirror.schedule')}</h4>
+                {scheduledTask ? (
+                  <p>{t('admin.mirror.scheduledAs')}: <strong>{scheduledTask.name}</strong> ({scheduledTask.frequency}) · {scheduledTask.status}</p>
+                ) : (
+                  <div className="form-inline">
+                    <label>{t('admin.mirror.frequency')}<select value={schedFreq} onChange={(e) => setSchedFreq(e.target.value)}>
+                      <option value="hourly">{t('admin.backups.frequencyHourly')}</option>
+                      <option value="daily">{t('admin.backups.frequencyDaily')}</option>
+                      <option value="weekly">{t('admin.backups.frequencyWeekly')}</option>
+                    </select></label>
+                    {schedFreq !== 'hourly' ? <>
+                      <label>{t('admin.mirror.time')}<input type="time" value={schedTime} onChange={(e) => setSchedTime(e.target.value)} /></label>
+                      <label>{t('admin.mirror.timezone')}<input value={schedTz} onChange={(e) => setSchedTz(e.target.value)} /></label>
+                    </> : null}
+                    <button className="btn btn-primary" onClick={handleSchedule} disabled={scheduling}>{t('admin.mirror.scheduleBtn')}</button>
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {selectedPlan && runs[0]?.summary ? <Reconciliation summary={runs[0].summary} /> : null}
+
+        {selectedPlan && runs.length > 0 && (
+          <section className="panel">
+            <header className="panel-head"><h3>{t('admin.mirror.runs')}</h3></header>
+            <table className="data-table">
+              <thead><tr><th>{t('common.status')}</th><th>{t('admin.mirror.records')}</th><th>{t('admin.mirror.values')}</th><th>{t('admin.mirror.startedAt')}</th><th>{t('admin.mirror.finishedAt')}</th></tr></thead>
+              <tbody>
+                {runs.map((run) => (
+                  <tr key={run.id}>
+                    <td>{statusBadge(run.status)}</td>
+                    <td>{run.records_synced}</td>
+                    <td>{run.values_synced}</td>
+                    <td className="cell-muted">{new Date(run.started_at).toLocaleString()}</td>
+                    <td className="cell-muted">{run.finished_at ? new Date(run.finished_at).toLocaleString() : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </section>
+        )}
+
+        {selectedTarget && <DbImportPanel projectId={projectId} source={selectedTarget} />}
+      </main>
     </AppShell>
   );
 }
@@ -361,9 +358,9 @@ export function MirrorApp() {
 function Reconciliation({ summary }: { summary: MirrorRunSummary }) {
   const rows = [...Object.entries(summary.tables).map(([name, item]) => ({ name, label: name, ...item })),
     ...Object.entries(summary.form_tables).map(([name, item]) => ({ name, label: `${item.form ?? name} (${name}, ${item.columns ?? 0} preguntas)`, ...item }))];
-  return <section style={{ marginBottom: 24 }}>
-    <h3>Conciliación de la última corrida {summary.reconciled ? '— origen y destino cuadran' : '— hay diferencias'}</h3>
+  return <section className="panel">
+    <header className="panel-head"><div><h3>Conciliación de la última copia</h3><p>{summary.reconciled ? 'Origen y destino cuadran en todas las tablas.' : 'Hay tablas con diferencias entre origen y destino.'}</p></div></header>
     <table className="data-table"><thead><tr><th>Tabla en la base externa</th><th>Origen</th><th>Destino</th><th>Estado</th></tr></thead>
-      <tbody>{rows.map((row) => <tr key={row.name}><td>{row.label}</td><td>{row.source}</td><td>{row.destination}</td><td>{row.ok ? 'Cuadra' : 'Diferencia'}</td></tr>)}</tbody></table>
+      <tbody>{rows.map((row) => <tr key={row.name}><td>{row.label}</td><td>{row.source}</td><td>{row.destination}</td><td><span className={`approval-badge ${row.ok ? 'sent' : 'failed'}`}>{row.ok ? 'Cuadra' : 'Diferencia'}</span></td></tr>)}</tbody></table>
   </section>;
 }

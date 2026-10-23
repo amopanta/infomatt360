@@ -1,18 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CircleMarker, MapContainer, Polyline, Popup, TileLayer } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
 
 import { AppShell } from '../../components/AppShell';
 import { useI18n } from '../../i18n';
 import { hasAnyCurrentProjectPermission, PROJECT_KEY } from '../auth/session';
-import { fetchDeviceStatus, fetchRoutes, requestRemoteWipe, serverDate, type FieldDeviceStatus, type RouteSummary } from './api';
+import { fetchDeviceStatus, requestRemoteWipe, serverDate, type FieldDeviceStatus } from './api';
+import { RouteVisits } from './RouteVisits';
 
 const REFRESH_MS = 60_000;
-
-function today(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-}
 
 /** "hace 5 min", "hace 3 h", "hace 2 días" */
 function useAgo() {
@@ -29,11 +23,6 @@ function useAgo() {
   };
 }
 
-function time(value: string | null) {
-  const date = serverDate(value);
-  return date ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-}
-
 export function FieldDevicesApp() {
   const { t } = useI18n();
   const ago = useAgo();
@@ -42,10 +31,10 @@ export function FieldDevicesApp() {
   const [loaded, setLoaded] = useState(false);
   const [filter, setFilter] = useState<'all' | 'attention'>('all');
   const [expanded, setExpanded] = useState('');
-  const [day, setDay] = useState(today());
-  const [routes, setRoutes] = useState<RouteSummary[]>([]);
   const [routeUser, setRouteUser] = useState('');
-  const [route, setRoute] = useState<RouteSummary | null>(null);
+  // «Recorridos y visitas» tiene su propia entrada en el menú y abre solo esa
+  // parte; «Equipos de campo» la muestra debajo de las tablets (docs/150).
+  const routesOnly = window.location.pathname.startsWith('/field-devices/routes');
   const [message, setMessage] = useState('');
   const canWipe = hasAnyCurrentProjectPermission(['identity.users.manage']);
 
@@ -68,16 +57,6 @@ export function FieldDevicesApp() {
     return () => window.clearInterval(timer);
   }, [projectId]);
 
-  useEffect(() => {
-    if (!projectId) return;
-    void fetchRoutes(projectId, day).then(setRoutes).catch((error: Error) => setMessage(error.message));
-  }, [projectId, day]);
-
-  useEffect(() => {
-    if (!projectId || !routeUser) { setRoute(null); return; }
-    void fetchRoutes(projectId, day, routeUser).then((rows) => setRoute(rows[0] ?? null)).catch((error: Error) => setMessage(error.message));
-  }, [projectId, day, routeUser]);
-
   const totals = useMemo(() => ({
     devices: devices.length,
     attention: devices.filter((d) => d.level !== 'ok').length,
@@ -85,12 +64,13 @@ export function FieldDevicesApp() {
     errors: devices.reduce((sum, d) => sum + d.error_count + d.conflict_count, 0),
   }), [devices]);
   const visible = filter === 'attention' ? devices.filter((d) => d.level !== 'ok') : devices;
-  const path = useMemo(() => (route?.points ?? []).map((p) => [p.latitude, p.longitude] as [number, number]), [route]);
 
   function showRoute(userId: string) {
     setRouteUser(userId);
     window.setTimeout(() => document.getElementById('field-route')?.scrollIntoView({ behavior: 'smooth' }), 50);
   }
+
+  if (routesOnly) return <AppShell title={t('ux.devices.routesNav')}><main className="devices-page"><RouteVisits projectId={projectId} /></main></AppShell>;
 
   return <AppShell title={t('ux.devices.title')}><main className="devices-page">
     <h1>{t('ux.devices.title')}</h1>
@@ -145,33 +125,7 @@ export function FieldDevicesApp() {
       </div>
     </section>
 
-    <section className="teams-card" id="field-route">
-      <div className="devices-head">
-        <h2>{t('ux.devices.routeTitle')}</h2>
-        <label>{t('ux.devices.day')} <input type="date" value={day} max={today()} onChange={(event) => setDay(event.target.value || today())} /></label>
-      </div>
-      <p className="devices-note">{t('ux.devices.routePrivacy')}</p>
-      {!routes.length ? <p>{t('ux.devices.noRoutes')}</p> : <div className="devices-routes">
-        <div className="teams-options">{routes.map((item) => (
-          <button type="button" key={item.user_id} className={`teams-item ${routeUser === item.user_id ? 'selected' : ''}`} onClick={() => setRouteUser(item.user_id)}>
-            {item.user_name}
-            <small>{t('ux.devices.routeSummary', { km: item.distance_km.toLocaleString(undefined, { maximumFractionDigits: 1 }), points: item.point_count, from: time(item.first_at), to: time(item.last_at) })}</small>
-          </button>
-        ))}</div>
-        {route && path.length > 0 && <MapContainer key={`${route.user_id}-${day}`} className="devices-map" bounds={path} boundsOptions={{ padding: [30, 30] }} scrollWheelZoom={false}>
-          <TileLayer attribution='&copy; OpenStreetMap' url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-          <Polyline positions={path} pathOptions={{ color: '#0f766e', weight: 4 }} />
-          {route.points.map((point, index) => {
-            const edge = index === 0 || index === route.points.length - 1;
-            return <CircleMarker key={point.recorded_at} center={[point.latitude, point.longitude]} radius={edge ? 8 : 4}
-              pathOptions={{ color: index === 0 ? '#15803d' : edge ? '#b91c1c' : '#0f766e', fillOpacity: 0.9 }}>
-              <Popup>{index === 0 ? t('ux.devices.start') : edge ? t('ux.devices.end') : ''} {serverDate(point.recorded_at)?.toLocaleTimeString()}{point.accuracy_m ? ` · ±${Math.round(point.accuracy_m)} m` : ''}</Popup>
-            </CircleMarker>;
-          })}
-        </MapContainer>}
-        {routeUser && !route && <p>{t('ux.devices.noRouteForUser')}</p>}
-      </div>}
-    </section>
+    <RouteVisits projectId={projectId} initialUser={routeUser} />
     {message && <p role="status">{message}</p>}
   </main></AppShell>;
 }

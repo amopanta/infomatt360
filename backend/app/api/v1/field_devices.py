@@ -24,9 +24,13 @@ from app.core.permissions import IDENTITY_USERS_MANAGE, RECORDS_COORDINATE, RECO
 from app.core.time import to_naive_utc, utc_now
 from app.db.session import get_db
 from app.models.audit import AuditLog
+from app.models.builder import BuilderComponent, BuilderTemplate
 from app.models.device_status import FieldDeviceStatus, FieldRoutePoint
 from app.models.identity import User
+from app.models.participants import Participant
+from app.models.runtime_record import RuntimeRecord, RuntimeRecordValue
 from app.services.assignment_service import assignment_service
+from app.services.gis_service import GEO_COMPONENT_TYPES, gis_service
 
 router = APIRouter()
 
@@ -304,6 +308,122 @@ def project_routes(
     ]
     summaries.sort(key=lambda s: s.user_name.lower())
     return summaries
+
+
+class RouteDayOut(BaseModel):
+    day: str
+    user_count: int
+    point_count: int
+    visit_count: int = 0
+
+
+@router.get("/project/{project_id}/route-days", response_model=list[RouteDayOut])
+def project_route_days(
+    project_id: str,
+    tz_offset_minutes: int = Query(300, ge=-840, le=840, description="Como Date.getTimezoneOffset(): Colombia = 300"),
+    days: int = Query(60, ge=1, le=366),
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Días con recorrido o con formularios capturados (más reciente
+    primero), para que la pantalla abra en el último día con datos y no en
+    un «hoy» vacío."""
+    require_any_project_permission(db, user.id, project_id, SUPERVISION_PERMISSIONS)
+    since = utc_now() - timedelta(days=days)
+    rows = (
+        db.query(FieldRoutePoint.recorded_at, FieldRoutePoint.user_id)
+        .filter(FieldRoutePoint.project_id == project_id, FieldRoutePoint.recorded_at >= since)
+        .all()
+    )
+    records = (
+        db.query(RuntimeRecord.created_at, RuntimeRecord.submitted_by)
+        .filter(RuntimeRecord.project_id == project_id, RuntimeRecord.created_at >= since, RuntimeRecord.parent_record_id.is_(None))
+        .all()
+    )
+    by_day: dict[str, list] = {}
+    for when, user_id, kind in [(at, uid, 1) for at, uid in rows] + [(at, uid, 2) for at, uid in records]:
+        day = (when - timedelta(minutes=tz_offset_minutes)).date().isoformat()
+        users, points, visits = by_day.setdefault(day, [set(), 0, 0])
+        if user_id:
+            users.add(user_id)
+        by_day[day] = [users, points + (kind == 1), visits + (kind == 2)]
+    return [RouteDayOut(day=day, user_count=len(users), point_count=points, visit_count=visits)
+            for day, (users, points, visits) in sorted(by_day.items(), reverse=True)]
+
+
+class VisitOut(BaseModel):
+    record_id: str
+    template_id: str
+    template_name: str
+    participant_id: str | None = None
+    participant_name: str | None = None
+    participant_document: str | None = None
+    user_id: str | None = None
+    user_name: str | None = None
+    status: str
+    created_at: datetime
+    latitude: float | None = None
+    longitude: float | None = None
+
+
+@router.get("/project/{project_id}/visits", response_model=list[VisitOut])
+def project_visits(
+    project_id: str,
+    date_from: datetime = Query(...),
+    date_to: datetime = Query(...),
+    user_id: str | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    """Visitas del periodo: cada formulario capturado, a quién y dónde (el
+    primer campo GPS del formulario). Se dibujan sobre el recorrido del
+    gestor; las que no tienen GPS se listan igual, sin punto (docs/150)."""
+    require_any_project_permission(db, user.id, project_id, SUPERVISION_PERMISSIONS)
+    start, end = to_naive_utc(date_from), to_naive_utc(date_to)
+    if end <= start or end - start > timedelta(days=31):
+        raise HTTPException(status_code=422, detail="El periodo debe ser de máximo 31 días")
+    query = (
+        db.query(RuntimeRecord, BuilderTemplate.name)
+        .join(BuilderTemplate, BuilderTemplate.id == RuntimeRecord.template_id)
+        .filter(RuntimeRecord.project_id == project_id, RuntimeRecord.created_at >= start, RuntimeRecord.created_at < end,
+                RuntimeRecord.parent_record_id.is_(None))
+    )
+    if user_id:
+        query = query.filter(RuntimeRecord.submitted_by == user_id)
+    rows = query.order_by(RuntimeRecord.created_at).limit(2000).all()
+    if not rows:
+        return []
+    record_ids = [record.id for record, _ in rows]
+    points: dict[str, tuple[float, float]] = {}
+    geo_values = (
+        db.query(RuntimeRecordValue.record_id, RuntimeRecordValue.field_value_json)
+        .join(RuntimeRecord, RuntimeRecord.id == RuntimeRecordValue.record_id)
+        .join(BuilderComponent, (BuilderComponent.template_id == RuntimeRecord.template_id) & (BuilderComponent.name == RuntimeRecordValue.field_name))
+        .filter(RuntimeRecordValue.record_id.in_(record_ids), BuilderComponent.component_type.in_(GEO_COMPONENT_TYPES))
+        .all()
+    )
+    for record_id, raw in geo_values:
+        if record_id in points:
+            continue
+        point = gis_service._representative_point(gis_service._geometry_from_json(raw))
+        if point is not None:
+            points[record_id] = (point[1], point[0])
+    participant_ids = {record.participant_id for record, _ in rows if record.participant_id}
+    participants = {p.id: p for p in db.query(Participant).filter(Participant.id.in_(participant_ids)).all()} if participant_ids else {}
+    user_ids = {record.submitted_by for record, _ in rows if record.submitted_by}
+    names = {u.id: u.full_name for u in db.query(User).filter(User.id.in_(user_ids)).all()} if user_ids else {}
+    visits = []
+    for record, template_name in rows:
+        participant = participants.get(record.participant_id or "")
+        latitude, longitude = points.get(record.id, (None, None))
+        visits.append(VisitOut(
+            record_id=record.id, template_id=record.template_id, template_name=template_name,
+            participant_id=record.participant_id, participant_name=participant.full_name if participant else None,
+            participant_document=participant.document_id if participant else None,
+            user_id=record.submitted_by, user_name=record.captured_by_name or names.get(record.submitted_by or ""),
+            status=record.status, created_at=record.created_at, latitude=latitude, longitude=longitude,
+        ))
+    return visits
 
 
 class WipeRequest(BaseModel):

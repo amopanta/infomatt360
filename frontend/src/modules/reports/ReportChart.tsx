@@ -1,4 +1,5 @@
 import { useI18n } from '../../i18n';
+import { operationalStatusLabel } from '../../lib/operationalFormat';
 import { barChartGeometry, pieChartGeometry } from './chartGeometry';
 import type { ChartPoint } from './types';
 
@@ -18,7 +19,7 @@ export function ReportChart({ kind, points }: { kind: 'bar' | 'pie'; points: Cha
         </svg>
         <ul className="reports-chart-legend">
           {slices.map((slice) => (
-            <li key={slice.label}><span className="reports-chart-swatch" style={{ background: slice.color }} />{slice.label}: {slice.value} ({slice.percent}%)</li>
+            <li key={slice.label}><span className="reports-chart-swatch" style={{ background: slice.color }} />{operationalStatusLabel(slice.label)}: {slice.value} ({slice.percent}%)</li>
           ))}
         </ul>
       </div>
@@ -32,7 +33,7 @@ export function ReportChart({ kind, points }: { kind: 'bar' | 'pie'; points: Cha
         {bars.map((bar) => (
           <g key={bar.label}>
             <rect x={bar.x} y={bar.y} width={bar.width} height={bar.height} fill={bar.color} />
-            <text x={bar.x + bar.width / 2} y={232} textAnchor="middle" fontSize="11">{bar.label}</text>
+            <text x={bar.x + bar.width / 2} y={232} textAnchor="middle" fontSize="11">{operationalStatusLabel(bar.label)}</text>
             <text x={bar.x + bar.width / 2} y={Math.max(bar.y - 4, 12)} textAnchor="middle" fontSize="11">{bar.value}</text>
           </g>
         ))}

@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
+import { Icon } from '../../components/Icon';
+import { StatusRibbon, statusLabel } from '../../components/StatusRibbon';
+import { operationalStatusLabel } from '../../lib/operationalFormat';
 import { useI18n } from '../../i18n';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
 import { fetchDashboard } from '../dashboard/api';
@@ -79,13 +82,13 @@ export function ReportsApp() {
       <main className="reports-shell reports-studio">
         <header className="reports-header">
           <div>
-            <h2><span className="reports-logo-mark">▦</span> InfoMatt360 <small>{t('reports.moduleSubtitle')}</small></h2>
+            <h2>{t('reports.title')}</h2>
             <p>{t('reports.description')}</p>
           </div>
           <div className="reports-actions">
-            <a href="/reports/indicators">{t('reports.indicatorConfig')}</a>
-            <a href="/reports/catalog">{t('reports.myReportsLink')}</a>
-            {canEdit && !editing ? <button className="secondary" onClick={startEditing}>{t('reports.customize')}</button> : null}
+            <a href="/reports/catalog" className="primary"><Icon name="report" />{t('reports.myReportsLink')}</a>
+            <a href="/reports/indicators"><Icon name="metric" />{t('reports.indicatorConfig')}</a>
+            {canEdit && !editing ? <button type="button" onClick={startEditing}><Icon name="dash" />{t('reports.customize')}</button> : null}
           </div>
         </header>
         {message ? <p role="status">{message}</p> : null}
@@ -105,18 +108,13 @@ export function ReportsApp() {
               {([['operativo', t('reports.tabOperational')], ['indicadores', t('reports.tabIndicators')], ['analitico', t('reports.tabAnalytic')], ['donantes', t('reports.tabDonors')], ['geografico', t('reports.tabGeographic')]] as const).map(([key, label]) => <button type="button" key={key} className={tab === key ? 'active' : ''} onClick={() => setTab(key as typeof tab)}>{label}</button>)}
             </nav>
             {tab === 'operativo' && <>
-              <section className="reports-overview" aria-label={t('reports.operationalSummary')}>
-                <article><strong>{board.summary.records_total.toLocaleString()}</strong><span>{t('reports.formsSent')}</span><small>{t('reports.projectRecords')}</small></article>
-                <article><strong>{(board.summary.records_by_status.pending ?? board.summary.records_by_status.submitted ?? 0).toLocaleString()}</strong><span>{t('reports.pendingReview')}</span><small>{t('reports.byRecordStatus')}</small></article>
-                <article><strong>{board.summary.records_total ? `${Math.round(((board.summary.records_by_status.approved ?? 0) / board.summary.records_total) * 100)}%` : '0%'}</strong><span>{t('reports.approved')}</span><small>{t('reports.ofTotalRecords')}</small></article>
-                <article><strong>{board.summary.templates.length.toLocaleString()}</strong><span>{t('reports.forms')}</span><small>{t('reports.inThisProject')}</small></article>
-              </section>
-              <div className="reports-operational-grid"><section className="reports-board">{board.widgets.map((widget, index) => <ReportWidgetView key={index} widget={widget} resolved={board.resolved[index]} summary={board.summary.templates} />)}</section><aside className="reports-recent"><h3>{t('reports.latestSubmissions')}</h3>{activity?.recent_records.length ? <table><thead><tr><th>{t('reports.formHeader')}</th><th>{t('reports.formStatusHeader')}</th></tr></thead><tbody>{activity.recent_records.slice(0, 6).map((record) => <tr key={record.id}><td><a href={`/records/${record.template_id}`}>{record.template_name}</a><small>{new Date(record.created_at).toLocaleString()}</small></td><td><span>{record.status}</span></td></tr>)}</tbody></table> : <p>{t('reports.noRecentSubmissions')}</p>}</aside></div>
+              <StatusRibbon total={board.summary.records_total} byStatus={board.summary.records_by_status} />
+              <div className="reports-operational-grid"><section className="reports-board">{board.widgets.map((widget, index) => <ReportWidgetView key={index} widget={widget} resolved={board.resolved[index]} summary={board.summary.templates} />)}</section><aside className="reports-recent"><h3>{t('reports.latestSubmissions')}</h3>{activity?.recent_records.length ? <ol>{activity.recent_records.slice(0, 8).map((record) => <li key={record.id}><span><a href={`/records/${record.template_id}`}>{record.template_name}</a><small>{new Date(record.created_at).toLocaleString()}</small></span><em className={`record-status status-${record.status}`}>{statusLabel(t, record.status)}</em></li>)}</ol> : <p>{t('reports.noRecentSubmissions')}</p>}</aside></div>
             </>}
             {(tab === 'indicadores' || tab === 'analitico') && <section className="reports-board">{board.widgets.map((widget, index) => ({ widget, resolved: board.resolved[index], index })).filter(({ widget }) => tab === 'indicadores' ? widget.type === 'kpi' : widget.type === 'chart' || widget.type === 'table').map(({ widget, resolved, index }) => <ReportWidgetView key={index} widget={widget} resolved={resolved} summary={board.summary.templates} />)}{!board.widgets.some((widget) => tab === 'indicadores' ? widget.type === 'kpi' : widget.type === 'chart' || widget.type === 'table') && <p>{t('reports.addBlocksHint')}</p>}</section>}
             {tab === 'donantes' && <section className="reports-empty"><h3>{t('reports.donors')}</h3><p>{t('reports.donorsDescription')}</p>{canEdit && <button type="button" onClick={startEditing}>{t('reports.addIndicator')}</button>}</section>}
             {tab === 'geografico' && <section className="reports-empty"><h3>{t('reports.geographicView')}</h3><p>{t('reports.geographicDescription')}</p><a href="/maps">{t('reports.openMaps')}</a></section>}
-            <footer className="reports-export"><button type="button" onClick={() => void exportXlsx()}>{t('reports.exportExcel')}</button><button type="button" onClick={exportCsv}>{t('reports.exportCsv')}</button><button type="button" onClick={() => window.print()}>{t('reports.exportPdf')}</button></footer>
+            <footer className="reports-export"><span>{t('reports.exportLabel')}</span><button type="button" onClick={() => void exportXlsx()}>{t('reports.exportExcel')}</button><button type="button" onClick={exportCsv}>{t('reports.exportCsv')}</button><button type="button" onClick={() => window.print()}>{t('reports.exportPdf')}</button></footer>
             <SavedExportsPanel projectId={projectId} templates={board.summary.templates} />
           </>
         ) : null}
@@ -181,17 +179,24 @@ function ReportRow({ template }: { template: ReportTemplateMetric }) {
   return (
     <tr>
       <td><strong>{template.template_name}</strong><small>{t('reports.percentOfTotal', { percent: template.percent_of_total.toLocaleString() })}</small></td>
-      <td>{template.template_status}</td>
+      <td><em className={`record-status template-${template.template_status}`}>{operationalStatusLabel(template.template_status)}</em></td>
       <td>{template.records_total.toLocaleString()}</td>
-      <td>{statusSummary(template.records_by_status, t)}</td>
+      <td><Distribution values={template.records_by_status} total={template.records_total} /></td>
       <td>{template.last_record_at ? new Date(template.last_record_at).toLocaleString() : t('reports.noRecords')}</td>
       <td><a href={`/records/${template.template_id}`}>{t('reports.open')}</a></td>
     </tr>
   );
 }
 
-function statusSummary(values: Record<string, number>, t: (key: string) => string): string {
-  const entries = Object.entries(values);
-  if (!entries.length) return t('reports.noRecords');
-  return entries.map(([status, count]) => `${status}: ${count}`).join(' · ');
+/** Barra pequeña con el reparto de estados del formulario y su texto. */
+function Distribution({ values, total }: { values: Record<string, number>; total: number }) {
+  const { t } = useI18n();
+  const entries = Object.entries(values).filter(([, count]) => count > 0);
+  if (!entries.length || !total) return <span className="report-distribution-label">{t('reports.noRecords')}</span>;
+  return (
+    <>
+      <span className="report-distribution" aria-hidden="true">{entries.map(([status, count]) => <span key={status} className={`status-${status}`} style={{ flexGrow: count }} />)}</span>
+      <span className="report-distribution-label">{entries.map(([status, count]) => `${statusLabel(t, status)}: ${count}`).join(' · ')}</span>
+    </>
+  );
 }

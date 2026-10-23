@@ -58,3 +58,24 @@ export function fetchRoutes(projectId: string, day: string, userId?: string) {
   if (userId) params.set('user_id', userId);
   return request<RouteSummary[]>(`/project/${projectId}/routes?${params}`);
 }
+
+export type RouteDay = { day: string; user_count: number; point_count: number; visit_count: number };
+export type Visit = {
+  record_id: string; template_id: string; template_name: string;
+  participant_id: string | null; participant_name: string | null; participant_document: string | null;
+  user_id: string | null; user_name: string | null; status: string; created_at: string;
+  latitude: number | null; longitude: number | null;
+};
+
+/** Días con recorrido o con formularios capturados, el más reciente primero (docs/150). */
+export const fetchRouteDays = (projectId: string) =>
+  request<RouteDay[]>(`/project/${projectId}/route-days?tz_offset_minutes=${new Date().getTimezoneOffset()}`);
+
+/** Formularios capturados ese día, con el participante y el punto GPS. */
+export function fetchVisits(projectId: string, day: string, userId?: string) {
+  const start = new Date(`${day}T00:00:00`);
+  const end = new Date(start); end.setDate(end.getDate() + 1);
+  const params = new URLSearchParams({ date_from: start.toISOString(), date_to: end.toISOString() });
+  if (userId) params.set('user_id', userId);
+  return request<Visit[]>(`/project/${projectId}/visits?${params}`);
+}

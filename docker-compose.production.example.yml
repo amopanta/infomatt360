@@ -85,6 +85,8 @@ services:
       API_RATE_LIMIT_BACKEND: redis
       AUTH_THROTTLE_BACKEND: redis
       AUTO_CREATE_TABLES: "false"
+      RUNTIME_CONFIG_DIR: /app/config
+      RUNTIME_CONFIG_WATCH: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -94,6 +96,8 @@ services:
         condition: service_started
     volumes:
       - uploads_data:/var/lib/infomatt360/uploads
+      # Configuración del asistente de instalación (base externa y correo, docs/151).
+      - config_data:/app/config
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=5)"]
       interval: 30s
@@ -114,11 +118,14 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://infomatt360:${POSTGRES_PASSWORD}@postgres:5432/infomatt360
       AUTO_CREATE_TABLES: "false"
+      RUNTIME_CONFIG_DIR: /app/config
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - uploads_data:/var/lib/infomatt360/uploads
+      # Configuración del asistente de instalación (base externa y correo, docs/151).
+      - config_data:/app/config
     command: ["python", "-m", "alembic", "upgrade", "head"]
 
   backend-2:
@@ -134,6 +141,8 @@ services:
       API_RATE_LIMIT_BACKEND: redis
       AUTH_THROTTLE_BACKEND: redis
       AUTO_CREATE_TABLES: "false"
+      RUNTIME_CONFIG_DIR: /app/config
+      RUNTIME_CONFIG_WATCH: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -143,6 +152,8 @@ services:
         condition: service_started
     volumes:
       - uploads_data:/var/lib/infomatt360/uploads
+      # Configuración del asistente de instalación (base externa y correo, docs/151).
+      - config_data:/app/config
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health/ready', timeout=5)"]
       interval: 30s
@@ -188,6 +199,8 @@ services:
       API_RATE_LIMIT_BACKEND: redis
       AUTH_THROTTLE_BACKEND: redis
       AUTO_CREATE_TABLES: "false"
+      RUNTIME_CONFIG_DIR: /app/config
+      RUNTIME_CONFIG_WATCH: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -197,6 +210,8 @@ services:
         condition: service_started
     volumes:
       - uploads_data:/var/lib/infomatt360/uploads
+      # Configuración del asistente de instalación (base externa y correo, docs/151).
+      - config_data:/app/config
     command: ["python", "-m", "app.cli.process_bulk_jobs", "--limit", "50", "--loop", "--sleep-seconds", "5", "--worker-id", "worker-bulk-01"]
 
   worker-scheduler:
@@ -215,6 +230,8 @@ services:
       API_RATE_LIMIT_BACKEND: redis
       AUTH_THROTTLE_BACKEND: redis
       AUTO_CREATE_TABLES: "false"
+      RUNTIME_CONFIG_DIR: /app/config
+      RUNTIME_CONFIG_WATCH: "true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -224,6 +241,8 @@ services:
         condition: service_started
     volumes:
       - uploads_data:/var/lib/infomatt360/uploads
+      # Configuración del asistente de instalación (base externa y correo, docs/151).
+      - config_data:/app/config
     command: ["python", "-m", "app.cli.run_scheduled_tasks", "--limit", "50", "--loop", "--sleep-seconds", "60"]
 
   frontend:
@@ -278,6 +297,7 @@ volumes:
   postgres_data:
   redis_data:
   uploads_data:
+  config_data:
   prometheus_data:
   grafana_data:
 

@@ -86,14 +86,18 @@ echo "Servidor de la aplicación y web respondiendo."
 
 say "6/6 Listo"
 domain_line=$(grep '^FRONTEND_URL=' "$ENV_FILE" | cut -d= -f2-)
+# Código para abrir el asistente (docs/151): solo lo ve quien tiene acceso al servidor.
+install_code=$(compose exec -T backend-1 python -m app.cli.install_code 2>/dev/null | sed -n 's/^Código de instalación: //p')
 cat <<EOF
 La web escucha en 127.0.0.1:18080. Publícala con HTTPS en ${domain_line}
 (por ejemplo con Caddy: "${domain_line#https://} { reverse_proxy 127.0.0.1:18080 }").
 
 Termina la instalación en el navegador, como en Moodle:
   ${domain_line}/install
-El asistente verifica requisitos y versión de la base, y crea la organización,
-el administrador, el primer proyecto, el correo, el almacenamiento y las copias.
+  Código de instalación: ${install_code:-(ver con: docker compose -f $COMPOSE_FILE --env-file $ENV_FILE exec backend-1 python -m app.cli.install_code)}
+El asistente pide ese código y luego: requisitos, base de datos (la incluida o
+una PostgreSQL externa), organización y proyecto, administrador, correo con
+envío de prueba, almacenamiento y copias de seguridad.
 
 Monitoreo (Prometheus/Grafana) es opcional: ver docs/61, paso 7.
 EOF

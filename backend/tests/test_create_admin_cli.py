@@ -11,6 +11,18 @@ from app.models.identity import Role, User
 from test_form_assignments_reopening import auth, setup_client
 
 
+def test_new_account_needs_document():
+    engine, sessions = setup_client()
+    try:
+        with sessions() as db:
+            import pytest
+            with pytest.raises(ValueError):
+                create_or_recover(db, "sin-doc@ejemplo.com", "Sin Documento", None, "Nueva12345x", None)
+    finally:
+        app.dependency_overrides.clear()
+        Base.metadata.drop_all(bind=engine)
+
+
 def test_password_rules():
     assert password_problem("corta1") is not None
     assert password_problem("sololetrasaqui") is not None
@@ -21,7 +33,7 @@ def test_creates_admin_that_can_log_in_and_recovers_existing_account():
     engine, sessions = setup_client()
     try:
         with sessions() as db:
-            result = create_or_recover(db, "Responsable@Ejemplo.com", "Persona Responsable", "123", "Nueva12345x", None)
+            result = create_or_recover(db, "Responsable@Ejemplo.com", "Persona Responsable", "1012345678", "Nueva12345x", None)
             assert result["created"] is True and result["projects"]
         with sessions() as db:
             user = db.query(User).filter(User.email == "responsable@ejemplo.com").one()

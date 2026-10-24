@@ -12,6 +12,8 @@ import json
 import time
 from uuid import uuid4
 
+from app.core import runtime_config
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.services.runtime_record_service import runtime_record_service
 
@@ -37,6 +39,9 @@ def main() -> int:
     parser.add_argument("--loop", action="store_true", help="Ejecuta ciclos continuos.")
     parser.add_argument("--sleep-seconds", type=float, default=5.0, help="Pausa entre ciclos en modo loop.")
     args = parser.parse_args()
+    if settings.runtime_config_watch:
+        # Reinicia junto con los servidores si el asistente cambia la base (docs/151).
+        runtime_config.watch_for_changes(settings.runtime_config_dir)
     worker_id = args.worker_id or f"bulk-worker-{uuid4()}"
 
     while True:

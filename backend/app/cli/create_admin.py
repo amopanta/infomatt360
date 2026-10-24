@@ -12,7 +12,7 @@ queda en la auditoría.
 
 Uso en producción (desde /opt/infomatt360):
     docker compose -f docker-compose.production.example.yml --env-file .env.production \\
-        exec backend-1 python -m app.cli.create_admin --email persona@ejemplo.com --name "Nombre Apellido"
+        exec backend-1 python -m app.cli.create_admin --email persona@ejemplo.com --name "Nombre Apellido" --document 1234567890
 """
 
 from __future__ import annotations
@@ -63,11 +63,13 @@ def create_or_recover(db: Session, email: str, full_name: str, document_id: str 
         projects_query = projects_query.filter(Project.id.in_(project_ids))
     projects = projects_query.all()
     if not projects:
-        raise SystemExit("No hay proyectos activos con esos identificadores.")
+        raise ValueError("No hay proyectos activos con esos identificadores.")
     role = admin_role(db)
     user = db.query(User).filter(User.email == email).first()
     created = user is None
     if user is None:
+        if not document_id or len(document_id.strip()) < 5:
+            raise ValueError("Para una cuenta nueva indica el número de documento (al menos 5 caracteres).")
         user = User(email=email, full_name=full_name, document_id=document_id, status="active")
         db.add(user)
     elif full_name:
@@ -94,7 +96,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Crea o recupera una cuenta de administrador.")
     parser.add_argument("--email", required=True)
     parser.add_argument("--name", default="", help="Nombre completo (obligatorio si la cuenta es nueva)")
-    parser.add_argument("--document", default=None, help="Número de documento (opcional)")
+    parser.add_argument("--document", default=None, help="Número de documento (obligatorio si la cuenta es nueva)")
     parser.add_argument("--project", action="append", help="Id de proyecto; se puede repetir. Por defecto, todos los activos.")
     args = parser.parse_args(argv)
 
@@ -102,6 +104,8 @@ def main(argv: list[str] | None = None) -> None:
         exists = db.query(User).filter(User.email == args.email.strip().lower()).first() is not None
     if not exists and len(args.name.strip()) < 3:
         sys.exit("Para una cuenta nueva indica el nombre completo con --name.")
+    if not exists and len((args.document or "").strip()) < 5:
+        sys.exit("Para una cuenta nueva indica el número de documento con --document.")
 
     password = getpass.getpass("Contraseña nueva (no se muestra): ")
     problem = password_problem(password)
@@ -111,7 +115,10 @@ def main(argv: list[str] | None = None) -> None:
         sys.exit("Las contraseñas no coinciden. No se cambió nada.")
 
     with SessionLocal() as db:
-        result = create_or_recover(db, args.email, args.name.strip(), args.document, password, args.project)
+        try:
+            result = create_or_recover(db, args.email, args.name.strip(), args.document, password, args.project)
+        except ValueError as exc:
+            sys.exit(str(exc))
     action = "Cuenta creada" if result["created"] else "Cuenta recuperada (contraseña nueva y activa)"
     print(f"{action}: {result['email']}")
     print("Administrador en: " + ", ".join(result["projects"]))

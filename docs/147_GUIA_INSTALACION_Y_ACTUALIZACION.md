@@ -186,19 +186,30 @@ tablets conservan su cola y lo reenvían. Tarda de 10 a 15 minutos.
 ## Recuperar acceso de administrador
 
 Si el sistema ya está instalado y nadie puede entrar (no hay cuenta, o el
-correo para recuperar la contraseña no está configurado), en el servidor:
+correo para recuperar la contraseña no está configurado), hay dos formas.
+
+**Desde la web (recomendado, docs/151).**
+1. En el servidor, obtén un código de recuperación. Vence a los 30 minutos y
+   sirve una vez:
+
+   ```bash
+   cd /opt/infomatt360
+   docker compose -f docker-compose.production.example.yml --env-file .env.production exec backend-1 python -m app.cli.install_code
+   ```
+
+2. Abre `https://<tu dominio>/install`.
+3. Pulsa «Recuperar acceso de administrador».
+4. Escribe el código, el correo, el nombre y el documento (estos dos solo si
+   la cuenta es nueva) y la contraseña.
+
+**Solo por consola.** El comando pide la contraseña sin mostrarla:
 
 ```bash
-cd /opt/infomatt360
-docker compose -f docker-compose.production.example.yml --env-file .env.production \
-  exec backend-1 python -m app.cli.create_admin --email persona@ejemplo.com --name "Nombre Apellido"
+docker compose -f docker-compose.production.example.yml --env-file .env.production   exec backend-1 python -m app.cli.create_admin --email persona@ejemplo.com --name "Nombre Apellido" --document 1234567890
 ```
 
-- Pide la contraseña dos veces, sin mostrarla. Debe tener al menos 10
-  caracteres, con letras y números.
-- **Correo nuevo:** crea la cuenta.
-- **Correo existente:** le pone la contraseña nueva y la reactiva.
-- La cuenta queda como «Administrador» de todos los proyectos activos. Con
-  `--project <id>` (se puede repetir) se limita a esos proyectos.
-- Cada uso queda en la auditoría (`admin_created_cli` /
-  `admin_recovered_cli`).
+En los dos casos:
+- **Correo nuevo:** se crea la cuenta (pide nombre y documento).
+- **Correo existente:** se le pone la contraseña nueva y se reactiva.
+- La cuenta queda como «Administrador» de todos los proyectos activos.
+- Cada uso queda en la auditoría.

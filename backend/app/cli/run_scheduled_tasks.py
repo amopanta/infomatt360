@@ -14,6 +14,8 @@ import argparse
 import json
 import time
 
+from app.core import runtime_config
+from app.core.config import settings
 from app.db.session import SessionLocal
 from app.services.scheduler_service import scheduler_service
 
@@ -29,6 +31,9 @@ def main() -> int:
     parser.add_argument("--loop", action="store_true", help="Ejecuta ciclos continuos.")
     parser.add_argument("--sleep-seconds", type=float, default=60.0, help="Pausa entre ciclos en modo loop. Default: 60.")
     args = parser.parse_args()
+    if settings.runtime_config_watch:
+        # Reinicia junto con los servidores si el asistente cambia la base (docs/151).
+        runtime_config.watch_for_changes(settings.runtime_config_dir)
 
     while True:
         result = run_once(args.limit)

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { BuilderPaletteItem } from './types';
-import { FIELD_CATALOG } from './fieldCatalog';
+import { FIELD_CATALOG, fieldLineIcon } from './fieldCatalog';
+import { Icon } from '../../components/Icon';
 import { useI18n } from '../../i18n';
 
 const BASIC = FIELD_CATALOG.filter((item) => item.basic);
@@ -22,7 +23,7 @@ export function BuilderPalette({ onAddField }: { onAddField?: (item: BuilderPale
   function renderItem(item: BuilderPaletteItem) {
     return (
       <button key={item.type} type="button" className="builder-palette-item" data-field-type={item.type} onClick={() => onAddField?.(item)}>
-        <span className="builder-palette-icon" aria-hidden="true">{item.icon}</span>
+        <span className="builder-palette-icon" aria-hidden="true"><Icon name={fieldLineIcon(item.type)} /></span>
         <span className="builder-palette-text">
           <strong>{item.label}</strong>
           <span>{item.description}</span>

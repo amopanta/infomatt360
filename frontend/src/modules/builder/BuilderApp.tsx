@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AppShell } from '../../components/AppShell';
+import { Icon } from '../../components/Icon';
 import { PROJECT_KEY, hasAnyCurrentProjectPermission } from '../auth/session';
 import { BuilderCanvas } from './BuilderCanvas';
 import { BuilderPalette } from './BuilderPalette';
@@ -418,11 +419,11 @@ export function BuilderApp() {
           <h2 id="builder-start-title">{t('ux.builder.startTitle')}</h2>
           <p>{t('ux.builder.startText')}</p>
           <div className="builder-start-grid">
-            <button type="button" onClick={() => setStartChosen(true)}><span aria-hidden="true">📄</span><strong>{t('ux.builder.startBlank')}</strong><small>{t('ux.builder.startBlankText')}</small></button>
-            <button type="button" onClick={() => { setStartChosen(true); void createMvpTemplate(); }}><span aria-hidden="true">🧾</span><strong>{t('ux.builder.startTemplate')}</strong><small>{t('ux.builder.startTemplateText')}</small></button>
-            <button type="button" onClick={() => { setStartChosen(true); setOpenAssist('pdf'); }}><span aria-hidden="true">📑</span><strong>{t('ux.builder.startPdf')}</strong><small>{t('ux.builder.startPdfText')}</small></button>
-            <button type="button" onClick={() => { setStartChosen(true); setOpenAssist('ai'); }}><span aria-hidden="true">✨</span><strong>{t('ux.builder.startAi')}</strong><small>{t('ux.builder.startAiText')}</small></button>
-            {hasAnyCurrentProjectPermission(['builder.write']) && <a href="/admin/xlsform"><span aria-hidden="true">📊</span><strong>{t('ux.builder.startXls')}</strong><small>{t('ux.builder.startXlsText')}</small></a>}
+            <button type="button" onClick={() => setStartChosen(true)}><span className="builder-start-icon" aria-hidden="true"><Icon name="file" /></span><strong>{t('ux.builder.startBlank')}</strong><small>{t('ux.builder.startBlankText')}</small></button>
+            <button type="button" onClick={() => { setStartChosen(true); void createMvpTemplate(); }}><span className="builder-start-icon" aria-hidden="true"><Icon name="users" /></span><strong>{t('ux.builder.startTemplate')}</strong><small>{t('ux.builder.startTemplateText')}</small></button>
+            <button type="button" onClick={() => { setStartChosen(true); setOpenAssist('pdf'); }}><span className="builder-start-icon" aria-hidden="true"><Icon name="filePdf" /></span><strong>{t('ux.builder.startPdf')}</strong><small>{t('ux.builder.startPdfText')}</small></button>
+            <button type="button" onClick={() => { setStartChosen(true); setOpenAssist('ai'); }}><span className="builder-start-icon" aria-hidden="true"><Icon name="sparkle" /></span><strong>{t('ux.builder.startAi')}</strong><small>{t('ux.builder.startAiText')}</small></button>
+            {hasAnyCurrentProjectPermission(['builder.write']) && <a href="/admin/xlsform"><span className="builder-start-icon" aria-hidden="true"><Icon name="sheet" /></span><strong>{t('ux.builder.startXls')}</strong><small>{t('ux.builder.startXlsText')}</small></a>}
           </div>
         </section>
       )}

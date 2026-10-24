@@ -2851,7 +2851,7 @@
     "loadingForm": "Cargando formulario...",
     "invalidUrl": "Debe abrir una URL con formato /runtime/{template_id}.",
     "previewMode": "Vista previa: puedes probar las preguntas; aquí no se guarda ninguna respuesta.",
-    "draftActive": "Borrador local activo.",
+    "draftActive": "Tus respuestas se guardan en este equipo mientras llenas el formulario.",
     "enterKeyAndName": "Ingresa la llave y el nombre del participante.",
     "participantRegistered": "Participante registrado y asignado a tu usuario.",
     "registerFailed": "No fue posible registrar el participante.",

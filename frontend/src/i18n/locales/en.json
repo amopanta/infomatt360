@@ -2851,7 +2851,7 @@
     "loadingForm": "Loading form...",
     "invalidUrl": "Open a URL with the format /runtime/{template_id}.",
     "previewMode": "Preview: you can test the questions; no responses are saved here.",
-    "draftActive": "Local draft active.",
+    "draftActive": "Your answers are saved on this device while you fill in the form.",
     "enterKeyAndName": "Enter the key and the participant's name.",
     "participantRegistered": "Participant registered and assigned to your user.",
     "registerFailed": "Could not register the participant.",

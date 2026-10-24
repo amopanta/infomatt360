@@ -300,3 +300,17 @@ apuntan al VPS, así que el certificado que ve el visitante es el del VPS. El
 - **Verificación desde fuera:** los dos dominios responden 200, y la hoja de
   estilos servida trae la ficha del participante y los iconos del
   constructor.
+
+### Paso 12 — Comando para crear o recuperar un administrador (2026-10-23)
+
+- El responsable no tenía cuenta en producción. Desde aquí no se podía
+  entrar:
+  - el asistente responde 409 porque el sistema ya está instalado;
+  - la recuperación por correo no funciona sin SMTP;
+  - el asistente no crea cuentas ni maneja contraseñas.
+- PR #57 unido (versión `6ead4ee`), desplegado con copia previa en
+  `backups/upgrade-20261023-213702`. Se comprobó que el comando existe en
+  `backend-1`.
+- **Uso:** el responsable lo ejecuta desde su sesión SSH y escribe la
+  contraseña él mismo (no se muestra). Ver docs/147, sección «Recuperar
+  acceso de administrador».

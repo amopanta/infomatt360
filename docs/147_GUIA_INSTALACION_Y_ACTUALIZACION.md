@@ -182,3 +182,23 @@ tablets conservan su cola y lo reenvían. Tarda de 10 a 15 minutos.
 - El proxy HTTPS y el dominio se configuran fuera de InfoMatt360.
 - La app móvil instalable (EAS) y el instalador del escritorio se publican
   aparte; no forman parte de esta actualización del servidor.
+
+## Recuperar acceso de administrador
+
+Si el sistema ya está instalado y nadie puede entrar (no hay cuenta, o el
+correo para recuperar la contraseña no está configurado), en el servidor:
+
+```bash
+cd /opt/infomatt360
+docker compose -f docker-compose.production.example.yml --env-file .env.production \
+  exec backend-1 python -m app.cli.create_admin --email persona@ejemplo.com --name "Nombre Apellido"
+```
+
+- Pide la contraseña dos veces, sin mostrarla. Debe tener al menos 10
+  caracteres, con letras y números.
+- **Correo nuevo:** crea la cuenta.
+- **Correo existente:** le pone la contraseña nueva y la reactiva.
+- La cuenta queda como «Administrador» de todos los proyectos activos. Con
+  `--project <id>` (se puede repetir) se limita a esos proyectos.
+- Cada uso queda en la auditoría (`admin_created_cli` /
+  `admin_recovered_cli`).

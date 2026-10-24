@@ -28,6 +28,11 @@ class InstallMailSetup(BaseModel):
     sender_email: EmailStr
     server_host: str | None = None
     server_port: str | None = None
+    # Usuario y contraseña del SMTP (docs/151): se guardan en la configuración
+    # del asistente, no en la base de datos.
+    username: str | None = Field(default=None, max_length=255)
+    password: str | None = Field(default=None, max_length=256)
+    use_tls: bool = True
 
 
 class InstallStorageSetup(BaseModel):
@@ -60,6 +65,60 @@ class InstallBootstrapRequest(BaseModel):
     mail: InstallMailSetup | None = None
     storage: InstallStorageSetup | None = None
     backup: InstallBackupSetup | None = None
+
+
+class InstallCodeRequest(BaseModel):
+    code: str = Field(..., min_length=4, max_length=40)
+
+
+class InstallCodeResponse(BaseModel):
+    valid: bool
+    kind: str  # "setup" (sin instalar) | "recovery" (ya instalado)
+
+
+class InstallDatabaseRequest(BaseModel):
+    """Base externa PostgreSQL. «bundled» vuelve a la base incluida."""
+
+    mode: str = Field(default="external", pattern="^(bundled|external)$")
+    host: str = Field(default="", max_length=255)
+    port: int = Field(default=5432, ge=1, le=65535)
+    name: str = Field(default="", max_length=120)
+    username: str = Field(default="", max_length=120)
+    password: str = Field(default="", max_length=256)
+    sslmode: str | None = Field(default=None, pattern="^(disable|prefer|require|verify-full)$")
+
+
+class InstallDatabaseResponse(BaseModel):
+    mode: str
+    server_version: str | None = None
+    empty: bool | None = None
+    current_revision: str | None = None
+    usable: bool = True
+    foreign_tables: list[str] = []
+    restarting: bool = False
+
+
+class InstallMailRequest(BaseModel):
+    host: str = Field(..., min_length=3, max_length=255)
+    port: int = Field(default=587, ge=1, le=65535)
+    username: str = Field(default="", max_length=255)
+    password: str = Field(default="", max_length=256)
+    use_tls: bool = True
+    sender_email: EmailStr
+    test_recipient: EmailStr | None = None
+
+
+class InstallRecoverAdminRequest(BaseModel):
+    email: EmailStr
+    full_name: str = Field(default="", max_length=180)
+    document_id: str = Field(default="", max_length=50)
+    password: str = Field(..., min_length=10, max_length=128)
+
+
+class InstallRecoverAdminResponse(BaseModel):
+    created: bool
+    email: str
+    projects: list[str]
 
 
 class InstallBootstrapResponse(BaseModel):

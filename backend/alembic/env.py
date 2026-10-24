@@ -22,9 +22,14 @@ from app.models import device_verification  # noqa: F401
 from app.models import device_status  # noqa: F401
 
 config = context.config
-config.set_main_option("sqlalchemy.url", settings.database_url)
+# El asistente de instalación migra una base externa antes de pasarse a ella
+# (install_setup_service.apply_database, docs/151): llega por attributes.
+database_url = config.attributes.get("database_url") or settings.database_url
+# configparser interpreta «%»; las contraseñas codificadas en la URL lo traen.
+config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
-if config.config_file_name is not None:
+# Desde el asistente no se reconfigura el logging del servidor que ya corre.
+if config.config_file_name is not None and "database_url" not in config.attributes:
     fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
@@ -33,7 +38,7 @@ target_metadata = Base.metadata
 def run_migrations_offline() -> None:
     """Ejecuta migraciones sin conexion activa."""
     context.configure(
-        url=settings.database_url,
+        url=database_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},

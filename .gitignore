@@ -17,3 +17,8 @@ backups/
 release/
 .claude/
 *.tar.gz
+
+# Configuración que escribe el asistente de instalación (docs/151): contiene contraseñas.
+backend/config/
+config/runtime.json
+config/install_code.json

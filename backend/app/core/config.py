@@ -115,7 +115,18 @@ class Settings(BaseSettings):
     permissions_policy: str = "geolocation=(self), microphone=(self), camera=(self)"
     x_frame_options: str = "DENY"
 
+    # Carpeta donde el asistente guarda la base externa y el correo
+    # (runtime_config.py, docs/151). En Docker es el volumen /app/config.
+    runtime_config_dir: str = "./config"
+    # Reinicia el proceso si esa configuración cambia (solo en Docker, donde
+    # el contenedor se vuelve a levantar solo).
+    runtime_config_watch: bool = False
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8-sig", extra="ignore")
 
 
 settings = Settings()
+
+from app.core import runtime_config  # noqa: E402  (debe ir después de crear settings)
+
+runtime_config.apply(settings)

@@ -9,6 +9,7 @@ from app.db.base import Base
 from app.db.session import get_db
 from app.main import app
 from app.models.identity import Role
+from app.services import install_code_service
 
 
 def setup_client():
@@ -74,7 +75,8 @@ def test_bootstrap_rejected_when_installer_disabled():
         Base.metadata.drop_all(bind=engine)
 
 
-def test_bootstrap_creates_admin_stack_and_is_idempotent_when_enforced():
+def test_bootstrap_creates_admin_stack_and_is_idempotent_when_enforced(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "runtime_config_dir", str(tmp_path))
     engine, sessions = setup_client()
     original_enforced = settings.installer_enforced
     original_session_local = install_guard_module.SessionLocal
@@ -87,7 +89,8 @@ def test_bootstrap_creates_admin_stack_and_is_idempotent_when_enforced():
             status_before = client.get("/api/v1/install/status")
             assert status_before.json() == {"installed": False, "installer_enforced": True}
 
-            created = client.post("/api/v1/install/bootstrap", json=BOOTSTRAP_PAYLOAD)
+            code = install_code_service.generate("setup")
+            created = client.post("/api/v1/install/bootstrap", json=BOOTSTRAP_PAYLOAD, headers={"X-Install-Code": code})
             assert created.status_code == 200
             body = created.json()
             assert body["organization_id"]
@@ -119,7 +122,11 @@ def test_bootstrap_creates_admin_stack_and_is_idempotent_when_enforced():
         Base.metadata.drop_all(bind=engine)
 
 
-def test_bootstrap_creates_optional_mail_storage_and_backup_when_provided():
+def test_bootstrap_creates_optional_mail_storage_and_backup_when_provided(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "runtime_config_dir", str(tmp_path))
+    # Guardar el correo cambia la configuración en memoria; se restaura al final.
+    for key in ("smtp_host", "smtp_port", "smtp_username", "smtp_password", "smtp_use_tls", "smtp_from_email"):
+        monkeypatch.setattr(settings, key, getattr(settings, key))
     engine, sessions = setup_client()
     original_enforced = settings.installer_enforced
     original_session_local = install_guard_module.SessionLocal
@@ -136,10 +143,11 @@ def test_bootstrap_creates_optional_mail_storage_and_backup_when_provided():
                 "storage": {"max_file_size_mb": 40},
                 "backup": {"frequency": "daily"},
             }
-            created = client.post("/api/v1/install/bootstrap", json=payload)
+            created = client.post("/api/v1/install/bootstrap", json=payload, headers={"X-Install-Code": install_code_service.generate("setup")})
             assert created.status_code == 200, created.text
             body = created.json()
             assert body["mail_profile_id"]
+            assert settings.smtp_host == "smtp.fundacion-piloto.org" and (tmp_path / "runtime.json").exists()
             assert body["storage_profile_id"]
             assert body["scheduled_task_id"]
 

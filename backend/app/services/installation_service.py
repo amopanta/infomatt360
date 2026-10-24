@@ -29,7 +29,12 @@ class InstallationService:
         if not settings.installer_enforced:
             return True
         row = db.query(InstallationState).first()
-        return bool(row and row.is_installed)
+        if row and row.is_installed:
+            return True
+        # Una base con usuarios ya está en uso aunque no tenga la marca (por
+        # ejemplo, una instalación anterior al asistente). Así se puede activar
+        # el asistente sin bloquear el sistema ni permitir instalar encima.
+        return db.query(User.id).first() is not None
 
     def status(self, db: Session) -> InstallStatusResponse:
         return InstallStatusResponse(installed=self.is_installed(db), installer_enforced=settings.installer_enforced)

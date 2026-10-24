@@ -12,12 +12,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_v1_router
+from app.core import runtime_config
 from app.core.config import settings
 from app.db.init_db import init_db
+from app.middleware import install_guard
 from app.middleware.install_guard import InstallGuardMiddleware
 from app.middleware.rate_limit import ApiRateLimitMiddleware
 from app.middleware.request_context import RequestContextMiddleware
 from app.middleware.security_headers import SecurityHeadersMiddleware
+from app.services import install_code_service
+from app.services.installation_service import installation_service
 
 
 def _upload_directory_failure() -> str | None:
@@ -33,6 +37,24 @@ def _upload_directory_failure() -> str | None:
     except Exception as exc:
         return f"UPLOAD_DIRECTORY debe permitir escritura en produccion: {exc}"
     return None
+
+
+def prepare_installer() -> None:
+    """Asistente de instalación (docs/151): sin instalar, deja el código en el
+    registro; en Docker, vigila la configuración que escribe el asistente para
+    reiniciar con la base o el correo nuevos."""
+    if settings.runtime_config_watch:
+        runtime_config.watch_for_changes(settings.runtime_config_dir)
+    if not settings.installer_enforced:
+        return
+    try:
+        # La misma sesión que usa el guardián de instalación.
+        with install_guard.SessionLocal() as db:
+            installed = installation_service.is_installed(db)
+    except Exception:  # sin base todavía: el asistente igual necesita el código
+        installed = False
+    if not installed:
+        install_code_service.ensure_setup_code()
 
 
 def validate_startup_settings() -> None:
@@ -93,6 +115,7 @@ def create_app() -> FastAPI:
         """Inicializa tablas de desarrollo durante el ciclo de vida moderno."""
         if settings.auto_create_tables:
             init_db()
+        prepare_installer()
         yield
 
     app = FastAPI(
@@ -109,7 +132,7 @@ def create_app() -> FastAPI:
         allow_origins=allowed_origins,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-API-Key", settings.request_id_header],
+        allow_headers=["Authorization", "Content-Type", "X-API-Key", "X-Install-Code", settings.request_id_header],
         expose_headers=[settings.request_id_header],
     )
     app.add_middleware(ApiRateLimitMiddleware)

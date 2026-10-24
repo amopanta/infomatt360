@@ -289,3 +289,14 @@ apuntan al VPS, así que el certificado que ve el visitante es el del VPS. El
 - **Verificación desde fuera:** los dos dominios responden 200, y la hoja de
   estilos servida trae el menú de celular, el encabezado de Registros y la
   página del Planeador.
+
+### Paso 11 — Tercera tanda del rediseño (2026-10-23)
+
+- PR #56 unido a `main` (versión `6d68275`): captura y constructor de
+  formularios (docs/150, sección 7).
+- Se ejecutó `./scripts/infomatt360-upgrade.sh`, con copia previa en
+  `backups/upgrade-20261023-213035`. Sin migraciones: sigue en
+  `0086_db_sync`.
+- **Verificación desde fuera:** los dos dominios responden 200, y la hoja de
+  estilos servida trae la ficha del participante y los iconos del
+  constructor.

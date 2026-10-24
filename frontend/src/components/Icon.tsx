@@ -40,6 +40,10 @@ const ICONS: Record<string, string> = {
   tablet: '<rect x="5" y="2.5" width="14" height="19" rx="2"/><path d="M10.5 18.5h3"/><path d="M9 8.5a4 4 0 0 1 6 0M10.5 10.5a1.8 1.8 0 0 1 3 0"/>',
   chevron: '<path d="M6 9l6 6 6-6"/>',
   db: '<ellipse cx="9" cy="6" rx="6" ry="2.5"/><path d="M3 6v10c0 1.4 2.7 2.5 6 2.5"/><path d="M3 11c0 1.4 2.7 2.5 6 2.5"/><path d="M14 14h7m-3-3 3 3-3 3"/>',
+  eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z"/><circle cx="12" cy="12" r="3"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16v4Z"/><path d="m13.5 6.5 4 4"/>',
+  menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+  close: '<path d="M6 6l12 12M18 6 6 18"/>',
   route: '<circle cx="6" cy="18" r="2.2"/><circle cx="18" cy="6" r="2.2"/><path d="M8 18h7.5a3 3 0 0 0 0-6h-7a3 3 0 0 1 0-6H16"/>',
 };
 

@@ -9,7 +9,7 @@ export function formatOperationalDate(value?: string | null): string {
 
 const labels: Record<string, string> = {
   active: 'Activo', inactive: 'Inactivo', suspended: 'Suspendido', blocked: 'Bloqueado',
-  person: 'Persona', draft: 'Borrador', submitted: 'Enviado', under_review: 'En revisión',
+  person: 'Persona', household: 'Hogar', organization: 'Organización', group: 'Grupo', draft: 'Borrador', submitted: 'Enviado', under_review: 'En revisión',
   tech_approved: 'Aprobado técnico', coordinator_approved: 'Aprobado coordinación',
   returned: 'Devuelto', corrected: 'Corregido', approved: 'Aprobado', rejected: 'Rechazado',
   cancelled: 'Cancelado', archived: 'Archivado', synced: 'Sincronizado', voided: 'Anulado',

@@ -2,6 +2,7 @@ import { formatOperationalDate, operationalStatusLabel } from '../../lib/operati
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 
 import { AppShell } from '../../components/AppShell';
+import { Icon } from '../../components/Icon';
 import { useI18n } from '../../i18n';
 import { PROJECT_KEY, currentProjectPermissions, hasAnyCurrentProjectPermission } from '../auth/session';
 import { ObservationsPanel } from './ObservationsPanel';
@@ -733,6 +734,7 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
   const projectId = localStorage.getItem(PROJECT_KEY) ?? '';
   const [records, setRecords] = useState<RuntimeRecord[]>([]);
   const [templateStatus, setTemplateStatus] = useState('');
+  const [templateName, setTemplateName] = useState('');
   const [templateFields, setTemplateFields] = useState<Array<{ name: string; label: string }>>([]);
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('');
@@ -769,6 +771,7 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
       .then((template) => {
         if (!active) return;
         setTemplateStatus(template.status);
+        setTemplateName(template.name);
         const names = new Set<string>();
         setTemplateFields(flattenComponents(template)
           .filter((component) => {
@@ -903,8 +906,11 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
         ) : deepLink.recordId ? (
           <p role="status">{t('recordsView.loadingResponse')}</p>
         ) : null}
-        {!deepLink.recordId && <><div className="records-toolbar">
-          {!embedded && <a href="/records">{t('recordsView.backToForms')}</a>}
+        {!deepLink.recordId && <>{!embedded && templateName && <header className="records-detail-head">
+          <a href="/records">{t('recordsView.backToForms')}</a>
+          <h2 title={templateName}>{templateName}</h2>
+          <p>{t('recordsView.detailSummary', { total })}{templateStatus ? <em className={`record-status template-${templateStatus}`}>{operationalStatusLabel(templateStatus)}</em> : null}</p>
+        </header>}<div className="records-toolbar">
           <div className="records-toolbar-actions">
             {templateStatus === 'published' && hasAnyCurrentProjectPermission(['records.write']) && <a className="forms-primary-link" href={`/runtime/${templateId}`}>{t('recordsView.addRecord')}</a>}
             {templateStatus && templateStatus !== 'published' && <span role="status">{captureNotAvailableMessage()}</span>}
@@ -914,7 +920,7 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
               <input type="checkbox" checked={unlinkedOnly} onChange={(event) => { setUnlinkedOnly(event.target.checked); setOffset(0); }} />
               {t('recordsView.unlinkedFilter')}
             </label>
-            <button onClick={() => void exportCsv()}>{t('recordsView.exportCsv')}</button>
+            <button type="button" className="secondary" onClick={() => void exportCsv()}>{t('recordsView.exportCsv')}</button>
           </div>
         </div>
         <details className="records-clean-exports">
@@ -985,15 +991,15 @@ export function RecordTable({ templateId, embedded = false }: { templateId: stri
                   <tr>
                     <td className="records-leading-col">
                       <input type="checkbox" aria-label={t('recordsView.selectRecord', { id: record.id })} checked={selectAllMatchingFilter || selectedIds.has(record.id)} onChange={() => toggleRecordSelection(record.id)} />
-                      <button type="button" className="record-icon-action" onClick={() => void openRecord(record.id)} aria-label={t('recordsView.openRecord', { id: record.id })} title={t('recordsView.openFullResponse')}>◉</button>
-                      {hasAnyCurrentProjectPermission(['records.write']) && ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && <button type="button" className="record-icon-action" onClick={() => void openRecord(record.id, true)} aria-label={t('recordsView.editRecord', { id: record.id })} title={t('recordsView.editResponseAction')}>✎</button>}
+                      <button type="button" className="record-icon-action" onClick={() => void openRecord(record.id)} aria-label={t('recordsView.openRecord', { id: record.id })} title={t('recordsView.openFullResponse')}><Icon name="eye" /></button>
+                      {hasAnyCurrentProjectPermission(['records.write']) && ['draft', 'submitted', 'returned', 'corrected'].includes(record.status) && <button type="button" className="record-icon-action" onClick={() => void openRecord(record.id, true)} aria-label={t('recordsView.editRecord', { id: record.id })} title={t('recordsView.editResponseAction')}><Icon name="edit" /></button>}
                     </td>
                     <td title={record.participant_name || ''}>{record.participant_id ? record.participant_name || t('recordsView.nameNotAvailable') : t('recordsView.noParticipantLinked')}</td>
                     <td>{record.participant_document_id || '—'}</td>
                     <td>{record.participant_external_code || '—'}</td>
                     <td>{record.participant_municipality || '—'}</td>
                     <td>{formatOperationalDate(record.created_at)}</td>
-                    <td><span className={`record-status ${record.status}`}>{operationalStatusLabel(record.status)}</span></td>
+                    <td><span className={`record-status status-${record.status}`}>{operationalStatusLabel(record.status)}</span></td>
                     <td title={record.submitted_by ?? ''}>{record.submitted_by_name || record.submitted_by || '—'}</td>
                     {fields.map((field) => {
                       const value = formatValue(record.values.find((item) => item.field_name === field.name)?.field_value_json, true, t);

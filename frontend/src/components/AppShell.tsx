@@ -114,6 +114,9 @@ export function AppShell({ title, children }: Props) {
   const permissions = currentProjectPermissions();
   const currentPath = window.location.pathname;
   const [projectCounts, setProjectCounts] = useState<Record<string, number>>({});
+  // En celular el menú va cerrado detrás de un botón; antes ocupaba toda la
+  // pantalla antes del contenido (docs/150).
+  const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => { if (projects.length > 1) void fetchMyProjectAssignmentCounts().then(setProjectCounts).catch(() => undefined); }, [selectedProjectId]);
 
   function canSee(item: MenuItem) {
@@ -171,9 +174,14 @@ export function AppShell({ title, children }: Props) {
 
   return (
     <div className="app-shell">
-      <aside className="app-sidebar">
-        <BrandLogo />
-        <nav className="app-nav">
+      <aside className={menuOpen ? 'app-sidebar menu-open' : 'app-sidebar'}>
+        <div className="app-sidebar-top">
+          <BrandLogo />
+          <button type="button" className="app-menu-toggle" aria-expanded={menuOpen} aria-controls="app-nav" onClick={() => setMenuOpen(!menuOpen)}>
+            <Icon name={menuOpen ? 'close' : 'menu'} /><span>{menuOpen ? t('ux.nav.closeMenu') : t('ux.nav.menu')}</span>
+          </button>
+        </div>
+        <nav className="app-nav" id="app-nav">
           {visibleGroups.map((group) => {
             const hasActive = group.items.some((item) => item.formsSubmenu ? currentPath.startsWith('/builder') : isActiveMenuItem(item.href));
             return (

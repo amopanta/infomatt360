@@ -278,3 +278,14 @@ apuntan al VPS, así que el certificado que ve el visitante es el del VPS. El
   - `GET /api/v1/field-devices/project/{id}/route-days` responde 401 (existe
     y pide sesión).
 - El pendiente 7 (cerrar los PR incluidos) queda resuelto.
+
+### Paso 10 — Segunda tanda del rediseño (2026-10-23)
+
+- PR #55 unido a `main` (versión `5bda6a8`): menú en celular, Planeador,
+  detalle de Registros, Participantes y Mapas (docs/150, sección 6).
+- Se ejecutó `./scripts/infomatt360-upgrade.sh`, con copia previa en
+  `backups/upgrade-20261023-210454`. Sin migraciones: sigue en
+  `0086_db_sync`.
+- **Verificación desde fuera:** los dos dominios responden 200, y la hoja de
+  estilos servida trae el menú de celular, el encabezado de Registros y la
+  página del Planeador.

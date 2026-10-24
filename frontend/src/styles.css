@@ -1925,3 +1925,45 @@ svg.ic { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor
 
 /* Mapas */
 .maps-shell { box-sizing: border-box; max-width: 1240px; margin: 0 auto; padding: var(--space-6) var(--space-6) 48px; }
+
+/* Tercera tanda (docs/150): captura y constructor. */
+
+/* Captura: el fondo del tema del formulario llega hasta abajo y la ficha
+   del participante se acomoda al ancho. */
+.runtime-themed { min-height: calc(100vh - 60px); box-sizing: border-box; padding: var(--space-5) var(--space-4) 40px; }
+.runtime-shell { margin: 0 auto; padding: var(--space-5) var(--space-6); border-width: 1px; border-radius: var(--radius-lg); }
+.runtime-shell h1 { font-size: var(--font-size-2xl); line-height: 1.2; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.runtime-participant-picker label, .runtime-participant-picker > p { font-size: var(--font-size-base); }
+.runtime-participant-summary { border-color: var(--border); border-radius: var(--radius-md); }
+.runtime-participant-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(140px, 100%), 1fr)); gap: var(--space-3) var(--space-4); margin: 0; padding: var(--space-3) var(--space-4) var(--space-4); background: var(--surface); }
+.runtime-participant-grid dt { color: var(--text-muted); font-size: var(--font-size-xs); font-weight: 700; }
+.runtime-participant-grid dd { margin: 2px 0 0; overflow-wrap: anywhere; font-weight: 600; }
+.runtime-actions button:disabled, .runtime-page-actions button:disabled { opacity: 1; color: var(--text-muted); background: var(--surface-muted); box-shadow: none; border: 1px solid var(--border); }
+.runtime-actions p, .runtime-actions [role="status"] { color: var(--text-muted); font-size: var(--font-size-sm); font-weight: 600; }
+@media (max-width: 640px) {
+  .runtime-themed { padding: var(--space-3) var(--space-2) 32px; }
+  .runtime-shell { padding: var(--space-4); }
+  .runtime-page-actions button { flex: 1; }
+}
+
+/* Constructor: márgenes, columnas laterales más angostas y campos del
+   lienzo con espacio suficiente. */
+.builder-layout { box-sizing: border-box; padding: var(--space-4) var(--space-5) 40px; grid-template-columns: minmax(220px, 260px) minmax(0, 1fr) minmax(220px, 260px); gap: var(--space-4); font-size: var(--font-size-base); }
+.builder-field-row { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--space-2) var(--space-3); }
+.builder-field-row label { font-weight: 700; }
+.builder-field-row label:has(> input[type="checkbox"]) { flex-direction: row; align-items: center; align-self: end; gap: 8px; min-height: 36px; }
+.builder-toolbar .builder-actions { flex-shrink: 0; }
+.builder-toolbar .builder-actions button { white-space: nowrap; }
+.builder-field-card input:not([type="checkbox"]), .builder-field-card select, .builder-field-card textarea { width: 100%; box-sizing: border-box; }
+.builder-field-type { display: inline-flex; align-items: center; gap: 5px; }
+.builder-field-type svg { width: 14px; height: 14px; }
+.builder-palette-icon { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-sm); color: var(--brand-primary-strong); background: var(--brand-primary-soft); font-size: 0; }
+.builder-palette-icon svg { width: 18px; height: 18px; }
+.builder-start { margin: var(--space-5) var(--space-5) var(--space-4); }
+.builder-start-grid { grid-template-columns: repeat(auto-fit, minmax(min(200px, 100%), 1fr)); }
+.builder-start-grid .builder-start-icon { display: grid; place-items: center; width: 44px; height: 44px; border-radius: var(--radius-md); color: var(--brand-primary-strong); background: var(--brand-primary-soft); }
+.builder-start-grid .builder-start-icon svg { width: 24px; height: 24px; }
+.builder-start-grid strong { font-size: var(--font-size-lg); }
+.builder-return { margin: var(--space-4) var(--space-5) 0; }
+@media (max-width: 1200px) { .builder-layout { grid-template-columns: minmax(220px, 260px) minmax(0, 1fr); } }
+@media (max-width: 900px) { .builder-layout { grid-template-columns: 1fr; padding: var(--space-3); } }

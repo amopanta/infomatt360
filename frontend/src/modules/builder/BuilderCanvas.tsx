@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import type { BuilderPreviewSection } from './types';
 import type { TemplateSummary } from '../records/api';
+import { Icon } from '../../components/Icon';
 import { useI18n } from '../../i18n';
-import { fieldTypeInfo } from './fieldCatalog';
+import { fieldTypeInfo, fieldLineIcon } from './fieldCatalog';
 
 const optionTypes = new Set(['SELECT', 'MULTISELECT', 'DROPDOWN', 'LIKERT_5', 'LIKERT_7', 'RATING', 'RANKING']);
 const numericTypes = new Set(['NUMBER', 'INTEGER', 'DECIMAL', 'PERCENTAGE', 'CURRENCY', 'NPS', 'YEAR', 'RANGE']);
@@ -143,7 +144,7 @@ export function BuilderCanvas({
                   </span>
                   <strong>{field.label || t('builder.canvas.untitledQuestion')}</strong>
                   <small className="builder-field-type" title={`${t('ux.builder.typeLabel')}: ${fieldTypeInfo(field.type).label}`}>
-                    <span aria-hidden="true">{fieldTypeInfo(field.type).icon}</span> {fieldTypeInfo(field.type).label}
+                    <Icon name={fieldLineIcon(field.type)} /> {fieldTypeInfo(field.type).label}
                   </small>
                   {!disableReorder ? (
                     <span className="builder-move-buttons">

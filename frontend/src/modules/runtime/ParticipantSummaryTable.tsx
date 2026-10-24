@@ -1,5 +1,6 @@
 import type { EligibleParticipant } from './api';
 import { useI18n } from '../../i18n';
+import { operationalStatusLabel } from '../../lib/operationalFormat';
 
 type ParticipantColumn = { label: string; value: string };
 
@@ -50,16 +51,18 @@ export function ParticipantSummaryTable({ person, assignmentReady }: { person: E
     { label: t('runtime.colGroup'), value: displayValue(person.group_name) },
     { label: t('runtime.colDepartment'), value: displayValue(person.department) },
     { label: t('runtime.colMunicipality'), value: displayValue(person.municipality) },
-    { label: t('runtime.colType'), value: displayValue(person.participant_type) },
-    { label: t('runtime.colStatus'), value: displayValue(person.status) },
-    { label: t('runtime.colDuplicateFlag'), value: displayValue(person.duplicate_flag) },
+    { label: t('runtime.colType'), value: person.participant_type ? operationalStatusLabel(person.participant_type) : '—' },
+    { label: t('runtime.colStatus'), value: person.status ? operationalStatusLabel(person.status) : '—' },
+    // Solo se muestra cuando hay algo que advertir; «none» era ruido en campo.
+    ...(person.duplicate_flag && person.duplicate_flag !== 'none' ? [{ label: t('runtime.colDuplicateFlag'), value: operationalStatusLabel(person.duplicate_flag) }] : []),
     ...metadataColumns(person, t),
   ];
   return <div className="runtime-participant-summary">
     <div className="runtime-participant-summary-heading"><h3>{t('runtime.participantData')}</h3>{!assignmentReady && <small>{t('runtime.confirmingAssignment')}</small>}</div>
-    <div className="runtime-participant-summary-scroll"><table>
-      <thead><tr>{columns.map((column, index) => <th key={`${column.label}-${index}`} scope="col">{column.label}</th>)}</tr></thead>
-      <tbody><tr>{columns.map((column, index) => <td key={`${column.label}-${index}`}>{column.value}</td>)}</tr></tbody>
-    </table></div>
+    {/* Ficha en rejilla: se acomoda al ancho (antes era una tabla de una fila
+        que se cortaba en celular, docs/150). */}
+    <dl className="runtime-participant-grid">
+      {columns.map((column, index) => <div key={`${column.label}-${index}`}><dt>{column.label}</dt><dd>{column.value}</dd></div>)}
+    </dl>
   </div>;
 }

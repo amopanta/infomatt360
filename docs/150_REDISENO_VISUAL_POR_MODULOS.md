@@ -105,15 +105,37 @@ Capturas: `09-bases-externas-antes.png`, `10-bases-externas-despues.png`,
 Capturas: `12`–`20` (antes y después de Planeador, detalle de Registros,
 Mapas y celular).
 
-## 7. Pruebas
+## 7. Tercera tanda: captura y constructor de formularios
+
+**Captura (lo que llena el gestor):**
+- El fondo del tema del formulario llega hasta abajo. Antes era una franja
+  blanca cortada a media pantalla.
+- **Datos del participante:** pasan de una tabla de una fila, que se cortaba
+  en celular, a una ficha en rejilla. Tipo y estado salen en español; la
+  «marca de duplicado» solo aparece cuando hay algo que advertir.
+- Los botones Anterior y Siguiente se ven claros cuando están desactivados.
+- «Borrador local activo.» pasa a decir: «Tus respuestas se guardan en este
+  equipo mientras llenas el formulario.».
+
+**Constructor:**
+- La página tiene márgenes y las columnas laterales son más angostas, así
+  que el lienzo tiene más espacio y los campos ya no se cortan.
+- La casilla «Obligatorio» va en la misma línea que su texto.
+- «Vista previa» y «Guardar plantilla» caben en una línea.
+- **Iconos:** en el banco de preguntas y en el lienzo, los 53 emojis se
+  reemplazan por iconos de línea, uno por categoría (`fieldLineIcon` en
+  `fieldCatalog.ts`). Los emojis se veían distintos en cada equipo. En
+  «¿Cómo quieres empezar?» pasa lo mismo.
+
+Capturas: `21`–`27`.
+
+## 8. Pruebas
 
 - Backend: 559 pruebas.
 - Web: 131 pruebas, incluida la de textos (`keys.test.ts`).
 - Se revisó que no haya desborde horizontal en computador (1440 px) ni en
   celular (390 px).
 
-## 8. Lo que sigue
+## 9. Lo que sigue
 
-- Pantallas de captura (formulario en el celular y en la web) y constructor
-  de formularios.
 - Manual de usuario con capturas del diseño nuevo.

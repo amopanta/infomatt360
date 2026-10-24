@@ -67,6 +67,18 @@ export const FIELD_CATALOG: BuilderPaletteItem[] = [
 const BY_TYPE = new Map(FIELD_CATALOG.map((item) => [item.type, item]));
 
 /** Nombre y emoji legibles de un tipo de pregunta, para no mostrar el código interno. */
+// Icono de línea por categoría (components/Icon.tsx). Reemplaza los emojis en
+// el banco de preguntas y el lienzo, que se veían distintos en cada equipo (docs/150).
+const CATEGORY_ICONS: Record<string, string> = {
+  Texto: 'text', 'Números': 'hash', Opciones: 'list', 'Escalas y opinión': 'scale', 'Fecha y hora': 'calendar',
+  'Fotos y archivos': 'camera', 'Mapa y ubicación': 'pin', Escanear: 'scan', 'Automáticos (se llenan solos)': 'auto', Avanzadas: 'gear',
+};
+
+export function fieldLineIcon(type: string): string {
+  const item = BY_TYPE.get(type);
+  return (item && CATEGORY_ICONS[item.category]) || 'form';
+}
+
 export function fieldTypeInfo(type: string): { label: string; icon: string } {
   const item = BY_TYPE.get(type);
   return { label: item?.label ?? type, icon: item?.icon ?? '❔' };
